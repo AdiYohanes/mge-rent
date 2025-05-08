@@ -1,6 +1,6 @@
 "use client";
 
-import type React from "react";
+import React from "react";
 import {
   LineChart,
   BarChart,
@@ -358,23 +358,20 @@ export function DashboardContent() {
   );
 }
 
-interface StatsCardProps {
-  title: string;
-  value: string;
-  change: number;
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
-}
+/**
+ * @typedef {Object} StatsCardProps
+ * @property {string} title
+ * @property {string} value
+ * @property {number} change
+ * @property {React.ReactNode} icon
+ * @property {string} iconBg
+ * @property {string} iconColor
+ */
 
-function StatsCard({
-  title,
-  value,
-  change,
-  icon,
-  iconBg,
-  iconColor,
-}: StatsCardProps) {
+/**
+ * @param {StatsCardProps} props
+ */
+function StatsCard({ title, value, change, icon, iconBg, iconColor }) {
   return (
     <Card>
       <CardContent className="p-6">
@@ -408,13 +405,17 @@ function StatsCard({
   );
 }
 
-interface BookingItemProps {
-  title: string;
-  subtitle: string;
-  hours: string;
-}
+/**
+ * @typedef {Object} BookingItemProps
+ * @property {string} title
+ * @property {string} subtitle
+ * @property {string} hours
+ */
 
-function BookingItem({ title, subtitle, hours }: BookingItemProps) {
+/**
+ * @param {BookingItemProps} props
+ */
+function BookingItem({ title, subtitle, hours }) {
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">
       <div>
@@ -426,14 +427,18 @@ function BookingItem({ title, subtitle, hours }: BookingItemProps) {
   );
 }
 
-interface TrendingItemProps {
-  number: number;
-  title: string;
-  subtitle: string;
-  orders: string;
-}
+/**
+ * @typedef {Object} TrendingItemProps
+ * @property {number} number
+ * @property {string} title
+ * @property {string} subtitle
+ * @property {string} orders
+ */
 
-function TrendingItem({ number, title, subtitle, orders }: TrendingItemProps) {
+/**
+ * @param {TrendingItemProps} props
+ */
+function TrendingItem({ number, title, subtitle, orders }) {
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">
       <div className="flex items-center gap-3">
