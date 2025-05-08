@@ -5,9 +5,9 @@ import BookingSteps from "@/components/booking/components/bookingStep";
 import BookingSummary from "@/components/booking/components/bookingSummary";
 import ConsoleSelection from "@/components/booking/components/ConsoleSelection";
 import RoomSelection from "@/components/booking/components/RoomSelection";
-import DateTimeSelection from "@/components/booking/components/DateTimeSelection";
 import FoodSelection from "@/components/booking/components/FoodSelection";
 import { Button } from "@/components/ui/button";
+import DateTimeSelection from "@/components/booking/components/DateTimeSelection";
 
 const BookingPage = () => {
   const [currentStep, setCurrentStep] = useState(1);

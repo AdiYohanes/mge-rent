@@ -1,7 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ReactNode } from "react";
-import { AuthProvider } from "@/features/auth/components/auth-privider";
+import { AuthProvider } from "@/provider/authProvider";
 import { Toaster } from "react-hot-toast";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
