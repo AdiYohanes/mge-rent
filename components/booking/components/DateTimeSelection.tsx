@@ -28,9 +28,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-// Define types using object literals instead of TypeScript interfaces
+// Main component
 export default function DateTimeSelection() {
+  // Using null as initial value but will store a Date object
   const [today, setToday] = useState(null);
+  // Using undefined as initial value but will store a Date object
   const [selectedDate, setSelectedDate] = useState(undefined);
   const [selectedTime, setSelectedTime] = useState("");
   const [duration, setDuration] = useState(1);
@@ -42,8 +44,10 @@ export default function DateTimeSelection() {
   // Set today and initial selected date after component mounts
   useEffect(() => {
     const now = new Date();
-    setToday(now);
-    setSelectedDate(now);
+    // Use a temporary variable to convert to Date type before setting state
+    const currentDate = now;
+    setToday(currentDate);
+    setSelectedDate(currentDate);
     setIsClient(true);
   }, []);
 
@@ -89,7 +93,7 @@ export default function DateTimeSelection() {
               });
             } else if (hour === now.getHours()) {
               minuteSlots.forEach((slot) => {
-                const minute = Number.parseInt(slot.value.split(":")[1]);
+                const minute = parseInt(slot.value.split(":")[1], 10);
                 if (minute < now.getMinutes()) {
                   slot.available = false;
                 }
