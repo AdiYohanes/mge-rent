@@ -1,12 +1,12 @@
-import { Sidebar } from "@/components/ui/sidebar";
+import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import React from "react";
 
-const AdminDashboard = () => {
+const AdminDashboardPage = () => {
   return (
-    <>
-      <Sidebar />
-    </>
+    <div className="w-full border border-black">
+      <AdminDashboard />
+    </div>
   );
 };
 
-export default AdminDashboard;
+export default AdminDashboardPage;
