@@ -358,28 +358,17 @@ export function DashboardContent() {
   );
 }
 
-/**
- * @typedef {Object} StatsCardProps
- * @property {string} title
- * @property {string} value
- * @property {number} change
- * @property {React.ReactNode} icon
- * @property {string} iconBg
- * @property {string} iconColor
- */
+interface StatsCardProps {
+  title: string;
+  value: string;
+  change: number;
+  icon: React.ReactNode;
+  iconBg: string;
+  iconColor: string;
+}
 
-/**
- * StatsCard component to display statistics
- * @param {{
- *   title: string,
- *   value: string,
- *   change: number,
- *   icon: React.ReactNode,
- *   iconBg: string,
- *   iconColor: string
- * }} props
- */
-function StatsCard({ title, value, change, icon, iconBg, iconColor }) {
+function StatsCard(props: StatsCardProps) {
+  const { title, value, change, icon, iconBg, iconColor } = props;
   return (
     <Card>
       <CardContent className="p-6">
@@ -413,22 +402,14 @@ function StatsCard({ title, value, change, icon, iconBg, iconColor }) {
   );
 }
 
-/**
- * @typedef {Object} BookingItemProps
- * @property {string} title
- * @property {string} subtitle
- * @property {string} hours
- */
+interface BookingItemProps {
+  title: string;
+  subtitle: string;
+  hours: string;
+}
 
-/**
- * BookingItem component to display booking information
- * @param {{
- *   title: string,
- *   subtitle: string,
- *   hours: string
- * }} props
- */
-function BookingItem({ title, subtitle, hours }) {
+function BookingItem(props: BookingItemProps) {
+  const { title, subtitle, hours } = props;
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">
       <div>
@@ -440,24 +421,15 @@ function BookingItem({ title, subtitle, hours }) {
   );
 }
 
-/**
- * @typedef {Object} TrendingItemProps
- * @property {number} number
- * @property {string} title
- * @property {string} subtitle
- * @property {string} orders
- */
+interface TrendingItemProps {
+  number: number;
+  title: string;
+  subtitle: string;
+  orders: string;
+}
 
-/**
- * TrendingItem component to display trending items
- * @param {{
- *   number: number,
- *   title: string,
- *   subtitle: string,
- *   orders: string
- * }} props
- */
-function TrendingItem({ number, title, subtitle, orders }) {
+function TrendingItem(props: TrendingItemProps) {
+  const { number, title, subtitle, orders } = props;
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">
       <div className="flex items-center gap-3">

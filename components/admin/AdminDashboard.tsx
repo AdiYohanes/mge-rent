@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { DashboardHeader } from "./Dashboardheader";
-import { DashboardContent } from "./DashboardContent";
+import { DashboardContent } from "./DashboardContent.jsx";
 
 export function AdminDashboard() {
   const [collapsed, setCollapsed] = useState(false);
