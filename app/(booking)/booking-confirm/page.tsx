@@ -10,12 +10,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import ConfirmationModal from "@/components/booking/components/confirmationModal";
 
-export interface BookingConfirmProps {
+interface BookingConfirmCompProps {
   onConfirm?: () => Promise<void>;
   className?: string;
 }
 
-const BookingConfirm = ({ onConfirm, className }: BookingConfirmProps) => {
+const BookingConfirmComponent = ({
+  onConfirm,
+  className,
+}: BookingConfirmCompProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentType>("qris");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -99,4 +102,6 @@ const BookingConfirm = ({ onConfirm, className }: BookingConfirmProps) => {
   );
 };
 
-export default BookingConfirm;
+export default function BookingConfirmPage() {
+  return <BookingConfirmComponent />;
+}
