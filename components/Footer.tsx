@@ -33,7 +33,7 @@ const ContactInfo = () => {
   return (
     <div className="mt-6 text-gray-200 space-y-4">
       <div className="flex items-start">
-        <MapPin className="w-5 h-5 text-[#b99733] mt-1 mr-3 flex-shrink-0" />
+        <MapPin className="w-5 h-5 text-[#b99733] mt-1 mr-3 shrink-0" />
         <div>
           <div className="font-bold text-white mb-1">Address:</div>
           <div className="text-sm">
@@ -43,7 +43,7 @@ const ContactInfo = () => {
       </div>
 
       <div className="flex items-start">
-        <Clock className="w-5 h-5 text-[#b99733] mt-1 mr-3 flex-shrink-0" />
+        <Clock className="w-5 h-5 text-[#b99733] mt-1 mr-3 shrink-0" />
         <div>
           <div className="font-bold text-white mb-1">Operational Hours:</div>
           <div className="text-sm">Monday - Sunday: 09.00 - 21.00</div>
@@ -51,7 +51,7 @@ const ContactInfo = () => {
       </div>
 
       <div className="flex items-start">
-        <Phone className="w-5 h-5 text-[#b99733] mt-1 mr-3 flex-shrink-0" />
+        <Phone className="w-5 h-5 text-[#b99733] mt-1 mr-3 shrink-0" />
         <div>
           <div className="font-bold text-white mb-1">Phone:</div>
           <div className="text-sm">+62 876-9084-0987</div>
@@ -59,7 +59,7 @@ const ContactInfo = () => {
       </div>
 
       <div className="flex items-start">
-        <Mail className="w-5 h-5 text-[#b99733] mt-1 mr-3 flex-shrink-0" />
+        <Mail className="w-5 h-5 text-[#b99733] mt-1 mr-3 shrink-0" />
         <div>
           <div className="font-bold text-white mb-1">Email:</div>
           <div className="text-sm">info@medangaming.com</div>
@@ -75,10 +75,10 @@ const Footer = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <main className="flex-grow">{/* Main content here */}</main>
+      <main className="grow">{/* Main content here */}</main>
 
       <footer className="bg-[#1B1010] text-white py-10">
-        <div className="max-w-screen-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[theme(screens.3xl)] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             {/* Column 1: Company Info */}
             <div className="space-y-6">

@@ -78,7 +78,7 @@ const ForgotPassword = () => {
           <Button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-6 text-base font-semibold text-white bg-gradient-to-r from-[#967515] to-[#c8a84b] hover:from-[#866714] hover:to-[#b7973a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#967515] transition-all duration-300 rounded-none"
+            className="w-full py-3 px-6 text-base font-semibold text-white bg-linear-to-r from-[#967515] to-[#c8a84b] hover:from-[#866714] hover:to-[#b7973a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#967515] transition-all duration-300 rounded-none"
           >
             {loading ? "Sending Email..." : "Send Email"}
           </Button>

@@ -304,7 +304,7 @@ const GameCard: React.FC<GameCardProps> = ({ game, onClick }) => {
             e.currentTarget.src = "/placeholder.svg?height=400&width=600";
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+        <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
           <p className="text-white text-sm line-clamp-2">{game.description}</p>
         </div>
       </div>
@@ -795,7 +795,7 @@ const GamesPage: React.FC = () => {
         {/* Search and Filters Bar */}
         <div className="bg-white p-4 shadow-md mb-8 sticky top-0 z-30">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-grow">
+            <div className="relative grow">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
                 type="text"

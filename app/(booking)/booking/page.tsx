@@ -70,7 +70,7 @@ const BookingPage = () => {
       </div>
 
       {/* Navigation Buttons */}
-      <div className="w-full px-8 md:px-16 lg:px-32 mt-8 flex justify-between">
+      <div className="w-full px-8 md:px-16 lg:px-32 mt-8 flex justify-between mb-10">
         <Button
           onClick={handlePreviousStep}
           className="px-6 py-2 bg-gray-300 text-black rounded-none hover:bg-gray-400 transition-all cursor-pointer"

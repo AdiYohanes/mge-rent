@@ -18,6 +18,7 @@ import {
   Clock3,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -27,27 +28,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-interface TimeSlot {
-  label: string;
-  value: string;
-  available: boolean;
-}
-
-interface HourSlot {
-  hour: number;
-  label: string;
-  available: boolean;
-  minutes: TimeSlot[];
-}
-
+// Define types using object literals instead of TypeScript interfaces
 export default function DateTimeSelection() {
-  const [today, setToday] = useState<Date | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedTime, setSelectedTime] = useState<string>("");
-  const [duration, setDuration] = useState<number>(1);
-  const [hourSlots, setHourSlots] = useState<HourSlot[]>([]);
+  const [today, setToday] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(undefined);
+  const [selectedTime, setSelectedTime] = useState("");
+  const [duration, setDuration] = useState(1);
+  const [hourSlots, setHourSlots] = useState([]);
   const [isClient, setIsClient] = useState(false);
-  const [timeOfDay, setTimeOfDay] = useState<string>("all");
+  const [timeOfDay, setTimeOfDay] = useState("all");
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // Set today and initial selected date after component mounts
   useEffect(() => {
@@ -58,13 +48,13 @@ export default function DateTimeSelection() {
   }, []);
 
   const fetchTimeSlots = useCallback(
-    (date: Date) => {
+    (date) => {
       if (date && isClient) {
         const isWeekend = [0, 6].includes(date.getDay()); // 0 is Sunday, 6 is Saturday
         const startHour = isWeekend ? 9 : 8; // 9AM for weekends, 8AM for weekdays
         const endHour = isWeekend ? 22 : 21; // 10PM for weekends, 9PM for weekdays
 
-        const hours: HourSlot[] = [];
+        const hours = [];
 
         for (let hour = startHour; hour < endHour; hour++) {
           const hourFormatted = hour.toString().padStart(2, "0");
@@ -72,7 +62,7 @@ export default function DateTimeSelection() {
           timeDate.setHours(hour, 0);
           const hourLabel = format(timeDate, "h a");
 
-          const minuteSlots: TimeSlot[] = [];
+          const minuteSlots = [];
 
           for (let minute = 0; minute < 60; minute += 10) {
             const minuteFormatted = minute.toString().padStart(2, "0");
@@ -136,23 +126,24 @@ export default function DateTimeSelection() {
     return { before: startOfDay(today) };
   };
 
-  const handleDateChange = (date: Date | undefined) => {
+  const handleDateChange = (date) => {
     if (date) {
       setSelectedDate(date);
+      setShowCalendar(false);
     }
   };
 
-  const handleTimeSelect = (time: string) => {
+  const handleTimeSelect = (time) => {
     setSelectedTime(time);
   };
 
-  const getTimeOfDay = (hour: number): string => {
+  const getTimeOfDay = (hour) => {
     if (hour >= 5 && hour < 12) return "morning";
     if (hour >= 12 && hour < 17) return "afternoon";
     return "evening";
   };
 
-  const filterTimeSlots = (filter: string) => {
+  const filterTimeSlots = (filter) => {
     setTimeOfDay(filter);
   };
 
@@ -193,8 +184,61 @@ export default function DateTimeSelection() {
         </header>
 
         <div className="grid md:grid-cols-5 gap-6">
-          {/* Date Selection */}
-          <Card className="shadow-md border border-[#B99733]/20 md:col-span-2">
+          {/* Date Selection - Mobile View */}
+          <Card className="shadow-md border border-[#B99733]/20 md:hidden">
+            <CardHeader className="pb-2 border-b border-[#B99733]/10">
+              <CardTitle className="flex items-center gap-2 text-lg text-[#B99733]">
+                <CalendarIcon className="h-5 w-5 text-[#B99733]/80" />
+                <span>Selected Date</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <Button
+                variant="outline"
+                className="w-full flex justify-between items-center border-[#B99733]/20 hover:bg-[#B99733]/10"
+                onClick={() => setShowCalendar(!showCalendar)}
+              >
+                <div className="flex items-center">
+                  <CalendarIcon className="mr-2 h-4 w-4 text-[#B99733]" />
+                  <span>
+                    {selectedDate
+                      ? format(selectedDate, "EEEE, MMMM d, yyyy")
+                      : "Select date"}
+                  </span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-[#B99733] transition-transform ${
+                    showCalendar ? "rotate-180" : ""
+                  }`}
+                />
+              </Button>
+
+              {showCalendar && (
+                <div className="mt-4 border border-[#B99733]/20 rounded-md overflow-hidden">
+                  {today && (
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateChange}
+                      disabled={getDisabledDays()}
+                      defaultMonth={today}
+                      className="rounded-md border-[#B99733]/20"
+                      classNames={{
+                        day_selected:
+                          "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white focus:bg-[#B99733] focus:text-white",
+                        day_today: "bg-[#B99733]/10 text-[#B99733]",
+                        day_outside: "text-[#B99733]/30",
+                        day: "hover:bg-[#B99733]/10 cursor-pointer",
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Date Selection - Desktop View */}
+          <Card className="shadow-md border border-[#B99733]/20 md:col-span-2 hidden md:block">
             <CardHeader className="pb-2 border-b border-[#B99733]/10">
               <CardTitle className="flex items-center gap-2 text-lg text-[#B99733]">
                 <CalendarIcon className="h-5 w-5 text-[#B99733]/80" />
@@ -240,7 +284,7 @@ export default function DateTimeSelection() {
                   {selectedDate && (
                     <Badge
                       variant="outline"
-                      className="text-[#B99733] bg-[#B99733]/10 border-[#B99733]/20"
+                      className="text-[#B99733] bg-[#B99733]/10 border-[#B99733]/20 hidden md:flex"
                     >
                       {format(selectedDate, "EEEE, MMMM d")}
                     </Badge>
@@ -253,13 +297,13 @@ export default function DateTimeSelection() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="mb-4 flex gap-2 justify-start">
+                <div className="mb-4 grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => filterTimeSlots("all")}
                     className={cn(
-                      "border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer",
+                      "border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm flex-1 sm:flex-none",
                       timeOfDay === "all" &&
                         "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white"
                     )}
@@ -271,7 +315,7 @@ export default function DateTimeSelection() {
                     size="sm"
                     onClick={() => filterTimeSlots("morning")}
                     className={cn(
-                      "border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer",
+                      "border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm flex-1 sm:flex-none",
                       timeOfDay === "morning" &&
                         "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white"
                     )}
@@ -283,7 +327,7 @@ export default function DateTimeSelection() {
                     size="sm"
                     onClick={() => filterTimeSlots("afternoon")}
                     className={cn(
-                      "border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer",
+                      "border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm flex-1 sm:flex-none",
                       timeOfDay === "afternoon" &&
                         "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white"
                     )}
@@ -295,7 +339,7 @@ export default function DateTimeSelection() {
                     size="sm"
                     onClick={() => filterTimeSlots("evening")}
                     className={cn(
-                      "border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer",
+                      "border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm flex-1 sm:flex-none",
                       timeOfDay === "evening" &&
                         "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white"
                     )}
@@ -304,7 +348,7 @@ export default function DateTimeSelection() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 max-h-[220px] overflow-y-auto pr-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-h-[220px] overflow-y-auto pr-2">
                   {getFilteredHourSlots().map((hourSlot) => (
                     <Popover key={hourSlot.hour}>
                       <PopoverTrigger asChild>
@@ -312,18 +356,18 @@ export default function DateTimeSelection() {
                           variant="outline"
                           disabled={!hourSlot.available}
                           className={cn(
-                            "w-full justify-between h-12 px-3 py-2 border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer",
+                            "w-full justify-between h-10 sm:h-12 px-3 py-2 border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm",
                             !hourSlot.available &&
                               "opacity-50 cursor-not-allowed"
                           )}
                         >
-                          <div className="flex items-center gap-2">
-                            <Clock3 className="h-4 w-4 text-[#B99733]" />
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <Clock3 className="h-3 w-3 sm:h-4 sm:w-4 text-[#B99733]" />
                             <span className="text-[#B99733]">
                               {hourSlot.label}
                             </span>
                           </div>
-                          <ChevronDown className="h-4 w-4 text-[#B99733]/70" />
+                          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-[#B99733]/70" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-48 p-2">
@@ -340,7 +384,7 @@ export default function DateTimeSelection() {
                               disabled={!minute.available}
                               onClick={() => handleTimeSelect(minute.value)}
                               className={cn(
-                                "justify-center h-9 cursor-pointer",
+                                "justify-center h-8 sm:h-9 text-xs sm:text-sm cursor-pointer",
                                 selectedTime === minute.value
                                   ? "bg-[#B99733] text-white hover:bg-[#B99733]/90"
                                   : "border-[#B99733]/20 hover:bg-[#B99733]/10",
@@ -377,13 +421,13 @@ export default function DateTimeSelection() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="flex gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {[1, 2, 3, 4, 5].map((hours) => (
                     <Button
                       key={hours}
                       variant={duration === hours ? "default" : "outline"}
                       className={cn(
-                        "flex-1 py-2 cursor-pointer",
+                        "py-2 cursor-pointer h-10 sm:h-12 text-xs sm:text-sm",
                         duration === hours
                           ? "bg-[#B99733] hover:bg-[#B99733]/90 text-white"
                           : "border-[#B99733]/20 hover:bg-[#B99733]/10 text-[#B99733]"
@@ -396,14 +440,14 @@ export default function DateTimeSelection() {
                 </div>
               </CardContent>
               <CardFooter className="pt-4 flex justify-between items-center border-t border-[#B99733]/10 mt-4">
-                <div className="text-sm text-[#B99733]/80">
+                <div className="text-xs sm:text-sm text-[#B99733]/80">
                   {selectedDate && selectedTime ? (
                     <div className="flex items-center gap-1">
                       <CheckCircle2 className="h-4 w-4 text-green-500" />
                       <span>
                         {format(selectedDate, "MMM d")} at{" "}
-                        {selectedTime.split(":").map(Number)[0] > 12
-                          ? `${selectedTime.split(":").map(Number)[0] - 12}:${
+                        {selectedTime.split(":")[0] > 12
+                          ? `${selectedTime.split(":")[0] - 12}:${
                               selectedTime.split(":")[1]
                             } PM`
                           : `${selectedTime} AM`}

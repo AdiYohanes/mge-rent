@@ -120,7 +120,7 @@ const ConsoleSelection = () => {
                 className={`w-full rounded-md font-medium transition-all duration-300 cursor-pointer ${
                   selectedConsole?.id === console.id
                     ? "bg-[#B99733] text-white hover:bg-[#695721] shadow-md"
-                    : "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 hover:bg-[#f0f0f0] border border-gray-300"
+                    : "bg-linear-to-r from-gray-100 to-gray-200 text-gray-800 hover:bg-[#f0f0f0] border border-gray-300"
                 }`}
                 onClick={() => handleSelect(console)}
                 aria-label={`Select ${console.name}`}
