@@ -369,7 +369,15 @@ export function DashboardContent() {
  */
 
 /**
- * @param {StatsCardProps} props
+ * StatsCard component to display statistics
+ * @param {{
+ *   title: string,
+ *   value: string,
+ *   change: number,
+ *   icon: React.ReactNode,
+ *   iconBg: string,
+ *   iconColor: string
+ * }} props
  */
 function StatsCard({ title, value, change, icon, iconBg, iconColor }) {
   return (
@@ -413,7 +421,12 @@ function StatsCard({ title, value, change, icon, iconBg, iconColor }) {
  */
 
 /**
- * @param {BookingItemProps} props
+ * BookingItem component to display booking information
+ * @param {{
+ *   title: string,
+ *   subtitle: string,
+ *   hours: string
+ * }} props
  */
 function BookingItem({ title, subtitle, hours }) {
   return (
@@ -436,7 +449,13 @@ function BookingItem({ title, subtitle, hours }) {
  */
 
 /**
- * @param {TrendingItemProps} props
+ * TrendingItem component to display trending items
+ * @param {{
+ *   number: number,
+ *   title: string,
+ *   subtitle: string,
+ *   orders: string
+ * }} props
  */
 function TrendingItem({ number, title, subtitle, orders }) {
   return (
