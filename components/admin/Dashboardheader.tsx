@@ -18,7 +18,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function DashboardHeader({ collapsed, setCollapsed, isMobile }) {
+interface DashboardHeaderProps {
+  collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
+  isMobile: boolean;
+}
+
+export function DashboardHeader({
+  collapsed,
+  setCollapsed,
+  isMobile,
+}: DashboardHeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [notifications] = useState(3); // Contoh notifikasi
