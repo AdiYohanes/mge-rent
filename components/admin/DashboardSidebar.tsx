@@ -26,8 +26,35 @@ import {
   SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
 
-export function DashboardSidebar({ collapsed, setCollapsed }) {
-  const [expandedMenus, setExpandedMenus] = useState({
+interface SubMenuItem {
+  name: string;
+  href: string;
+}
+
+interface MenuItem {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  href: string;
+  active: boolean;
+  expandable: boolean;
+  subItems?: SubMenuItem[];
+}
+
+interface DashboardSidebarProps {
+  collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
+}
+
+type ExpandedMenusState = {
+  [key: string]: boolean;
+};
+
+export function DashboardSidebar({
+  collapsed,
+  setCollapsed,
+}: DashboardSidebarProps) {
+  const [expandedMenus, setExpandedMenus] = useState<ExpandedMenusState>({
     booking: false,
     user: false,
     rental: false,
@@ -35,14 +62,14 @@ export function DashboardSidebar({ collapsed, setCollapsed }) {
     setting: false,
   });
 
-  const toggleMenu = (menu) => {
+  const toggleMenu = (menu: string) => {
     setExpandedMenus((prev) => ({
       ...prev,
       [menu]: !prev[menu],
     }));
   };
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       id: "dashboard",
       name: "Dashboard",
