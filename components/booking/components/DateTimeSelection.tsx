@@ -28,18 +28,34 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
+// Define types for time slots and hour slots
+interface MinuteSlot {
+  label: string;
+  value: string;
+  available: boolean;
+}
+
+interface HourSlot {
+  hour: number;
+  label: string;
+  available: boolean;
+  minutes: MinuteSlot[];
+}
+
+type TimeOfDay = "all" | "morning" | "afternoon" | "evening";
+
 // Main component
 export default function DateTimeSelection() {
   // Using null as initial value but will store a Date object
-  const [today, setToday] = useState(null);
+  const [today, setToday] = useState<Date | null>(null);
   // Using undefined as initial value but will store a Date object
-  const [selectedDate, setSelectedDate] = useState(undefined);
-  const [selectedTime, setSelectedTime] = useState("");
-  const [duration, setDuration] = useState(1);
-  const [hourSlots, setHourSlots] = useState([]);
-  const [isClient, setIsClient] = useState(false);
-  const [timeOfDay, setTimeOfDay] = useState("all");
-  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [duration, setDuration] = useState<number>(1);
+  const [hourSlots, setHourSlots] = useState<HourSlot[]>([]);
+  const [isClient, setIsClient] = useState<boolean>(false);
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("all");
+  const [showCalendar, setShowCalendar] = useState<boolean>(false);
 
   // Set today and initial selected date after component mounts
   useEffect(() => {
@@ -52,13 +68,13 @@ export default function DateTimeSelection() {
   }, []);
 
   const fetchTimeSlots = useCallback(
-    (date) => {
+    (date: Date) => {
       if (date && isClient) {
         const isWeekend = [0, 6].includes(date.getDay()); // 0 is Sunday, 6 is Saturday
         const startHour = isWeekend ? 9 : 8; // 9AM for weekends, 8AM for weekdays
         const endHour = isWeekend ? 22 : 21; // 10PM for weekends, 9PM for weekdays
 
-        const hours = [];
+        const hours: HourSlot[] = [];
 
         for (let hour = startHour; hour < endHour; hour++) {
           const hourFormatted = hour.toString().padStart(2, "0");
@@ -66,7 +82,7 @@ export default function DateTimeSelection() {
           timeDate.setHours(hour, 0);
           const hourLabel = format(timeDate, "h a");
 
-          const minuteSlots = [];
+          const minuteSlots: MinuteSlot[] = [];
 
           for (let minute = 0; minute < 60; minute += 10) {
             const minuteFormatted = minute.toString().padStart(2, "0");
@@ -130,24 +146,24 @@ export default function DateTimeSelection() {
     return { before: startOfDay(today) };
   };
 
-  const handleDateChange = (date) => {
+  const handleDateChange = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
       setShowCalendar(false);
     }
   };
 
-  const handleTimeSelect = (time) => {
+  const handleTimeSelect = (time: string) => {
     setSelectedTime(time);
   };
 
-  const getTimeOfDay = (hour) => {
+  const getTimeOfDay = (hour: number): TimeOfDay => {
     if (hour >= 5 && hour < 12) return "morning";
     if (hour >= 12 && hour < 17) return "afternoon";
     return "evening";
   };
 
-  const filterTimeSlots = (filter) => {
+  const filterTimeSlots = (filter: TimeOfDay) => {
     setTimeOfDay(filter);
   };
 
@@ -450,8 +466,8 @@ export default function DateTimeSelection() {
                       <CheckCircle2 className="h-4 w-4 text-green-500" />
                       <span>
                         {format(selectedDate, "MMM d")} at{" "}
-                        {selectedTime.split(":")[0] > 12
-                          ? `${selectedTime.split(":")[0] - 12}:${
+                        {parseInt(selectedTime.split(":")[0]) > 12
+                          ? `${parseInt(selectedTime.split(":")[0]) - 12}:${
                               selectedTime.split(":")[1]
                             } PM`
                           : `${selectedTime} AM`}
@@ -468,4 +484,4 @@ export default function DateTimeSelection() {
       </div>
     </div>
   );
-} 
+}
