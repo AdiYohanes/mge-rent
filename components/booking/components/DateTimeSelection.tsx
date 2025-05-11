@@ -258,7 +258,7 @@ export default function DateTimeSelection() {
           </Card>
 
           {/* Date Selection - Desktop View */}
-          <Card className="shadow-md border border-[#B99733]/20 md:col-span-2 hidden md:block">
+          <Card className="shadow-md border border-red md:col-span-2 hidden md:block">
             <CardHeader className="pb-2 border-b border-[#B99733]/10">
               <CardTitle className="flex items-center gap-2 text-lg text-[#B99733]">
                 <CalendarIcon className="h-5 w-5 text-[#B99733]/80" />
@@ -269,7 +269,7 @@ export default function DateTimeSelection() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="calendar-container">
+              <div className="calendar-container w-full h-full">
                 {today && (
                   <Calendar
                     mode="single"
@@ -277,13 +277,18 @@ export default function DateTimeSelection() {
                     onSelect={handleDateChange}
                     disabled={getDisabledDays()}
                     defaultMonth={today}
-                    className="rounded-md border-[#B99733]/20"
+                    className="rounded-md border-[#B99733]/20 w-full h-full"
                     classNames={{
                       day_selected:
-                        "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white focus:bg-[#B99733] focus:text-white",
+                        "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white focus:bg-[#B99733] focus:text-white flex justify-center items-center", // Menambahkan flexbox untuk centering
                       day_today: "bg-[#B99733]/10 text-[#B99733]",
                       day_outside: "text-[#B99733]/30",
                       day: "hover:bg-[#B99733]/10 cursor-pointer",
+                    }}
+                    style={{
+                      fontSize: "1.5rem", // Menyesuaikan ukuran font
+                      height: "100%", // Pastikan kalender mengisi seluruh tinggi kontainer
+                      width: "100%", // Pastikan kalender mengisi seluruh lebar kontainer
                     }}
                   />
                 )}

@@ -270,19 +270,6 @@ export function DashboardSidebar({
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <div className="mt-auto p-4 border-t border-gray-100 bg-[#f9f7ef]">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#efe3bc] flex items-center justify-center">
-            <Users size={14} className="text-[#B99733]" />
-          </div>
-          {!collapsed && (
-            <div className="transition-opacity duration-200">
-              <p className="text-sm font-medium text-gray-900">Admin User</p>
-              <p className="text-xs text-gray-500">admin@example.com</p>
-            </div>
-          )}
-        </div>
-      </div>
     </Sidebar>
   );
 }
