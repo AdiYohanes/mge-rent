@@ -1,14 +1,12 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import {
-  Bell,
-  Search,
-  Menu,
-  User,
-  ChevronDown,
-  LogOut,
-  Settings,
-} from "lucide-react";
+import { motion } from "framer-motion";
+import { Bell, Search, User, Settings, LogOut } from "lucide-react";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,23 +15,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 
-interface DashboardHeaderProps {
-  collapsed: boolean;
-  setCollapsed: (collapsed: boolean) => void;
-  isMobile: boolean;
-}
-
-export function DashboardHeader({
-  collapsed,
-  setCollapsed,
-  isMobile,
-}: DashboardHeaderProps) {
-  const [searchOpen, setSearchOpen] = useState(false);
+export function DashboardHeader() {
   const [scrolled, setScrolled] = useState(false);
-  const [notifications] = useState(3); // Contoh notifikasi
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notifications] = useState(3);
 
-  // Deteksi scroll untuk efek bayangan pada header
+  // Detect scroll for shadow effect on header
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 10);
@@ -44,117 +34,98 @@ export function DashboardHeader({
   }, []);
 
   return (
-    <header
-      className={`flex items-center justify-between h-16 px-4 md:px-6 bg-white transition-all duration-300 ${
-        scrolled ? "shadow-md" : "border-b border-[#B99733]/10"
-      } sticky top-0 z-30`}
+    <motion.header
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className={cn(
+        "sticky top-0 z-40 flex w-full h-16 items-center justify-between border-b bg-background px-4 transition-shadow duration-200",
+        scrolled ? "shadow-md" : ""
+      )}
     >
-      <div className="flex items-center gap-3">
-        {isMobile && (
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-2 rounded-none hover:bg-[#f9f7ef] transition-colors"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <Menu size={20} className="text-[#B99733]" />
-          </button>
-        )}
+      <div className="flex items-center gap-4">
+        <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
 
         <div
-          className={`relative ${
-            searchOpen ? "flex-1 md:max-w-md" : "w-auto"
-          } transition-all duration-300`}
+          className={cn("relative", searchOpen ? "w-full md:w-80" : "w-auto")}
         >
-          <div
-            className={`relative flex items-center ${
-              searchOpen ? "w-full" : "w-auto"
-            }`}
-          >
-            {searchOpen ? (
-              <input
-                type="text"
+          {searchOpen ? (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
                 placeholder="Search..."
-                className="w-full py-2 pl-9 pr-4 border border-[#B99733]/20 outline-none focus:border-[#B99733] rounded-none bg-[#f9f7ef]/50"
+                className="pl-9 pr-4 h-9 w-full"
                 autoFocus
                 onBlur={() => setSearchOpen(false)}
               />
-            ) : (
-              <button
-                onClick={() => setSearchOpen(true)}
-                className="p-2 rounded-none hover:bg-[#f9f7ef] transition-colors hidden md:flex"
-                aria-label="Search"
-              >
-                <Search size={18} className="text-gray-500" />
-              </button>
-            )}
-            {searchOpen && (
-              <Search size={18} className="absolute left-2 text-gray-400" />
-            )}
-          </div>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-2 hidden md:flex"
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Search...</span>
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="flex items-center gap-1 md:gap-4">
-        <div className="relative">
-          <button
-            className="p-2 rounded-none hover:bg-[#f9f7ef] transition-colors relative"
-            aria-label="Notifications"
-          >
-            <Bell size={18} className="text-[#B99733]" />
-            {notifications > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full">
-                {notifications}
-              </span>
-            )}
-          </button>
-        </div>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5 text-muted-foreground" />
+          {notifications > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px]"
+            >
+              {notifications}
+            </Badge>
+          )}
+        </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 hover:bg-[#f9f7ef] p-1 md:p-2 rounded-none transition-colors">
-              <div className="relative w-8 h-8 overflow-hidden border border-[#B99733]/20 rounded-none bg-[#f9f7ef]">
+            <Button variant="ghost" size="sm" className="gap-2 h-8 pl-2 pr-3">
+              <div className="relative h-7 w-7 overflow-hidden rounded-full border">
                 <Image
                   src="/images/logo.png"
                   alt="Profile"
-                  width={32}
-                  height={32}
+                  width={28}
+                  height={28}
                   className="object-cover"
                 />
               </div>
-              <div className="flex flex-col items-start hidden md:flex">
-                <span className="text-sm font-medium leading-tight">Admin</span>
-                <span className="text-xs text-gray-500 leading-tight">
+              <div className="flex flex-col items-start text-left hidden md:flex">
+                <span className="text-sm font-medium leading-none">Admin</span>
+                <span className="text-xs text-muted-foreground leading-none mt-1">
                   admin@mge.com
                 </span>
               </div>
-              <ChevronDown
-                size={14}
-                className="text-gray-500 hidden md:block"
-              />
-            </button>
+            </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="w-56 rounded-none border-[#B99733]/20"
-          >
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-              <User size={14} />
+            <DropdownMenuItem>
+              <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-              <Settings size={14} />
+            <DropdownMenuItem>
+              <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-2 text-red-500 cursor-pointer">
-              <LogOut size={14} />
+            <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </header>
+    </motion.header>
   );
 }

@@ -59,17 +59,19 @@ const AdminLoginPage = () => {
       ) {
         toast.success("Welcome back, Administrator!");
 
-        // Save to localStorage
+        // Save to localStorage or sessionStorage if available
         const adminData = {
           username: formData.username,
           role: "admin",
           rememberMe,
         };
 
-        if (rememberMe) {
-          localStorage.setItem("admin", JSON.stringify(adminData));
-        } else {
-          sessionStorage.setItem("admin", JSON.stringify(adminData));
+        if (typeof window !== "undefined") {
+          if (rememberMe) {
+            localStorage.setItem("admin", JSON.stringify(adminData));
+          } else {
+            sessionStorage.setItem("admin", JSON.stringify(adminData));
+          }
         }
 
         setTimeout(() => {

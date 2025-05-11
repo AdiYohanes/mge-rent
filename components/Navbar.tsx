@@ -11,11 +11,11 @@ import { useRouter } from "next/navigation";
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [isClient, setIsClient] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    setIsClient(true);
+    setMounted(true);
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -27,6 +27,26 @@ export default function Navbar() {
     setUser(null);
     router.push("/signin");
   };
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return (
+      <header className="bg-white text-black shadow-md font-minecraft">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <Link href="/">
+            <Image
+              src="/images/logo.png"
+              alt="Logo"
+              width={50}
+              height={50}
+              className="w-12 h-12 cursor-pointer"
+            />
+          </Link>
+          <div className="h-[52px] w-[140px]"></div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="bg-white text-black shadow-md font-minecraft">
@@ -87,7 +107,7 @@ export default function Navbar() {
         )}
 
         <div className="hidden md:flex items-center">
-          {isClient && user ? (
+          {user ? (
             <div className="flex items-center">
               <p className="mr-4">Welcome, {user.username}!</p>
               <Button
@@ -98,7 +118,7 @@ export default function Navbar() {
                 Logout
               </Button>
             </div>
-          ) : isClient ? (
+          ) : (
             <Link href="/signin">
               <Button
                 variant="ghost"
@@ -113,8 +133,6 @@ export default function Navbar() {
                 Login
               </Button>
             </Link>
-          ) : (
-            <div className="h-[52px] w-[140px]"></div>
           )}
         </div>
       </div>

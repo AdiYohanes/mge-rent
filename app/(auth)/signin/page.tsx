@@ -18,11 +18,11 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isClient, setIsClient] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    setIsClient(true);
+    setMounted(true);
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,7 +52,8 @@ const Login = () => {
       formData.password === "testPassword"
     ) {
       toast.success("Login successful!");
-      if (isClient) {
+      // Safely access localStorage only in browser
+      if (mounted && typeof window !== "undefined") {
         localStorage.setItem(
           "user",
           JSON.stringify({ username: formData.username })

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -30,11 +31,15 @@ export default function ConfirmationModal({
   isLoading = false,
 }: ConfirmationModalProps) {
   const router = useRouter();
+  const [bookingId, setBookingId] = useState<string>("");
+
+  useEffect(() => {
+    // Generate booking ID only on client side
+    setBookingId(`BK-${Math.floor(Math.random() * 10000)}`);
+  }, []);
 
   const handleConfirm = () => {
     onConfirm();
-    // Generate a random booking ID for the success page
-    const bookingId = `BK-${Math.floor(Math.random() * 10000)}`;
     router.push(`/booking-success?id=${bookingId}`);
   };
 
@@ -81,9 +86,7 @@ export default function ConfirmationModal({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Booking ID:</span>
-              <span className="font-medium">
-                BK-{Math.floor(Math.random() * 10000)}
-              </span>
+              <span className="font-medium">{bookingId || "Loading..."}</span>
             </div>
           </div>
         </div>

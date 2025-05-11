@@ -295,13 +295,13 @@ const GameCard: React.FC<GameCardProps> = ({ game, onClick }) => {
       {/* Game image with overlay */}
       <div className="relative h-64 overflow-hidden">
         <Image
-          src={game.image || "/placeholder.svg"}
+          src={game.image}
           alt={game.title}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-110"
           onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
             // Fallback to placeholder if image fails to load
-            e.currentTarget.src = "/placeholder.svg?height=400&width=600";
+            e.currentTarget.src = "/images/games/1.png";
           }}
         />
         <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
@@ -545,10 +545,11 @@ const GameDetailModal: React.FC<GameDetailModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  // Close modal when clicking outside
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         modalRef.current &&
@@ -558,12 +559,14 @@ const GameDetailModal: React.FC<GameDetailModalProps> = ({
       }
     };
 
-    if (isOpen) {
+    if (typeof document !== "undefined") {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("mousedown", handleClickOutside);
+      }
     };
   }, [isOpen, onClose]);
 

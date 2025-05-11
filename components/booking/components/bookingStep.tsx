@@ -27,6 +27,7 @@ export default function BookingSteps({
   const [prevStep, setPrevStep] = useState(currentStep);
   const [direction, setDirection] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Track direction of step change for animations
   useEffect(() => {
@@ -38,15 +39,23 @@ export default function BookingSteps({
     setPrevStep(currentStep);
   }, [currentStep, prevStep]);
 
+  // Initial mount and client-side check
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Check if we're on mobile
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
+
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  }, [mounted]);
 
   // Animation for step icon
   const iconVariants = {
@@ -69,6 +78,26 @@ export default function BookingSteps({
       },
     },
   };
+
+  // Render consistent UI for server and client
+  if (!mounted) {
+    return (
+      <div className={cn("bg-white rounded-lg shadow-md", className)}>
+        {/* Loading State or SSR-safe UI */}
+        <div className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-12 h-12 rounded-full bg-gray-200" />
+              <div className="ml-3">
+                <div className="h-4 w-24 bg-gray-200 rounded mb-2" />
+                <div className="h-6 w-32 bg-gray-200 rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Mobile view shows only current step with navigator
   if (isMobile) {

@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import type React from "react";
+
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import {
   ChevronRight,
   LayoutDashboard,
@@ -12,23 +16,41 @@ import {
   Coffee,
   CreditCard,
   Settings,
-  Menu,
+  Bell,
+  BarChart3,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 interface SubMenuItem {
   name: string;
   href: string;
+  active?: boolean;
+  badge?: number | string;
 }
 
 interface MenuItem {
@@ -38,233 +60,394 @@ interface MenuItem {
   href: string;
   active: boolean;
   expandable: boolean;
+  badge?: number | string;
   subItems?: SubMenuItem[];
 }
 
-interface DashboardSidebarProps {
-  collapsed: boolean;
-  setCollapsed: (collapsed: boolean) => void;
-}
+export function DashboardSidebar() {
+  const { state } = useSidebar();
+  const pathname = usePathname();
 
-type ExpandedMenusState = {
-  [key: string]: boolean;
-};
+  // Initialize open menus based on current path
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
-export function DashboardSidebar({
-  collapsed,
-  setCollapsed,
-}: DashboardSidebarProps) {
-  const [expandedMenus, setExpandedMenus] = useState<ExpandedMenusState>({
-    booking: false,
-    user: false,
-    rental: false,
-    food: false,
-    setting: false,
-  });
-
-  const toggleMenu = (menu: string) => {
-    setExpandedMenus((prev) => ({
-      ...prev,
-      [menu]: !prev[menu],
-    }));
-  };
-
+  // Define menu items
   const menuItems: MenuItem[] = [
     {
       id: "dashboard",
       name: "Dashboard",
       icon: LayoutDashboard,
       href: "/admin",
-      active: true,
+      active: pathname === "/admin",
       expandable: false,
     },
     {
       id: "booking",
       name: "Booking",
       icon: CalendarCheck,
-      href: "#",
-      active: false,
+      href: "/admin/dashboard/booking",
+      active: pathname.includes("/admin/dashboard/booking"),
       expandable: true,
+      badge: 3,
       subItems: [
-        { name: "All Bookings", href: "#" },
-        { name: "Pending", href: "#" },
-        { name: "Confirmed", href: "#" },
+        { name: "Room", href: "/admin/dashboard/booking?type=room", badge: 2 },
+        {
+          name: "Food & Drink",
+          href: "/admin/dashboard/booking?type=food",
+          badge: 1,
+        },
+        { name: "Event", href: "/admin/dashboard/booking?type=event" },
       ],
     },
     {
       id: "user",
       name: "User",
       icon: Users,
-      href: "#",
-      active: false,
-      expandable: true,
-      subItems: [
-        { name: "All Users", href: "#" },
-        { name: "Admins", href: "#" },
-        { name: "Customers", href: "#" },
-      ],
+      href: "/admin/dashboard/users",
+      active: pathname.includes("/admin/dashboard/users"),
+      expandable: false,
     },
     {
       id: "rental",
       name: "Rental",
       icon: Home,
-      href: "#",
-      active: false,
-      expandable: true,
-      subItems: [
-        { name: "All Units", href: "#" },
-        { name: "VVIP Units", href: "#" },
-        { name: "VIP Units", href: "#" },
-        { name: "Regular Units", href: "#" },
-      ],
+      href: "/admin/dashboard/rentals",
+      active: pathname.includes("/admin/dashboard/rentals"),
+      expandable: false,
     },
     {
       id: "food",
       name: "Food & Drinks",
       icon: Coffee,
-      href: "#",
-      active: false,
+      href: "/admin/dashboard/food",
+      active: pathname.includes("/admin/dashboard/food"),
       expandable: true,
       subItems: [
-        { name: "All Items", href: "#" },
-        { name: "Food", href: "#" },
-        { name: "Drinks", href: "#" },
+        { name: "All Items", href: "/admin/dashboard/food" },
+        { name: "Food", href: "/admin/dashboard/food/food" },
+        { name: "Drinks", href: "/admin/dashboard/food/drinks" },
       ],
     },
     {
       id: "transaction",
       name: "Transaction",
       icon: CreditCard,
-      href: "#",
-      active: false,
+      href: "/admin/dashboard/transactions",
+      active: pathname.includes("/admin/dashboard/transactions"),
       expandable: false,
     },
     {
-      id: "setting",
-      name: "Setting",
-      icon: Settings,
-      href: "#",
-      active: false,
-      expandable: true,
-      subItems: [
-        { name: "Profile", href: "#" },
-        { name: "Security", href: "#" },
-        { name: "Appearance", href: "#" },
-      ],
+      id: "analytics",
+      name: "Analytics",
+      icon: BarChart3,
+      href: "/admin/dashboard/analytics",
+      active: pathname.includes("/admin/dashboard/analytics"),
+      expandable: false,
     },
   ];
 
+  // Secondary menu items
+  const secondaryMenuItems: MenuItem[] = [
+    {
+      id: "notifications",
+      name: "Notifications",
+      icon: Bell,
+      href: "/admin/dashboard/notifications",
+      active: pathname.includes("/admin/dashboard/notifications"),
+      expandable: false,
+      badge: 5,
+    },
+    {
+      id: "settings",
+      name: "Settings",
+      icon: Settings,
+      href: "/admin/dashboard/settings",
+      active: pathname.includes("/admin/dashboard/settings"),
+      expandable: true,
+      subItems: [
+        { name: "Profile", href: "/admin/dashboard/settings/profile" },
+        { name: "Security", href: "/admin/dashboard/settings/security" },
+        { name: "Appearance", href: "/admin/dashboard/settings/appearance" },
+      ],
+    },
+    {
+      id: "help",
+      name: "Help & Support",
+      icon: HelpCircle,
+      href: "/admin/dashboard/help",
+      active: pathname.includes("/admin/dashboard/help"),
+      expandable: false,
+    },
+  ];
+
+  // Initialize open menus based on active state
+  useEffect(() => {
+    const initialOpenMenus: Record<string, boolean> = {};
+
+    // Open menus that contain active items
+    [...menuItems, ...secondaryMenuItems].forEach((item) => {
+      if (
+        item.expandable &&
+        (item.active ||
+          item.subItems?.some((subItem) => pathname.includes(subItem.href)))
+      ) {
+        initialOpenMenus[item.id] = true;
+      }
+    });
+
+    setOpenMenus(initialOpenMenus);
+  }, [pathname]);
+
+  const toggleMenu = (menuId: string) => {
+    setOpenMenus((prev) => ({
+      ...prev,
+      [menuId]: !prev[menuId],
+    }));
+  };
+
   return (
-    <Sidebar className="border-r bg-white shadow-md">
-      <div className="flex items-center justify-between h-20 px-4 border-b bg-gradient-to-r from-[#f9f5e7] to-[#f3edd5]">
-        <Link href="/admin" className="flex items-center gap-3">
-          {collapsed ? (
-            <div className="relative flex items-center justify-center">
-              <div className="absolute w-11 h-11 rounded-full bg-[#B99733]/10 animate-pulse"></div>
-              <div className="w-10 h-10 rounded-full bg-white p-1 flex items-center justify-center relative z-10 border border-[#B99733]/20">
-                <Image
-                  src="/images/logo.png"
-                  alt="Logo"
-                  width={32}
-                  height={32}
-                  className="object-contain transition-transform hover:scale-105"
-                />
-              </div>
+    <Sidebar className="border-r">
+      <SidebarHeader className="border-b h-16 flex items-center px-4 bg-gray-100/90">
+        <Link href="/admin" className="flex items-center gap-2 w-full">
+          <motion.div
+            className="relative flex items-center justify-center"
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 400, damping: 10 }}
+          >
+            <div className="absolute w-10 h-10 rounded-full bg-amber-200/50 animate-pulse"></div>
+            <div className="w-9 h-9 rounded-full bg-white p-1 flex items-center justify-center relative z-10 border border-amber-200">
+              <Image
+                src="/images/logo.png"
+                alt="MGE Logo"
+                width={32}
+                height={32}
+                className="object-contain"
+              />
             </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <div className="relative flex items-center justify-center">
-                <div className="absolute w-11 h-11 rounded-full bg-[#B99733]/10 animate-pulse"></div>
-                <div className="w-10 h-10 rounded-full bg-white p-1 flex items-center justify-center relative z-10 border border-[#B99733]/20">
-                  <Image
-                    src="/images/logo.png"
-                    alt="Logo"
-                    width={32}
-                    height={32}
-                    className="object-contain"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-[#B99733] text-lg leading-tight">
-                  MGE
-                </span>
-                <span className="text-xs text-[#B99733]/80 font-medium">
-                  Playstation
-                </span>
-              </div>
+          </motion.div>
+
+          {state === "expanded" && (
+            <div className="flex flex-col">
+              <span className="font-bold text-amber-800 text-lg leading-tight">
+                MGE
+              </span>
+              <span className="text-xs text-amber-600/80 font-medium">
+                Playstation
+              </span>
             </div>
           )}
         </Link>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded-full hover:bg-[#e9deb6] transition-colors"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <Menu size={18} className="text-[#B99733]" />
-        </button>
-      </div>
-      <SidebarContent className="py-2">
+      </SidebarHeader>
+
+      <SidebarContent className="px-2 py-4">
+        {/* Main Menu */}
+        <div className="mb-1 px-3">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            Main Menu
+          </h3>
+        </div>
         <SidebarMenu>
           {menuItems.map((item) => (
-            <SidebarMenuItem key={item.id} className="px-2 py-1">
+            <SidebarMenuItem key={item.id}>
               {item.expandable ? (
-                <>
-                  <SidebarMenuButton
-                    onClick={() => toggleMenu(item.id)}
-                    className={cn(
-                      "justify-between transition-all duration-200 rounded-lg hover:bg-[#f9f7ef] cursor-pointer",
-                      item.active
-                        ? "bg-[#B99733] text-white hover:bg-[#B99733] hover:text-white shadow-sm"
-                        : "hover:translate-x-1"
-                    )}
-                  >
-                    <div className="flex items-center">
-                      <item.icon
+                <Collapsible
+                  open={openMenus[item.id]}
+                  onOpenChange={() => toggleMenu(item.id)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      className={cn(
+                        "justify-between group transition-all duration-200",
+                        item.active &&
+                          "bg-amber-600 text-white hover:bg-amber-700"
+                      )}
+                    >
+                      <div className="flex items-center">
+                        <item.icon className="h-4 w-4 mr-2" />
+                        <span>{item.name}</span>
+                        {item.badge && (
+                          <Badge
+                            variant="secondary"
+                            className="ml-2 h-5 px-1.5 bg-amber-200 text-amber-800"
+                          >
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </div>
+                      <ChevronRight
                         className={cn(
-                          "w-5 h-5 mr-2 transition-transform",
-                          expandedMenus[item.id] && "text-[#B99733]"
+                          "h-4 w-4 transition-transform duration-200",
+                          openMenus[item.id] && "rotate-90"
                         )}
                       />
-                      <span>{item.name}</span>
-                    </div>
-                    <ChevronRight
-                      className={cn(
-                        "w-4 h-4 transition-transform duration-200",
-                        expandedMenus[item.id] && "rotate-90 text-[#B99733]"
-                      )}
-                    />
-                  </SidebarMenuButton>
-                  {expandedMenus[item.id] && (
-                    <SidebarMenuSub className="animate-in slide-in-from-top-2 duration-200">
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
                       {item.subItems?.map((subItem) => (
-                        <SidebarMenuSubItem key={subItem.name} className="px-1">
+                        <SidebarMenuSubItem key={subItem.name}>
                           <SidebarMenuSubButton
                             asChild
-                            className="transition-all duration-200 rounded-md hover:bg-[#f3edd5] hover:translate-x-1"
+                            isActive={pathname === subItem.href}
+                            className="transition-all duration-200"
+                          >
+                            <Link
+                              href={subItem.href}
+                              className="flex items-center justify-between"
+                            >
+                              <span>{subItem.name}</span>
+                              {subItem.badge && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 px-1.5 bg-amber-100 text-amber-800"
+                                >
+                                  {subItem.badge}
+                                </Badge>
+                              )}
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </Collapsible>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={item.active}
+                        className={cn(
+                          "transition-all duration-200",
+                          item.active &&
+                            "bg-amber-600 text-white hover:bg-amber-700"
+                        )}
+                      >
+                        <Link
+                          href={item.href}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex items-center">
+                            <item.icon className="h-4 w-4 mr-2" />
+                            <span>{item.name}</span>
+                          </div>
+                          {item.badge && (
+                            <Badge
+                              variant="secondary"
+                              className="h-5 px-1.5 bg-amber-200 text-amber-800"
+                            >
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="hidden md:block">
+                      {item.name}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+
+        {/* Secondary Menu */}
+        <div className="mt-6 mb-1 px-3">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            System
+          </h3>
+        </div>
+        <SidebarMenu>
+          {secondaryMenuItems.map((item) => (
+            <SidebarMenuItem key={item.id}>
+              {item.expandable ? (
+                <Collapsible
+                  open={openMenus[item.id]}
+                  onOpenChange={() => toggleMenu(item.id)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      className={cn(
+                        "justify-between group transition-all duration-200",
+                        item.active &&
+                          "bg-amber-600 text-white hover:bg-amber-700"
+                      )}
+                    >
+                      <div className="flex items-center">
+                        <item.icon className="h-4 w-4 mr-2" />
+                        <span>{item.name}</span>
+                        {item.badge && (
+                          <Badge
+                            variant="secondary"
+                            className="ml-2 h-5 px-1.5 bg-amber-200 text-amber-800"
+                          >
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </div>
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 transition-transform duration-200",
+                          openMenus[item.id] && "rotate-90"
+                        )}
+                      />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {item.subItems?.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.name}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === subItem.href}
+                            className="transition-all duration-200"
                           >
                             <Link href={subItem.href}>{subItem.name}</Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ))}
                     </SidebarMenuSub>
-                  )}
-                </>
+                  </CollapsibleContent>
+                </Collapsible>
               ) : (
-                <SidebarMenuButton
-                  asChild
-                  className={cn(
-                    "rounded-lg transition-all duration-200",
-                    item.active
-                      ? "bg-[#B99733] text-white hover:bg-[#B99733] hover:text-white shadow-sm"
-                      : "hover:bg-[#f9f7ef] hover:translate-x-1"
-                  )}
-                >
-                  <Link href={item.href} className="flex items-center">
-                    <item.icon className="w-5 h-5 mr-2" />
-                    <span>{item.name}</span>
-                  </Link>
-                </SidebarMenuButton>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={item.active}
+                        className={cn(
+                          "transition-all duration-200",
+                          item.active &&
+                            "bg-amber-600 text-white hover:bg-amber-700"
+                        )}
+                      >
+                        <Link
+                          href={item.href}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex items-center">
+                            <item.icon className="h-4 w-4 mr-2" />
+                            <span>{item.name}</span>
+                          </div>
+                          {item.badge && (
+                            <Badge
+                              variant="secondary"
+                              className="h-5 px-1.5 bg-amber-200 text-amber-800"
+                            >
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="hidden md:block">
+                      {item.name}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </SidebarMenuItem>
           ))}
