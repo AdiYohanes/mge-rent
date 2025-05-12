@@ -1,15 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import {
-  Search,
-  Pencil,
-  Trash2,
-  PlusCircle,
-  GripVertical,
-  Upload,
-  X,
-} from "lucide-react";
+import { Search, Pencil, Trash2, PlusCircle, Upload } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,17 +36,8 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-interface FoodDrinkItem {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  category: "Food" | "Drink"; // Simplified category
-  status: "Available" | "Sold Out";
-}
-
 // Sample data - updated with both food and drink items
-const sampleData: FoodDrinkItem[] = [
+const sampleData = [
   // Food items
   {
     id: "1",
@@ -219,7 +202,7 @@ const FoodDrinkItem = ({
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
-  const [{ isDragging }, drag, preview] = useDrag({
+  const [{ isDragging }, drag] = useDrag({
     type: "FOOD_ITEM",
     item: { index },
     collect: (monitor) => ({
@@ -229,7 +212,7 @@ const FoodDrinkItem = ({
 
   const [, drop] = useDrop({
     accept: "FOOD_ITEM",
-    hover: (item: { index: number }, monitor) => {
+    hover: (item: { index: number }) => {
       if (!ref.current) {
         return;
       }
@@ -319,37 +302,28 @@ const FoodDrinkItem = ({
 };
 
 // Image Dropzone Component
-const ImageDropzone = ({
-  onImageChange,
-  initialImage = null,
-  className = "",
-}: {
-  onImageChange: (image: string | null, file?: File | null) => void;
-  initialImage?: string | null;
-  className?: string;
-}) => {
+const ImageDropzone = ({ onImageChange, className = "" }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [preview, setPreview] = useState<string | null>(initialImage);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState(null);
 
-  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
   }, []);
 
-  const validateFile = (file: File): boolean => {
+  const validateFile = (file) => {
     // Check file type
     const validTypes = [
       "image/jpeg",
@@ -383,7 +357,6 @@ const ImageDropzone = ({
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        setPreview(result);
         onImageChange(result, file);
       };
       reader.readAsDataURL(file);
@@ -392,7 +365,7 @@ const ImageDropzone = ({
   );
 
   const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
+    (e) => {
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(false);
@@ -406,67 +379,46 @@ const ImageDropzone = ({
   );
 
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e) => {
       e.preventDefault();
 
       if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        processFile(file);
+        processFile(e.target.files[0]);
       }
     },
     [processFile]
   );
 
-  const removeImage = useCallback(() => {
-    setPreview(null);
-    onImageChange(null);
-  }, [onImageChange]);
-
   return (
     <div className={cn("w-full", className)}>
-      {!preview ? (
-        <div
-          className={cn(
-            "border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center cursor-pointer transition-colors",
-            isDragging
-              ? "border-amber-500 bg-amber-50"
-              : "border-gray-300 hover:border-amber-400"
-          )}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onClick={() => document.getElementById("fileInput")?.click()}
-        >
-          <Upload className="h-10 w-10 text-gray-400 mb-2" />
-          <p className="text-sm text-center font-medium">
-            Drag & drop image here, or click to select
-          </p>
-          <p className="text-xs text-gray-500 text-center mt-1">
-            Supports: JPG, PNG, GIF, WEBP (max 5MB)
-          </p>
-          <input
-            id="fileInput"
-            type="file"
-            className="hidden"
-            accept="image/*"
-            onChange={handleChange}
-          />
-        </div>
-      ) : (
-        <div className="relative rounded-md overflow-hidden border border-gray-200">
-          <div className="pt-[100%] relative">
-            <Image src={preview} alt="Preview" fill className="object-cover" />
-            <button
-              type="button"
-              onClick={removeImage}
-              className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md hover:bg-gray-100"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      <div
+        className={cn(
+          "border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center cursor-pointer transition-colors",
+          isDragging
+            ? "border-amber-500 bg-amber-50"
+            : "border-gray-300 hover:border-amber-400"
+        )}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={() => document.getElementById("fileInput")?.click()}
+      >
+        <Upload className="h-10 w-10 text-gray-400 mb-2" />
+        <p className="text-sm text-center font-medium">
+          Drag & drop image here, or click to select
+        </p>
+        <p className="text-xs text-gray-500 text-center mt-1">
+          Supports: JPG, PNG, GIF, WEBP (max 5MB)
+        </p>
+        <input
+          id="fileInput"
+          type="file"
+          className="hidden"
+          accept="image/*"
+          onChange={handleChange}
+        />
+      </div>
       {errorMessage && (
         <p className="text-xs text-red-500 mt-1">{errorMessage}</p>
       )}
@@ -479,19 +431,17 @@ interface FoodDrinkTableProps {
 }
 
 export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
-  // State untuk data dan filter
   const [items, setItems] = useState<FoodDrinkItem[]>(sampleData);
   const [currentTab, setCurrentTab] = useState<"all" | "food" | "drink">(
     initialTab
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5); // Changed from 10 to 5
-
-  // State untuk modal
+  const [itemsPerPage] = useState(5);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
   const [currentItem, setCurrentItem] = useState<FoodDrinkItem | null>(null);
   const [newItem, setNewItem] = useState<Partial<FoodDrinkItem>>({
     name: "",
@@ -500,9 +450,6 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     category: "Food",
     status: "Available",
   });
-
-  // Add file state
-  const [imageFile, setImageFile] = useState<File | null>(null);
 
   // Filter data berdasarkan tab dan pencarian
   const filteredData = items.filter((item) => {
@@ -624,7 +571,6 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
       category: currentTab === "drink" ? "Drink" : "Food", // Set default based on current tab
       status: "Available",
     });
-    setImageFile(null);
   };
 
   // Handle image change
@@ -633,7 +579,6 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     file: File | null = null
   ) => {
     setNewItem({ ...newItem, image: imageData || "" });
-    setImageFile(file);
   };
 
   // Submit functions
@@ -1063,7 +1008,6 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                 </Label>
                 <ImageDropzone
                   onImageChange={handleImageChange}
-                  initialImage={newItem.image}
                   className="mb-1"
                 />
               </div>

@@ -2,25 +2,9 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Plus, Minus } from "lucide-react";
 
-type FoodItemProps = {
-  id: number;
-  name: string;
-  price: number;
-  image: string;
-  quantity: number;
-  onAdd: () => void;
-  onRemove: () => void;
-};
+export default function FoodItem(props) {
+  const { name, price, image, quantity, onAdd, onRemove } = props;
 
-export default function FoodItem({
-  id,
-  name,
-  price,
-  image,
-  quantity,
-  onAdd,
-  onRemove,
-}: FoodItemProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

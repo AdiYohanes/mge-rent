@@ -1,11 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, Pencil, Trash2, PlusCircle, GripVertical, Upload, X } from "lucide-react";
+import {
+  Search,
+  Pencil,
+  Trash2,
+  PlusCircle,
+  GripVertical,
+  Upload,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -30,7 +37,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { toast } from "sonner";
@@ -120,7 +126,7 @@ const GameItem = ({
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
-  const [{ isDragging }, drag, preview] = useDrag({
+  const [{ isDragging }, drag] = useDrag({
     type: "GAME",
     item: { index },
     collect: (monitor) => ({
@@ -130,7 +136,7 @@ const GameItem = ({
 
   const [, drop] = useDrop({
     accept: "GAME",
-    hover: (item: { index: number }, monitor) => {
+    hover: (item: { index: number }) => {
       if (!ref.current) {
         return;
       }
@@ -240,15 +246,15 @@ export function GamelistTable() {
 
     // Clean up the preview URL when component unmounts
     return () => URL.revokeObjectURL(objectUrl);
-  }, [selectedFile]);
+  }, [selectedFile, newGame, setNewGame]);
 
   // Function to handle file drop
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith("image/")) {
         setSelectedFile(file);
       } else {
         toast.error("Please upload an image file");
@@ -260,7 +266,7 @@ export function GamelistTable() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith("image/")) {
         setSelectedFile(file);
       } else {
         toast.error("Please upload an image file");
@@ -592,10 +598,13 @@ export function GamelistTable() {
         </CardContent>
 
         {/* Modified Add Game Dialog */}
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-          if (!open) resetFormWithFile();
-          setIsAddDialogOpen(open);
-        }}>
+        <Dialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) resetFormWithFile();
+            setIsAddDialogOpen(open);
+          }}
+        >
           <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader className="pb-2">
               <DialogTitle>Add Game</DialogTitle>
@@ -603,7 +612,10 @@ export function GamelistTable() {
 
             <div className="grid gap-4 py-2">
               <div>
-                <Label htmlFor="image-upload" className="text-sm font-medium block mb-1">
+                <Label
+                  htmlFor="image-upload"
+                  className="text-sm font-medium block mb-1"
+                >
                   Image
                 </Label>
                 <div
@@ -620,7 +632,7 @@ export function GamelistTable() {
                     accept="image/*"
                     onChange={handleFileChange}
                   />
-                  
+
                   {previewUrl ? (
                     <div className="relative w-full h-full">
                       <Image
@@ -645,14 +657,19 @@ export function GamelistTable() {
                   ) : (
                     <>
                       <Upload className="h-5 w-5 text-amber-500 mb-2" />
-                      <span className="text-amber-500 text-sm font-medium">Drop files here or click to upload</span>
+                      <span className="text-amber-500 text-sm font-medium">
+                        Drop files here or click to upload
+                      </span>
                     </>
                   )}
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="name" className="text-sm font-medium block mb-1">
+                <Label
+                  htmlFor="name"
+                  className="text-sm font-medium block mb-1"
+                >
                   Name <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -666,7 +683,10 @@ export function GamelistTable() {
               </div>
 
               <div>
-                <Label htmlFor="console" className="text-sm font-medium block mb-1">
+                <Label
+                  htmlFor="console"
+                  className="text-sm font-medium block mb-1"
+                >
                   Console <span className="text-red-500">*</span>
                 </Label>
                 <Select
@@ -682,13 +702,18 @@ export function GamelistTable() {
                     <SelectItem value="Playstation 4">Playstation 4</SelectItem>
                     <SelectItem value="Playstation 5">Playstation 5</SelectItem>
                     <SelectItem value="Xbox Series X">Xbox Series X</SelectItem>
-                    <SelectItem value="Nintendo Switch">Nintendo Switch</SelectItem>
+                    <SelectItem value="Nintendo Switch">
+                      Nintendo Switch
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <Label htmlFor="genre" className="text-sm font-medium block mb-1">
+                <Label
+                  htmlFor="genre"
+                  className="text-sm font-medium block mb-1"
+                >
                   Genre <span className="text-red-500">*</span>
                 </Label>
                 <Select
@@ -705,28 +730,35 @@ export function GamelistTable() {
                     <SelectItem value="Adventure">Adventure</SelectItem>
                     <SelectItem value="RPG">RPG</SelectItem>
                     <SelectItem value="Sports">Sports</SelectItem>
-                    <SelectItem value="Multiplayer, Co-op, Action, Adventure">Multiplayer, Co-op, Action, Adventure</SelectItem>
-                    <SelectItem value="Single, Co-op, Sports, Adventure">Single, Co-op, Sports, Adventure</SelectItem>
+                    <SelectItem value="Multiplayer, Co-op, Action, Adventure">
+                      Multiplayer, Co-op, Action, Adventure
+                    </SelectItem>
+                    <SelectItem value="Single, Co-op, Sports, Adventure">
+                      Single, Co-op, Sports, Adventure
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <Label htmlFor="units" className="text-sm font-medium block mb-1">
+                <Label
+                  htmlFor="units"
+                  className="text-sm font-medium block mb-1"
+                >
                   Unit Availability
                 </Label>
                 <Select
                   value={newGame.units?.length ? "units" : ""}
                   onValueChange={(value) => {
                     if (value === "all") {
-                      setNewGame({ 
-                        ...newGame, 
-                        units: ["Unit A", "Unit B", "Unit C", "Unit D"] 
+                      setNewGame({
+                        ...newGame,
+                        units: ["Unit A", "Unit B", "Unit C", "Unit D"],
                       });
                     } else if (value) {
-                      setNewGame({ 
-                        ...newGame, 
-                        units: [value] 
+                      setNewGame({
+                        ...newGame,
+                        units: [value],
                       });
                     }
                   }}

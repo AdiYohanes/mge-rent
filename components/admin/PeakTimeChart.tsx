@@ -106,8 +106,8 @@ export function PeakTimeChart({ className }: PeakTimeChartProps) {
     { hour: "", units: 0 }
   );
 
-  // Custom tooltip component
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Custom tooltip component using simple type annotation
+  const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-2 border rounded-md shadow-sm">

@@ -1,8 +1,6 @@
 "use client";
 
-import type React from "react";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -44,133 +42,125 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 
-interface SubMenuItem {
-  name: string;
-  href: string;
-  active?: boolean;
-  badge?: number | string;
-}
-
-interface MenuItem {
-  id: string;
-  name: string;
-  icon: React.ElementType;
-  href: string;
-  active: boolean;
-  expandable: boolean;
-  badge?: number | string;
-  subItems?: SubMenuItem[];
-}
-
 export function DashboardSidebar() {
   const { state } = useSidebar();
   const pathname = usePathname();
 
-  // Initialize open menus based on current path
+  // Initialize open menus based on current path with proper type
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
-  // Define menu items
-  const menuItems: MenuItem[] = [
-    {
-      id: "dashboard",
-      name: "Dashboard",
-      icon: LayoutDashboard,
-      href: "/admin/dashboard",
-      active: pathname === "/admin/dashboard",
-      expandable: false,
-    },
-    {
-      id: "booking",
-      name: "Booking",
-      icon: CalendarCheck,
-      href: "/admin/dashboard/booking",
-      active: pathname.includes("/admin/dashboard/booking"),
-      expandable: true,
-      badge: 3,
-      subItems: [
-        { name: "Room", href: "/admin/dashboard/booking?type=room", badge: 2 },
-        {
-          name: "Food & Drink",
-          href: "/admin/dashboard/booking?type=food",
-          badge: 1,
-        },
-        { name: "Event", href: "/admin/dashboard/booking?type=event" },
-      ],
-    },
-    {
-      id: "user",
-      name: "User",
-      icon: Users,
-      href: "/admin/dashboard/users",
-      active: pathname.includes("/admin/dashboard/users"),
-      expandable: true,
-      subItems: [
-        {
-          name: "Customer MGE Rental",
-          href: "/admin/dashboard/users/customer",
-        },
-        { name: "User Admin", href: "/admin/dashboard/users/admin" },
-      ],
-    },
-    {
-      id: "rental",
-      name: "Rental",
-      icon: Home,
-      href: "/admin/dashboard/rentals",
-      active: pathname.includes("/admin/dashboard/rentals"),
-      expandable: true,
-      subItems: [
-        { name: "Console", href: "/admin/dashboard/rentals/console" },
-        { name: "Room", href: "/admin/dashboard/rentals/room" },
-        { name: "Unit", href: "/admin/dashboard/rentals/unit" },
-        { name: "Gamelist", href: "/admin/dashboard/rentals/gamelist" },
-      ],
-    },
-    {
-      id: "food",
-      name: "Food & Drinks",
-      icon: Coffee,
-      href: "/admin/dashboard/food",
-      active: pathname.includes("/admin/dashboard/food"),
-      expandable: false,
-    },
-    {
-      id: "transaction",
-      name: "Transaction",
-      icon: CreditCard,
-      href: "/admin/dashboard/transactions",
-      active: pathname.includes("/admin/dashboard/transactions"),
-      expandable: false,
-    },
-    {
-      id: "analytics",
-      name: "Analytics",
-      icon: BarChart3,
-      href: "/admin/dashboard/analytics",
-      active: pathname.includes("/admin/dashboard/analytics"),
-      expandable: false,
-    },
-  ];
+  // Define menu items wrapped in useMemo
+  const menuItems = useMemo(
+    () => [
+      {
+        id: "dashboard",
+        name: "Dashboard",
+        icon: LayoutDashboard,
+        href: "/admin/dashboard",
+        active: pathname === "/admin/dashboard",
+        expandable: false,
+      },
+      {
+        id: "booking",
+        name: "Booking",
+        icon: CalendarCheck,
+        href: "/admin/dashboard/booking",
+        active: pathname.includes("/admin/dashboard/booking"),
+        expandable: true,
+        badge: 3,
+        subItems: [
+          {
+            name: "Room",
+            href: "/admin/dashboard/booking?type=room",
+            badge: 2,
+          },
+          {
+            name: "Food & Drink",
+            href: "/admin/dashboard/booking?type=food",
+            badge: 1,
+          },
+          { name: "Event", href: "/admin/dashboard/booking?type=event" },
+        ],
+      },
+      {
+        id: "user",
+        name: "User",
+        icon: Users,
+        href: "/admin/dashboard/users",
+        active: pathname.includes("/admin/dashboard/users"),
+        expandable: true,
+        subItems: [
+          {
+            name: "Customer MGE Rental",
+            href: "/admin/dashboard/users/customer",
+          },
+          { name: "User Admin", href: "/admin/dashboard/users/admin" },
+        ],
+      },
+      {
+        id: "rental",
+        name: "Rental",
+        icon: Home,
+        href: "/admin/dashboard/rentals",
+        active: pathname.includes("/admin/dashboard/rentals"),
+        expandable: true,
+        subItems: [
+          { name: "Console", href: "/admin/dashboard/rentals/console" },
+          { name: "Room", href: "/admin/dashboard/rentals/room" },
+          { name: "Unit", href: "/admin/dashboard/rentals/unit" },
+          { name: "Gamelist", href: "/admin/dashboard/rentals/gamelist" },
+        ],
+      },
+      {
+        id: "food",
+        name: "Food & Drinks",
+        icon: Coffee,
+        href: "/admin/dashboard/food",
+        active: pathname.includes("/admin/dashboard/food"),
+        expandable: false,
+      },
+      {
+        id: "transaction",
+        name: "Transaction",
+        icon: CreditCard,
+        href: "/admin/dashboard/transactions",
+        active: pathname.includes("/admin/dashboard/transactions"),
+        expandable: false,
+      },
+      {
+        id: "analytics",
+        name: "Analytics",
+        icon: BarChart3,
+        href: "/admin/dashboard/analytics",
+        active: pathname.includes("/admin/dashboard/analytics"),
+        expandable: false,
+      },
+    ],
+    [pathname]
+  );
 
-  // Secondary menu items
-  const secondaryMenuItems: MenuItem[] = [
-    {
-      id: "settings",
-      name: "Settings",
-      icon: Settings,
-      href: "/admin/dashboard/settings",
-      active: pathname.includes("/admin/dashboard/settings"),
-      expandable: true,
-      subItems: [
-        { name: "Promo management", href: "/admin/dashboard/settings/promo" },
-        { name: "FAQ", href: "/admin/dashboard/settings/faq" },
-        {
-          name: "Food&drink category",
-          href: "/admin/dashboard/settings/food-category",
-        },
-      ],
-    },
-  ];
+  // Secondary menu items wrapped in useMemo
+  const secondaryMenuItems = useMemo(
+    () => [
+      {
+        id: "settings",
+        name: "Settings",
+        icon: Settings,
+        href: "/admin/dashboard/settings",
+        active: pathname.includes("/admin/dashboard/settings"),
+        expandable: true,
+        subItems: [
+          { name: "Promo management", href: "/admin/dashboard/settings/promo" },
+          { name: "FAQ", href: "/admin/dashboard/settings/faq" },
+          {
+            name: "Food&drink category",
+            href: "/admin/dashboard/settings/food-category",
+          },
+        ],
+      },
+    ],
+    [pathname]
+  );
 
   // Initialize open menus based on active state
   useEffect(() => {
@@ -188,7 +178,7 @@ export function DashboardSidebar() {
     });
 
     setOpenMenus(initialOpenMenus);
-  }, [pathname]);
+  }, [pathname, menuItems, secondaryMenuItems]);
 
   const toggleMenu = (menuId: string) => {
     setOpenMenus((prev) => ({
