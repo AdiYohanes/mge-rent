@@ -16,9 +16,7 @@ import {
   Coffee,
   CreditCard,
   Settings,
-  Bell,
   BarChart3,
-  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
