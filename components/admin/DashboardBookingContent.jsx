@@ -57,10 +57,7 @@ export function DashboardBookingContent() {
                     description: "Manage food & drink orders",
                     icon: <Utensils className="h-5 w-5 text-orange-500 mr-2" />,
                     tabs: [
-                        { id: "all", label: "All Orders" },
-                        { id: "pending", label: "Pending" },
-                        { id: "confirmed", label: "Confirmed" },
-                        { id: "cancelled", label: "Cancelled" },
+                        { id: "all", label: "All Orders" }
                     ]
                 };
             case "event":
@@ -69,10 +66,7 @@ export function DashboardBookingContent() {
                     description: "Manage event reservations",
                     icon: <Calendar className="h-5 w-5 text-purple-500 mr-2" />,
                     tabs: [
-                        { id: "all", label: "All Events" },
-                        { id: "pending", label: "Pending" },
-                        { id: "confirmed", label: "Confirmed" },
-                        { id: "cancelled", label: "Cancelled" },
+                        { id: "all", label: "All Events" }
                     ]
                 };
             default: // room
@@ -97,21 +91,21 @@ export function DashboardBookingContent() {
                 return {
                     title: "Pending Bookings",
                     description: `Manage all pending ${bookingType} bookings`,
-                    filterStatus: "pending",
+                    filterStatus: "booking_success",
                     icon: <Clock className="h-5 w-5 text-amber-500 mr-2" />
                 };
             case "confirmed":
                 return {
                     title: "Confirmed Bookings",
                     description: `Manage all confirmed ${bookingType} bookings`,
-                    filterStatus: "confirmed",
+                    filterStatuses: ["booking_ongoing", "booking_finish"],
                     icon: <CalendarCheck className="h-5 w-5 text-green-500 mr-2" />
                 };
             case "cancelled":
                 return {
                     title: "Cancelled Bookings",
                     description: `View all cancelled ${bookingType} bookings`,
-                    filterStatus: "cancelled",
+                    filterStatuses: ["booking_canceled", "return"],
                     icon: <Clock className="h-5 w-5 text-red-500 mr-2" />
                 };
             default:
@@ -137,42 +131,57 @@ export function DashboardBookingContent() {
                 <p className="text-sm text-gray-500 ml-7">{bookingTypeContent.description}</p>
             </div>
 
-            <Tabs
-                value={activeTab}
-                onValueChange={handleTabChange}
-                className="mb-6"
-            >
-                <TabsList className="grid grid-cols-4 md:w-[600px]">
-                    {bookingTypeContent.tabs.map((tab) => (
-                        <TabsTrigger
-                            key={tab.id}
-                            value={tab.id}
-                            className="data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-                        >
-                            {tab.label}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
+            {bookingType === "room" ? (
+                <Tabs
+                    value={activeTab}
+                    onValueChange={handleTabChange}
+                    className="mb-6"
+                >
+                    <TabsList className="grid grid-cols-4 md:w-[600px]">
+                        {bookingTypeContent.tabs.map((tab) => (
+                            <TabsTrigger
+                                key={tab.id}
+                                value={tab.id}
+                                className="data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+                            >
+                                {tab.label}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
 
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeTab}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="mt-4"
-                    >
-                        {isLoading ? (
-                            <div className="flex justify-center items-center py-20">
-                                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
-                            </div>
-                        ) : (
-                            <BookingTable filterStatus={filterStatus} bookingType={bookingType} />
-                        )}
-                    </motion.div>
-                </AnimatePresence>
-            </Tabs>
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={activeTab}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.2 }}
+                            className="mt-4"
+                        >
+                            {isLoading ? (
+                                <div className="flex justify-center items-center py-20">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+                                </div>
+                            ) : (
+                                <BookingTable
+                                    filterStatus={activeTab === "confirmed" ?
+                                        ["booking_ongoing", "booking_finish"] :
+                                        activeTab === "cancelled" ?
+                                            ["booking_canceled", "return"] :
+                                            activeTab === "pending" ?
+                                                "booking_success" : null}
+                                    bookingType={bookingType}
+                                />
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                </Tabs>
+            ) : (
+                <BookingTable
+                    filterStatus={null}
+                    bookingType={bookingType}
+                />
+            )}
         </div>
     );
 } 

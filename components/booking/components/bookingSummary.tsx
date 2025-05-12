@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { usePathname } from "next/navigation";
 
 interface BookingSummaryProps {
   className?: string;
@@ -50,6 +51,9 @@ export default function BookingSummary({
   className,
   selectedDate,
 }: BookingSummaryProps) {
+  const pathname = usePathname();
+  const showPromoCode = pathname === "/booking-confirm";
+
   const [isOpen, setIsOpen] = useState(true);
   const [highlightTotal, setHighlightTotal] = useState(false);
   const [promoCode, setPromoCode] = useState<string>("");
@@ -528,64 +532,66 @@ export default function BookingSummary({
               </div>
 
               {/* Promo Code Section with Status Feedback */}
-              <div className="mt-5">
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-                  <div className="relative flex-grow">
-                    <Input
-                      type="text"
-                      placeholder="Enter promo code"
-                      className="w-full border-[#B99733] focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 rounded-md pr-10"
-                      value={promoCode}
-                      onChange={(e) =>
-                        setPromoCode(e.target.value.toUpperCase())
-                      }
-                      onKeyDown={handleKeyDown}
-                    />
-                    {promoStatus === "success" && (
-                      <Check className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 h-5 w-5" />
-                    )}
-                    {promoStatus === "error" && (
-                      <X className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 h-5 w-5" />
-                    )}
-                  </div>
-                  <Button
-                    onClick={handleApplyPromoCode}
-                    className="bg-[#B99733] hover:bg-[#9e8230] text-white rounded-md whitespace-nowrap px-6"
-                  >
-                    Apply Code
-                  </Button>
-                </div>
-
-                {/* Promo code message */}
-                <AnimatePresence>
-                  {promoStatus !== "idle" && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
+              {showPromoCode && (
+                <div className="mt-5">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+                    <div className="relative flex-grow">
+                      <Input
+                        type="text"
+                        placeholder="Enter promo code"
+                        className="w-full border-[#B99733] focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 rounded-md pr-10"
+                        value={promoCode}
+                        onChange={(e) =>
+                          setPromoCode(e.target.value.toUpperCase())
+                        }
+                        onKeyDown={handleKeyDown}
+                      />
+                      {promoStatus === "success" && (
+                        <Check className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 h-5 w-5" />
+                      )}
+                      {promoStatus === "error" && (
+                        <X className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 h-5 w-5" />
+                      )}
+                    </div>
+                    <Button
+                      onClick={handleApplyPromoCode}
+                      className="bg-[#B99733] hover:bg-[#9e8230] text-white rounded-md whitespace-nowrap px-6"
                     >
-                      <div
-                        className={`mt-2 text-sm ${
-                          promoStatus === "success"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {promoMessage}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      Apply Code
+                    </Button>
+                  </div>
 
-                {/* Promo code hints */}
-                <div className="mt-2 flex items-start gap-1">
-                  <Info size={14} className="text-gray-400 mt-0.5" />
-                  <span className="text-xs text-gray-500">
-                    Try these promo codes: DISCOUNT10, DISCOUNT20, DISCOUNT30
-                  </span>
+                  {/* Promo code message */}
+                  <AnimatePresence>
+                    {promoStatus !== "idle" && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div
+                          className={`mt-2 text-sm ${
+                            promoStatus === "success"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {promoMessage}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Promo code hints */}
+                  <div className="mt-2 flex items-start gap-1">
+                    <Info size={14} className="text-gray-400 mt-0.5" />
+                    <span className="text-xs text-gray-500">
+                      Try these promo codes: DISCOUNT10, DISCOUNT20, DISCOUNT30
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </motion.div>
         )}

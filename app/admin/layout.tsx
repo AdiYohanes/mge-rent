@@ -1,6 +1,7 @@
 import type React from "react";
 import type { Metadata } from "next";
 import "../globals.css";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Admin || MGE",
@@ -12,5 +13,10 @@ export default function AdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <main>{children}</main>;
+  return (
+    <main>
+      <Toaster position="top-right" />
+      {children}
+    </main>
+  );
 }

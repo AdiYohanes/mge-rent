@@ -62,16 +62,22 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden md:flex space-x-6">
-          <Link href="#" className="block text-black hover:text-[#B99733]">
+          <Link href="/" className="block text-black hover:text-[#B99733]">
             MGE Rental
           </Link>
-          <Link href="#" className="block text-black hover:text-[#B99733]">
+          <Link
+            href="/booking"
+            className="block text-black hover:text-[#B99733]"
+          >
             Rent
           </Link>
-          <Link href="#" className="block text-black hover:text-[#B99733]">
+          <Link
+            href="/restaurant"
+            className="block text-black hover:text-[#B99733]"
+          >
             Food & Drinks
           </Link>
-          <Link href="#" className="block text-black hover:text-[#B99733]">
+          <Link href="/faq" className="block text-black hover:text-[#B99733]">
             FAQ
           </Link>
         </div>
@@ -100,9 +106,9 @@ export default function Navbar() {
             <a href="#" className="block text-black">
               Food & Drinks
             </a>
-            <a href="#" className="block text-black">
+            <Link href="/faq" className="block text-black">
               FAQ
-            </a>
+            </Link>
           </div>
         )}
 

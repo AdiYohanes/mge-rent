@@ -77,8 +77,8 @@ export function DashboardSidebar() {
       id: "dashboard",
       name: "Dashboard",
       icon: LayoutDashboard,
-      href: "/admin",
-      active: pathname === "/admin",
+      href: "/admin/dashboard",
+      active: pathname === "/admin/dashboard",
       expandable: false,
     },
     {
@@ -105,7 +105,14 @@ export function DashboardSidebar() {
       icon: Users,
       href: "/admin/dashboard/users",
       active: pathname.includes("/admin/dashboard/users"),
-      expandable: false,
+      expandable: true,
+      subItems: [
+        {
+          name: "Customer MGE Rental",
+          href: "/admin/dashboard/users/customer",
+        },
+        { name: "User Admin", href: "/admin/dashboard/users/admin" },
+      ],
     },
     {
       id: "rental",
@@ -113,7 +120,13 @@ export function DashboardSidebar() {
       icon: Home,
       href: "/admin/dashboard/rentals",
       active: pathname.includes("/admin/dashboard/rentals"),
-      expandable: false,
+      expandable: true,
+      subItems: [
+        { name: "Console", href: "/admin/dashboard/rentals/console" },
+        { name: "Room", href: "/admin/dashboard/rentals/room" },
+        { name: "Unit", href: "/admin/dashboard/rentals/unit" },
+        { name: "Gamelist", href: "/admin/dashboard/rentals/gamelist" },
+      ],
     },
     {
       id: "food",
@@ -121,12 +134,7 @@ export function DashboardSidebar() {
       icon: Coffee,
       href: "/admin/dashboard/food",
       active: pathname.includes("/admin/dashboard/food"),
-      expandable: true,
-      subItems: [
-        { name: "All Items", href: "/admin/dashboard/food" },
-        { name: "Food", href: "/admin/dashboard/food/food" },
-        { name: "Drinks", href: "/admin/dashboard/food/drinks" },
-      ],
+      expandable: false,
     },
     {
       id: "transaction",
@@ -149,15 +157,6 @@ export function DashboardSidebar() {
   // Secondary menu items
   const secondaryMenuItems: MenuItem[] = [
     {
-      id: "notifications",
-      name: "Notifications",
-      icon: Bell,
-      href: "/admin/dashboard/notifications",
-      active: pathname.includes("/admin/dashboard/notifications"),
-      expandable: false,
-      badge: 5,
-    },
-    {
       id: "settings",
       name: "Settings",
       icon: Settings,
@@ -165,18 +164,13 @@ export function DashboardSidebar() {
       active: pathname.includes("/admin/dashboard/settings"),
       expandable: true,
       subItems: [
-        { name: "Profile", href: "/admin/dashboard/settings/profile" },
-        { name: "Security", href: "/admin/dashboard/settings/security" },
-        { name: "Appearance", href: "/admin/dashboard/settings/appearance" },
+        { name: "Promo management", href: "/admin/dashboard/settings/promo" },
+        { name: "FAQ", href: "/admin/dashboard/settings/faq" },
+        {
+          name: "Food&drink category",
+          href: "/admin/dashboard/settings/food-category",
+        },
       ],
-    },
-    {
-      id: "help",
-      name: "Help & Support",
-      icon: HelpCircle,
-      href: "/admin/dashboard/help",
-      active: pathname.includes("/admin/dashboard/help"),
-      expandable: false,
     },
   ];
 
