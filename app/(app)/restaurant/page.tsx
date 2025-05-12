@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search } from "lucide-react";
 import BookingSummary from "@/components/restaurant/BookingSummary";
 import FoodItem from "@/components/restaurant/FoodItem";
+import { useRouter } from "next/navigation";
 
 // Types
 type FoodItem = {
@@ -143,7 +144,7 @@ export default function RestaurantPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isBookingSummaryOpen, setIsBookingSummaryOpen] = useState(true);
   const [bookingInfo, setBookingInfo] = useState<BookingInfo | null>(null);
-  const [orderSuccess, setOrderSuccess] = useState(false);
+  const router = useRouter();
 
   // Fetch booking info from localStorage
   useEffect(() => {
@@ -209,14 +210,12 @@ export default function RestaurantPage() {
   const handleSubmitOrder = () => {
     if (cart.length === 0) return;
 
-    // In a real app, this would send the order to the backend
-    setOrderSuccess(true);
+    // Store cart items in localStorage or state management
+    localStorage.setItem("restaurantCart", JSON.stringify(cart));
+    localStorage.setItem("restaurantTotal", totalPrice.toString());
 
-    // Reset after 3 seconds
-    setTimeout(() => {
-      setOrderSuccess(false);
-      setCart([]);
-    }, 3000);
+    // Navigate to order confirmation page
+    router.push("/restaurant-invoice");
   };
 
   return (
@@ -227,7 +226,7 @@ export default function RestaurantPage() {
       variants={fadeIn}
     >
       {/* Header */}
-      <div className="bg-white shadow-md py-8">
+      <div className="bg-white py-8">
         <div className="max-w-5xl mx-auto px-4">
           <h1 className="font-minecraft text-4xl md:text-5xl text-center">
             Food & Drinks
@@ -315,36 +314,23 @@ export default function RestaurantPage() {
         )}
 
         {/* Order Button - Now at bottom but not fixed */}
-        <AnimatePresence>
-          {orderSuccess ? (
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="w-full py-5 text-center bg-green-500 text-white text-xl font-medium rounded-lg mt-6 mb-10"
-            >
-              Order confirmed! Thank you for your order.
-            </motion.div>
-          ) : (
-            <motion.button
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full py-5 font-minecraft text-xl text-white rounded-lg shadow-lg mt-6 mb-10 bg-[#B99733] disabled:opacity-70"
-              disabled={cart.length === 0}
-              onClick={handleSubmitOrder}
-            >
-              {cart.length > 0
-                ? `Order (${cart.reduce(
-                    (sum, item) => sum + item.quantity,
-                    0
-                  )} items): Rp${totalPrice.toLocaleString()}`
-                : "Order"}
-            </motion.button>
-          )}
-        </AnimatePresence>
+        <motion.button
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full py-5 font-minecraft text-xl text-white rounded-lg shadow mt-6 mb-10 bg-[#B99733] disabled:opacity-70"
+          disabled={cart.length === 0}
+          onClick={handleSubmitOrder}
+        >
+          {cart.length > 0
+            ? `Order (${cart.reduce(
+                (sum, item) => sum + item.quantity,
+                0
+              )} items): Rp${totalPrice.toLocaleString()}`
+            : "Order"}
+        </motion.button>
       </div>
     </motion.div>
   );
