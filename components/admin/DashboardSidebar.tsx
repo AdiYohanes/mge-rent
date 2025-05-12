@@ -278,7 +278,7 @@ export function DashboardSidebar() {
                               className="flex items-center justify-between"
                             >
                               <span>{subItem.name}</span>
-                              {subItem.badge && (
+                              {subItem?.badge && (
                                 <Badge
                                   variant="secondary"
                                   className="h-5 px-1.5 bg-amber-100 text-amber-800"
