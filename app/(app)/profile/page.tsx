@@ -76,8 +76,9 @@ export default function Profile() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 font-funnel">
-      <h1 className="text-5xl font-bold mb-8 text-center">
-        <span className="text-[#B99733] font-minecraft">Edit Profile</span>
+      <h1 className="text-5xl font-bold mb-8 text-center font-minecraft">
+        <span className="text-black">Edit </span>
+        <span className="text-[#B99733] ">Profile</span>
       </h1>
 
       <div className="text-center mb-10">
@@ -90,7 +91,9 @@ export default function Profile() {
 
       {/* Personal Information Section */}
       <div className="border border-[#B99733] p-6 mb-8">
-        <h2 className="text-xl text-[#B99733] mb-4">Personal Information</h2>
+        <h2 className="text-xl text-[#B99733] mb-4 font-minecraft">
+          Personal Information
+        </h2>
 
         <form onSubmit={handleSavePersonalInfo}>
           <div className="mb-4">
@@ -148,7 +151,9 @@ export default function Profile() {
 
       {/* Change Password Section */}
       <div className="border border-[#B99733] p-6">
-        <h2 className="text-xl text-[#B99733] mb-4">Change Password</h2>
+        <h2 className="text-xl text-[#B99733] mb-4 font-minecraft">
+          Change Password
+        </h2>
 
         <form onSubmit={handleChangePassword}>
           <div className="mb-4">

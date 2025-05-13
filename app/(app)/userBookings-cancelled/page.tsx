@@ -27,7 +27,7 @@ export default function BookingCancelledPage() {
 
       <div className="bg-[#FFFCEB] py-6 px-4 rounded-sm mb-10 shadow-sm">
         <p className="text-base leading-relaxed">
-          We're sad to see you go, but we will meet another time!
+          We&apos;re sad to see you go, but we will meet another time!
           <br />
           We will send you a confirmation and refund information through
           <span className="font-bold text-[#B99733]"> Whatsapp</span>, please

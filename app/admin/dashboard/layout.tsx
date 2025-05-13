@@ -19,13 +19,13 @@ export default function DashboardLayout({
       <div className="flex h-screen w-full overflow-hidden bg-background">
         <DashboardSidebar />
         <motion.div
-          className="flex flex-col flex-1 w-full overflow-hidden"
+          className="flex flex-col flex-1 w-full overflow-auto"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         >
           <DashboardHeader />
-          <main>{children}</main>
+          <main className="flex-1 overflow-auto">{children}</main>
         </motion.div>
       </div>
     </SidebarProvider>

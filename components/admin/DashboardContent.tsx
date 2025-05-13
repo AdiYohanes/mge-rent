@@ -134,7 +134,7 @@ export function DashboardContent() {
   };
 
   return (
-    <div className="flex-1 w-full overflow-auto">
+    <div className="flex-1 w-full">
       <motion.div
         className="w-full px-6 py-6 space-y-6"
         variants={container}

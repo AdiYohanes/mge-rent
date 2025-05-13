@@ -985,7 +985,8 @@ export default function UserBookings() {
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 font-funnel">
       <h1 className="text-5xl font-bold mb-8 text-center">
-        <span className="text-[#B99733] font-minecraft">Booking History</span>
+        <span className="text-black font-minecraft">Booking </span>
+        <span className="text-[#B99733] font-minecraft">History</span>
       </h1>
 
       <div className="text-center mb-10">

@@ -1056,23 +1056,23 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
                             <div className="flex flex-col gap-1">
                                 {booking.foodTypes?.map((type, i) => (
                                     <span key={i} className="text-sm">{type}</span>
-                                )) || booking.foodItems.map((_, i) => (
+                                )) || (booking.foodItems?.map((_, i) => (
                                     <span key={i} className="text-sm">{i % 2 === 0 ? "Food" : "Drink"}</span>
-                                ))}
+                                )) || <span className="text-sm">N/A</span>)}
                             </div>
                         </TableCell>
                         <TableCell>
                             <div className="flex flex-col gap-1">
-                                {booking.foodItems.map((item, i) => (
+                                {booking.foodItems?.map((item, i) => (
                                     <span key={i} className="text-sm">{item}</span>
-                                ))}
+                                )) || <span className="text-sm">N/A</span>}
                             </div>
                         </TableCell>
                         <TableCell>
                             <div className="flex flex-col gap-1">
-                                {booking.foodItems.map((_, i) => (
+                                {booking.foodItems?.map((_, i) => (
                                     <span key={i} className="text-sm">1</span>
-                                ))}
+                                )) || <span className="text-sm">0</span>}
                             </div>
                         </TableCell>
                         <TableCell>{booking.date}</TableCell>
