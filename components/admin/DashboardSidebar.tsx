@@ -182,7 +182,10 @@ export function DashboardSidebar() {
   return (
     <Sidebar className="border-r">
       <SidebarHeader className="border-b h-16 flex items-center px-4 bg-gray-100/90">
-        <Link href="/admin" className="flex items-center gap-2 w-full">
+        <Link
+          href="/admin/dashboard"
+          className="flex items-center gap-2 w-full"
+        >
           <motion.div
             className="relative flex items-center justify-center"
             whileHover={{ scale: 1.05 }}
