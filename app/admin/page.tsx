@@ -314,7 +314,7 @@ const AdminLoginPage = () => {
               <p className="text-sm text-gray-600">
                 Not an admin?{" "}
                 <a
-                  href="/auth/login"
+                  href="/signin"
                   className="font-medium text-amber-600 hover:text-amber-700 transition-colors"
                 >
                   Go to user login
