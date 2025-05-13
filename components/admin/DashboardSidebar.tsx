@@ -205,7 +205,7 @@ export function DashboardSidebar() {
 
           {state === "expanded" && (
             <div className="flex flex-col">
-              <span className="font-bold text-amber-800 text-lg leading-tight">
+              <span className="font-bold text-black/80 text-lg leading-tight">
                 MGE
               </span>
               <span className="text-xs text-amber-600/80 font-medium">
@@ -236,7 +236,7 @@ export function DashboardSidebar() {
                       className={cn(
                         "justify-between group transition-all duration-200",
                         item.active &&
-                          "bg-amber-600 text-white hover:bg-amber-700"
+                          "bg-[#B99733] text-white hover:bg-amber-700"
                       )}
                     >
                       <div className="flex items-center">

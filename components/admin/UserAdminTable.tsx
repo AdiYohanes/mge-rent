@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowUpDown,
@@ -228,7 +228,7 @@ export function UserAdminTable() {
           size="sm"
           onClick={() => setCurrentPage(i)}
           className={`h-8 w-8 p-0 rounded-full ${
-            currentPage === i ? "bg-amber-500 text-white" : ""
+            currentPage === i ? "bg-[#B99733] text-white" : ""
           }`}
         >
           {i}

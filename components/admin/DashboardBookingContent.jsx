@@ -142,7 +142,7 @@ export function DashboardBookingContent() {
                             <TabsTrigger
                                 key={tab.id}
                                 value={tab.id}
-                                className="data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+                                className="data-[state=active]:bg-[#B99733] data-[state=active]:text-white"
                             >
                                 {tab.label}
                             </TabsTrigger>

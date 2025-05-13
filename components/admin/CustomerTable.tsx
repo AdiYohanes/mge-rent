@@ -227,7 +227,7 @@ export function CustomerTable() {
           size="sm"
           onClick={() => setCurrentPage(i)}
           className={`h-8 w-8 p-0 rounded-full ${
-            currentPage === i ? "bg-amber-500 text-white" : ""
+            currentPage === i ? "bg-[#B99733] text-white" : ""
           }`}
         >
           {i}
@@ -403,7 +403,7 @@ export function CustomerTable() {
               key={customer.id}
               className="bg-amber-50 border border-amber-100 rounded-lg p-4 flex items-center space-x-3"
             >
-              <div className="w-10 h-10 flex items-center justify-center font-bold rounded-full bg-amber-500 text-white">
+              <div className="w-10 h-10 flex items-center justify-center font-bold rounded-full bg-[#B99733] text-white">
                 #{index + 1}
               </div>
               <div className="flex-1">
@@ -464,7 +464,7 @@ export function CustomerTable() {
 
               {/* Add customer button */}
               <Button
-                className="bg-amber-600 hover:bg-amber-700 flex gap-1 items-center"
+                className="bg-[#B99733] hover:bg-amber-700 flex gap-1 items-center cursor-pointer"
                 onClick={handleAddCustomer}
               >
                 <UserPlus className="h-4 w-4" />

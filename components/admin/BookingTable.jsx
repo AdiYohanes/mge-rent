@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
     Table,
@@ -21,20 +21,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-    Search,
-    Eye,
-    ArrowUpDown,
+    Search, ArrowUpDown,
     ChevronLeft,
     ChevronRight,
-    CalendarIcon,
-    FilterIcon,
-    Clock,
-    CheckCircle2,
-    XCircle,
+    CalendarIcon, Clock, XCircle,
     RefreshCw,
     RotateCcw,
-    CalendarCheck,
-    AlertCircle,
+    CalendarCheck
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,11 +38,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
-import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
@@ -57,11 +45,9 @@ import {
 } from "@/components/ui/tooltip";
 import {
     Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
+    DialogContent, DialogFooter,
     DialogHeader,
-    DialogTitle,
+    DialogTitle
 } from "@/components/ui/dialog";
 
 // Dummy data untuk tabel booking
@@ -72,12 +58,13 @@ const bookingData = [
         customerName: "John Doe",
         phoneNumber: "081234567890",
         roomType: "VVIP",
-        consoleUnit: "PlayStation 5",
-        unitNumber: "PS5-001",
+        console: "PlayStation 5",
+        unitNumber: "Unit A",
         totalPerson: 4,
         date: "2025-03-10",
         time: "13:00 - 15:00",
         startTime: "13:00",
+        endTime: "15:00",
         duration: "2 hours",
         status: "booking_success",
         amount: 150000,
@@ -85,6 +72,7 @@ const bookingData = [
         foodItems: ["Mineral Water", "Snack Combo", "Coffee"],
         foodTypes: ["Food", "Drink", "Food"],
         eventType: "Birthday Party",
+        eventDescription: "Test event Desc",
         eventName: "John's 25th Birthday",
     },
     {
@@ -93,12 +81,13 @@ const bookingData = [
         customerName: "Jane Smith",
         phoneNumber: "081298765432",
         roomType: "VIP",
-        consoleUnit: "PlayStation 5",
-        unitNumber: "PS5-002",
+        console: "PlayStation 5",
+        unitNumber: "Unit B",
         totalPerson: 2,
         date: "2025-03-10",
         time: "16:00 - 18:00",
         startTime: "16:00",
+        endTime: "18:00",
         duration: "2 hours",
         status: "booking_ongoing",
         amount: 120000,
@@ -106,6 +95,7 @@ const bookingData = [
         foodItems: ["Cola", "Popcorn"],
         foodTypes: ["Food", "Drink"],
         eventType: "Gathering",
+        eventDescription: "Test event Desc",
         eventName: "Team Building",
     },
     {
@@ -114,11 +104,12 @@ const bookingData = [
         customerName: "Robert Johnson",
         phoneNumber: "081345678901",
         roomType: "Regular",
-        consoleUnit: "PlayStation 4",
-        unitNumber: "PS4-001",
+        console: "PlayStation 4",
+        unitNumber: "Unit C",
         totalPerson: 3,
         date: "2025-03-11",
         time: "10:00 - 12:00",
+        endTime: "12:00",
         startTime: "10:00",
         duration: "2 hours",
         status: "booking_finish",
@@ -127,6 +118,7 @@ const bookingData = [
         foodItems: ["Tea", "Sandwich"],
         foodTypes: ["Food", "Drink"],
         eventType: "Tournament",
+        eventDescription: "Test event Desc",
         eventName: "FIFA Championship",
     },
     {
@@ -135,12 +127,13 @@ const bookingData = [
         customerName: "Emily Davis",
         phoneNumber: "081456789012",
         roomType: "VVIP",
-        consoleUnit: "PlayStation 5",
-        unitNumber: "PS5-003",
+        console: "PlayStation 5",
+        unitNumber: "Unit C",
         totalPerson: 5,
         date: "2025-03-11",
         time: "14:00 - 16:00",
         startTime: "14:00",
+        endTime: "16:00",
         duration: "2 hours",
         status: "booking_canceled",
         amount: 150000,
@@ -148,6 +141,7 @@ const bookingData = [
         foodItems: ["Juice Pack", "Chips"],
         foodTypes: ["Food", "Drink"],
         eventType: "Corporate",
+        eventDescription: "Test event Desc",
         eventName: "Product Launch",
     },
     {
@@ -156,12 +150,13 @@ const bookingData = [
         customerName: "Michael Wilson",
         phoneNumber: "081567890123",
         roomType: "VIP",
-        consoleUnit: "PlayStation 5",
-        unitNumber: "PS5-004",
+        console: "PlayStation 5",
+        unitNumber: "Unit D",
         totalPerson: 3,
         date: "2025-03-12",
         time: "11:00 - 13:00",
         startTime: "11:00",
+        endTime: "13:00",
         duration: "2 hours",
         status: "return",
         amount: 120000,
@@ -169,6 +164,7 @@ const bookingData = [
         foodItems: ["Energy Drink", "Burger"],
         foodTypes: ["Food", "Drink"],
         eventType: "Birthday Party",
+        eventDescription: "Test event Desc",
         eventName: "Mike's Birthday",
     },
     {
@@ -177,12 +173,13 @@ const bookingData = [
         customerName: "Sarah Brown",
         phoneNumber: "081678901234",
         roomType: "Regular",
-        consoleUnit: "PlayStation 4",
-        unitNumber: "PS4-002",
+        console: "PlayStation 4",
+        unitNumber: "Unit D",
         totalPerson: 2,
         date: "2025-03-12",
         time: "17:00 - 19:00",
         startTime: "17:00",
+        endTime: "19:00",
         duration: "2 hours",
         status: "booking_reschedule",
         amount: 80000,
@@ -190,6 +187,7 @@ const bookingData = [
         foodItems: ["Iced Tea", "Fries"],
         foodTypes: ["Food", "Drink"],
         eventType: "Casual",
+        eventDescription: "Test event Desc",
         eventName: "Game Night",
     },
     {
@@ -198,12 +196,13 @@ const bookingData = [
         customerName: "David Miller",
         phoneNumber: "081789012345",
         roomType: "VVIP",
-        consoleUnit: "PlayStation 5",
-        unitNumber: "PS5-005",
+        console: "PlayStation 5",
+        unitNumber: "Unit E",
         totalPerson: 4,
         date: "2025-03-13",
         time: "12:00 - 14:00",
         startTime: "12:00",
+        endTime: "14:00",
         duration: "2 hours",
         status: "booking_success",
         amount: 150000,
@@ -211,6 +210,7 @@ const bookingData = [
         foodItems: ["Coffee", "Cake"],
         foodTypes: ["Food", "Drink"],
         eventType: "Corporate",
+        eventDescription: "Test event Desc",
         eventName: "Team Meeting",
     },
     {
@@ -219,12 +219,13 @@ const bookingData = [
         customerName: "Lisa Taylor",
         phoneNumber: "081890123456",
         roomType: "Regular",
-        consoleUnit: "PlayStation 4",
-        unitNumber: "PS4-003",
+        console: "PlayStation 4",
+        unitNumber: "Unit F",
         totalPerson: 2,
         date: "2025-03-13",
         time: "15:00 - 17:00",
         startTime: "15:00",
+        endTime: "17:00",
         duration: "2 hours",
         status: "booking_ongoing",
         amount: 80000,
@@ -232,127 +233,135 @@ const bookingData = [
         foodItems: ["Soda", "Pizza"],
         foodTypes: ["Food", "Drink"],
         eventType: "Tournament",
+        eventDescription: "Test event Desc",
         eventName: "Racing Championship",
     },
-    {
-        id: "E001",
-        transactionNumber: "TRX0001239",
-        customerName: "Event Customer",
-        phoneNumber: "081234567890",
-        eventName: "Gathering A",
-        eventDescription: "Lorem Ipsum",
-        console: "PlayStation 4",
-        room: "VIP",
-        unit: "Unit A",
-        totalPerson: 10,
-        date: "12/08/2025",
-        startTime: "10:00",
-        endTime: "12:00",
-        duration: "2",
-        status: "booking_ongoing",
-    },
-    {
-        id: "E002",
-        transactionNumber: "TRX0001399",
-        customerName: "Event Customer",
-        phoneNumber: "081234567890",
-        eventName: "Gathering B",
-        eventDescription: "Lorem Ipsum",
-        console: "PlayStation 4",
-        room: "VIP",
-        unit: "Unit B",
-        totalPerson: 15,
-        date: "12/08/2025",
-        startTime: "10:00",
-        endTime: "13:00",
-        duration: "3",
-        status: "booking_canceled",
-    },
-    {
-        id: "E003",
-        transactionNumber: "TRX0001239",
-        customerName: "Event Customer",
-        phoneNumber: "081234567890",
-        eventName: "Gathering C",
-        eventDescription: "Lorem Ipsum",
-        console: "PlayStation 5",
-        room: "Regular",
-        unit: "Unit C",
-        totalPerson: 20,
-        date: "12/08/2025",
-        startTime: "10:00",
-        endTime: "12:00",
-        duration: "2",
-        status: "booking_finish",
-    },
-    {
-        id: "E004",
-        transactionNumber: "TRX0002369",
-        customerName: "Event Customer",
-        phoneNumber: "081234567890",
-        eventName: "Gathering D",
-        eventDescription: "Lorem Ipsum",
-        console: "PlayStation 5",
-        room: "Regular",
-        unit: "Unit C",
-        totalPerson: 10,
-        date: "12/08/2025",
-        startTime: "10:00",
-        endTime: "12:00",
-        duration: "2",
-        status: "booking_ongoing",
-    },
-    {
-        id: "E005",
-        transactionNumber: "TRX0006548",
-        customerName: "Event Customer",
-        phoneNumber: "081234567890",
-        eventName: "Gathering E",
-        eventDescription: "Lorem Ipsum",
-        console: "PlayStation 4",
-        room: "VIP",
-        unit: "Unit A",
-        totalPerson: 15,
-        date: "12/08/2025",
-        startTime: "10:00",
-        endTime: "12:00",
-        duration: "2",
-        status: "booking_reschedule",
-    },
-    {
-        id: "E006",
-        transactionNumber: "TRX0006548",
-        customerName: "Event Customer",
-        phoneNumber: "081234567890",
-        eventName: "Gathering F",
-        eventDescription: "Lorem Ipsum",
-        console: "PlayStation 5",
-        room: "VIP",
-        unit: "Unit D",
-        totalPerson: 12,
-        date: "12/08/2025",
-        startTime: "10:00",
-        endTime: "12:00",
-        duration: "2",
-        status: "booking_success",
-    },
-    {
-        id: "E007",
-        transactionNumber: "TRX0006479",
-        customerName: "Event Customer",
-        phoneNumber: "081234567890",
-        eventName: "Gathering G",
-        eventDescription: "Lorem Ipsum",
-        console: "PlayStation 5",
-        room: "VIP",
-        unit: "Unit A",
-        totalPerson: 16,
-        date: "12/08/2025",
-        startTime: "10:00",
-        endTime: "12:00",
-        duration: "2",
-        status: "booking_success",
-    },
+    // {
+    //     id: "E001",
+    //     transactionNumber: "TRX0001239",
+    //     customerName: "Event Customer",
+    //     phoneNumber: "081234567890",
+    //     eventName: "Gathering A",
+    //     eventDescription: "Lorem Ipsum",
+    //     console: "PlayStation 4",
+    //     room: "VIP",
+    //     unit: "Unit A",
+    //     totalPerson: 10,
+    //     date: "12/08/2025",
+    //     startTime: "10:00",
+    //     endTime: "12:00",
+    //     duration: "2",
+    //     status: "booking_ongoing",
+    //     amount: 250000,
+    // },
+    // {
+    //     id: "E002",
+    //     transactionNumber: "TRX0001399",
+    //     customerName: "Event Customer",
+    //     phoneNumber: "081234567890",
+    //     eventName: "Gathering B",
+    //     eventDescription: "Lorem Ipsum",
+    //     console: "PlayStation 4",
+    //     room: "VIP",
+    //     unit: "Unit B",
+    //     totalPerson: 15,
+    //     date: "12/08/2025",
+    //     startTime: "10:00",
+    //     endTime: "13:00",
+    //     duration: "3",
+    //     status: "booking_canceled",
+    //     amount: 375000,
+    // },
+    // {
+    //     id: "E003",
+    //     transactionNumber: "TRX0001239",
+    //     customerName: "Event Customer",
+    //     phoneNumber: "081234567890",
+    //     eventName: "Gathering C",
+    //     eventDescription: "Lorem Ipsum",
+    //     console: "PlayStation 5",
+    //     room: "Regular",
+    //     unit: "Unit C",
+    //     totalPerson: 20,
+    //     date: "12/08/2025",
+    //     startTime: "10:00",
+    //     endTime: "12:00",
+    //     duration: "2",
+    //     status: "booking_finish",
+    //     amount: 300000,
+    // },
+    // {
+    //     id: "E004",
+    //     transactionNumber: "TRX0002369",
+    //     customerName: "Event Customer",
+    //     phoneNumber: "081234567890",
+    //     eventName: "Gathering D",
+    //     eventDescription: "Lorem Ipsum",
+    //     console: "PlayStation 5",
+    //     room: "Regular",
+    //     unit: "Unit C",
+    //     totalPerson: 10,
+    //     date: "12/08/2025",
+    //     startTime: "10:00",
+    //     endTime: "12:00",
+    //     duration: "2",
+    //     status: "booking_ongoing",
+    //     amount: 200000,
+    // },
+    // {
+    //     id: "E005",
+    //     transactionNumber: "TRX0006548",
+    //     customerName: "Event Customer",
+    //     phoneNumber: "081234567890",
+    //     eventName: "Gathering E",
+    //     eventDescription: "Lorem Ipsum",
+    //     console: "PlayStation 4",
+    //     room: "VIP",
+    //     unit: "Unit A",
+    //     totalPerson: 15,
+    //     date: "12/08/2025",
+    //     startTime: "10:00",
+    //     endTime: "12:00",
+    //     duration: "2",
+    //     status: "booking_reschedule",
+    //     amount: 280000,
+    // },
+    // {
+    //     id: "E006",
+    //     transactionNumber: "TRX0006548",
+    //     customerName: "Event Customer",
+    //     phoneNumber: "081234567890",
+    //     eventName: "Gathering F",
+    //     eventDescription: "Lorem Ipsum",
+    //     console: "PlayStation 5",
+    //     room: "VIP",
+    //     unit: "Unit D",
+    //     totalPerson: 12,
+    //     date: "12/08/2025",
+    //     startTime: "10:00",
+    //     endTime: "12:00",
+    //     duration: "2",
+    //     status: "booking_success",
+    //     amount: 320000,
+    // },
+    // {
+    //     id: "E007",
+    //     transactionNumber: "TRX0006479",
+    //     customerName: "Event Customer",
+    //     phoneNumber: "081234567890",
+    //     eventName: "Gathering G",
+    //     eventDescription: "Lorem Ipsum",
+    //     console: "PlayStation 5",
+    //     room: "VIP",
+    //     unit: "Unit A",
+    //     totalPerson: 16,
+    //     date: "12/08/2025",
+    //     startTime: "10:00",
+    //     endTime: "12:00",
+    //     duration: "2",
+    //     status: "booking_success",
+    //     amount: 350000,
+    // },
 ];
 
 export function BookingTable({ filterStatus = null, bookingType = "room" }) {
@@ -511,11 +520,21 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
 
     // Format angka ke format rupiah
     const formatCurrency = (amount) => {
+        // Handle invalid number values
+        if (amount === undefined || amount === null || isNaN(amount)) {
+            return "Rp0";
+        }
+
+        // Ensure amount is a number
+        const numAmount = Number(amount);
+
+        // Format to Indonesian Rupiah
         return new Intl.NumberFormat("id-ID", {
             style: "currency",
             currency: "IDR",
             minimumFractionDigits: 0,
-        }).format(amount);
+            maximumFractionDigits: 0,
+        }).format(numAmount).replace(/\s/g, '');
     };
 
     // Generate pagination buttons
@@ -752,6 +771,18 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
                                 )}
                             </div>
                         </TableHead>
+                        <TableHead
+                            className="cursor-pointer hover:bg-gray-50"
+                            onClick={() => handleSort("amount")}
+                        >
+                            <div className="flex items-center">
+                                Total Payment
+                                {sortField === "amount" && (
+                                    <ArrowUpDown className={`ml-1 h-3 w-3 ${sortDirection === "desc" ? "rotate-180" : ""}`} />
+                                )}
+                            </div>
+                        </TableHead>
+
                         <TableHead className="text-right">Actions</TableHead>
                     </>
                 );
@@ -1089,14 +1120,16 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
                         <TableCell>{booking.eventName}</TableCell>
                         <TableCell>{booking.eventDescription}</TableCell>
                         <TableCell>{booking.console}</TableCell>
-                        <TableCell>{booking.room}</TableCell>
-                        <TableCell>{booking.unit}</TableCell>
+                        <TableCell>{booking.roomType}</TableCell>
+                        <TableCell>{booking.unitNumber}</TableCell>
                         <TableCell>{booking.totalPerson}</TableCell>
                         <TableCell>{booking.date}</TableCell>
                         <TableCell>{booking.startTime}</TableCell>
                         <TableCell>{booking.endTime}</TableCell>
                         <TableCell>{booking.duration}</TableCell>
                         <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                        <TableCell>{formatCurrency(booking.amount)}</TableCell>
+                        {/* <TableCell>{getStatusBadge(booking.status)}</TableCell> */}
                         <TableCell className="text-right">
                             {getActionButtons(booking.status, booking)}
                         </TableCell>
@@ -1109,7 +1142,7 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
                         <TableCell className="font-medium">{booking.transactionNumber}</TableCell>
                         <TableCell>{booking.customerName}</TableCell>
                         <TableCell>{booking.phoneNumber}</TableCell>
-                        <TableCell>{booking.consoleUnit}</TableCell>
+                        <TableCell>{booking.console}</TableCell>
                         <TableCell>{booking.roomType}</TableCell>
                         <TableCell>{booking.unitNumber}</TableCell>
                         <TableCell>{booking.totalPerson}</TableCell>
@@ -1386,6 +1419,18 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
                         <Badge variant="outline" className="ml-2">
                             Filtering: {months.find(m => m.value === selectedMonth)?.label} {selectedYear}
                         </Badge>
+                    )}
+
+                    {/* Add OTS Booking Button */}
+                    {bookingType === "room" && (
+                        <div className="ml-auto">
+                            <Button
+                                className="bg-[#B99733] hover:bg-[#a38429] text-white"
+                                onClick={() => alert("Add OTS Booking functionality will be implemented")}
+                            >
+                                Add OTS Booking
+                            </Button>
+                        </div>
                     )}
                 </div>
             </CardHeader>
