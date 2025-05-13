@@ -127,14 +127,6 @@ export function DashboardSidebar() {
         active: pathname.includes("/admin/dashboard/transactions"),
         expandable: false,
       },
-      {
-        id: "analytics",
-        name: "Analytics",
-        icon: BarChart3,
-        href: "/admin/dashboard/analytics",
-        active: pathname.includes("/admin/dashboard/analytics"),
-        expandable: false,
-      },
     ],
     [pathname]
   );
