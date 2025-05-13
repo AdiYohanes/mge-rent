@@ -1,6 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import Image from "next/image";
 import { HiMenuAlt3 } from "react-icons/hi";
@@ -12,7 +12,9 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const router = useRouter();
+  const profileMenuRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
@@ -22,9 +24,25 @@ export default function Navbar() {
     }
   }, []);
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target)
+      ) {
+        setIsProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("user");
     setUser(null);
+    setIsProfileMenuOpen(false);
     router.push("/signin");
   };
 
@@ -96,33 +114,120 @@ export default function Navbar() {
         </div>
 
         {isMenuOpen && (
-          <div className="md:hidden absolute top-16 left-0 right-0 bg-white shadow-md p-4 space-y-4 ">
-            <a href="#" className="block text-black ">
+          <div className="md:hidden absolute top-16 left-0 right-0 bg-white shadow-md p-4 space-y-4 z-20">
+            <Link
+              href="/"
+              className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
+            >
               MGE Rental
-            </a>
-            <a href="#" className="block text-black">
+            </Link>
+            <Link
+              href="/booking"
+              className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
+            >
               Rent
-            </a>
-            <a href="#" className="block text-black">
+            </Link>
+            <Link
+              href="/restaurant"
+              className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
+            >
               Food & Drinks
-            </a>
-            <Link href="/faq" className="block text-black">
+            </Link>
+            <Link
+              href="/faq"
+              className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
+            >
               FAQ
             </Link>
+            {user && (
+              <div className="relative">
+                <div
+                  className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer flex items-center"
+                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                >
+                  <div className="w-6 h-6 bg-black rounded-full flex items-center justify-center overflow-hidden mr-2">
+                    <Image
+                      src="/images/button-icon.png"
+                      alt="Profile"
+                      width={24}
+                      height={24}
+                      className="pixelated"
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  </div>
+                  <span>{user.username}</span>
+                </div>
+                {isProfileMenuOpen && (
+                  <div className="absolute left-full -top-1 ml-1 bg-white border border-gray-200 shadow-lg z-30 w-48">
+                    <Link
+                      href="/profile"
+                      className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] border-b border-gray-100 transition-colors duration-200 cursor-pointer"
+                    >
+                      Edit Profile
+                    </Link>
+                    <Link
+                      href="/userBookings"
+                      className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] border-b border-gray-100 transition-colors duration-200 cursor-pointer"
+                    >
+                      Booking History
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         <div className="hidden md:flex items-center">
           {user ? (
-            <div className="flex items-center">
-              <p className="mr-4">Welcome, {user.username}!</p>
-              <Button
-                variant="ghost"
-                onClick={handleLogout}
-                className="bg-[#1B1010] text-white gap-4 px-8 py-6 rounded-none hover:bg-gray-900 hover:text-[#B99733] transition duration-300 cursor-pointer"
+            <div className="flex items-center relative" ref={profileMenuRef}>
+              <div
+                className="flex items-center bg-[#1B1010] text-white px-4 py-2 cursor-pointer hover:bg-gray-900 transition-colors duration-200"
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center overflow-hidden">
+                    <Image
+                      src="/images/button-icon.png"
+                      alt="Profile"
+                      width={32}
+                      height={32}
+                      className="pixelated"
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  </div>
+                  <span className="text-white">{user.username}</span>
+                </div>
+              </div>
+
+              {isProfileMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 shadow-lg z-30 w-48">
+                  <Link
+                    href="/profile"
+                    className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] border-b border-gray-100 transition-colors duration-200 cursor-pointer"
+                  >
+                    Edit Profile
+                  </Link>
+                  <Link
+                    href="/userBookings"
+                    className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] border-b border-gray-100 transition-colors duration-200 cursor-pointer"
+                  >
+                    Booking History
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
               >
                 Logout
-              </Button>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <Link href="/signin">
