@@ -378,6 +378,24 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
     const [confirmAction, setConfirmAction] = useState("");
 
+    // New state for OTS Booking modal
+    const [isOTSBookingModalOpen, setIsOTSBookingModalOpen] = useState(false);
+    const [newOTSBooking, setNewOTSBooking] = useState({
+        transactionNumber: `TRX-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+        customerName: "",
+        phoneNumber: "",
+        console: "PlayStation 5",
+        roomType: "VVIP",
+        unitNumber: "Unit A",
+        totalPerson: 1,
+        date: new Date().toISOString().split('T')[0],
+        startTime: "",
+        duration: "2 hours",
+        status: "booking_success",
+        amount: 150000,
+        paymentMethod: "Cash"
+    });
+
     // State variables for event booking actions
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -1309,6 +1327,72 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
         return today.toISOString().split('T')[0];
     };
 
+    // Function to save new OTS booking
+    const saveOTSBooking = () => {
+        // In a real app, this would call an API to create the booking
+        // For this demo, we'll just simulate a successful creation
+        setIsOTSBookingModalOpen(false);
+
+        toast.success("OTS Booking created successfully!", {
+            description: `New booking for ${newOTSBooking.customerName} has been added.`,
+            duration: 5000,
+        });
+
+        // Reset form for next use
+        setNewOTSBooking({
+            transactionNumber: `TRX-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+            customerName: "",
+            phoneNumber: "",
+            console: "PlayStation 5",
+            roomType: "VVIP",
+            unitNumber: "Unit A",
+            totalPerson: 1,
+            date: new Date().toISOString().split('T')[0],
+            startTime: "",
+            duration: "2 hours",
+            status: "booking_success",
+            amount: 150000,
+            paymentMethod: "Cash"
+        });
+    };
+
+    // Function to handle room type change and update price
+    const handleRoomTypeChange = (value) => {
+        let newAmount;
+        switch (value) {
+            case "VVIP":
+                newAmount = 150000;
+                break;
+            case "VIP":
+                newAmount = 120000;
+                break;
+            case "Regular":
+                newAmount = 80000;
+                break;
+            default:
+                newAmount = 150000;
+        }
+
+        setNewOTSBooking({
+            ...newOTSBooking,
+            roomType: value,
+            amount: newAmount
+        });
+    };
+
+    // Function to handle duration change and update price
+    const handleDurationChange = (value) => {
+        const hours = parseInt(value.split(' ')[0]);
+        const baseAmount = newOTSBooking.roomType === "VVIP" ? 150000 :
+            newOTSBooking.roomType === "VIP" ? 120000 : 80000;
+
+        setNewOTSBooking({
+            ...newOTSBooking,
+            duration: value,
+            amount: baseAmount * hours
+        });
+    };
+
     return (
         <Card>
             <CardHeader className="pb-2">
@@ -1426,7 +1510,7 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
                         <div className="ml-auto">
                             <Button
                                 className="bg-[#B99733] hover:bg-[#a38429] text-white"
-                                onClick={() => alert("Add OTS Booking functionality will be implemented")}
+                                onClick={() => setIsOTSBookingModalOpen(true)}
                             >
                                 Add OTS Booking
                             </Button>
@@ -2299,6 +2383,260 @@ export function BookingTable({ filterStatus = null, bookingType = "room" }) {
                             disabled={!newEvent.eventName || !newEvent.date || !newEvent.startTime || !newEvent.endTime}
                         >
                             Add Event
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Add OTS Booking Modal */}
+            <Dialog open={isOTSBookingModalOpen} onOpenChange={setIsOTSBookingModalOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                        <DialogTitle>Add OTS Booking</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="ots-transactionNumber" className="text-sm font-medium block mb-1">
+                                    No. Transaction <span className="text-red-500">*</span>
+                                </label>
+                                <Input
+                                    id="ots-transactionNumber"
+                                    value={newOTSBooking.transactionNumber}
+                                    className="bg-gray-100"
+                                    readOnly
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="ots-name" className="text-sm font-medium block mb-1">
+                                    Name <span className="text-red-500">*</span>
+                                </label>
+                                <Input
+                                    id="ots-name"
+                                    value={newOTSBooking.customerName}
+                                    onChange={(e) => setNewOTSBooking({ ...newOTSBooking, customerName: e.target.value })}
+                                    placeholder="Customer Name"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="ots-phone" className="text-sm font-medium block mb-1">
+                                Phone Number <span className="text-red-500">*</span>
+                            </label>
+                            <Input
+                                id="ots-phone"
+                                value={newOTSBooking.phoneNumber}
+                                onChange={(e) => setNewOTSBooking({ ...newOTSBooking, phoneNumber: e.target.value })}
+                                placeholder="Phone Number"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="ots-console" className="text-sm font-medium block mb-1">
+                                Console <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={newOTSBooking.console}
+                                onValueChange={(value) => setNewOTSBooking({ ...newOTSBooking, console: value })}
+                            >
+                                <SelectTrigger id="ots-console" className="w-full">
+                                    <SelectValue placeholder="Select Console" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="PlayStation 5">PlayStation 5</SelectItem>
+                                    <SelectItem value="PlayStation 4">PlayStation 4</SelectItem>
+                                    <SelectItem value="Xbox Series X">Xbox Series X</SelectItem>
+                                    <SelectItem value="Nintendo Switch">Nintendo Switch</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div>
+                            <label htmlFor="ots-room" className="text-sm font-medium block mb-1">
+                                Room <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={newOTSBooking.roomType}
+                                onValueChange={handleRoomTypeChange}
+                            >
+                                <SelectTrigger id="ots-room" className="w-full">
+                                    <SelectValue placeholder="Select Room" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="VVIP">VVIP</SelectItem>
+                                    <SelectItem value="VIP">VIP</SelectItem>
+                                    <SelectItem value="Regular">Regular</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div>
+                            <label htmlFor="ots-unit" className="text-sm font-medium block mb-1">
+                                Unit <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={newOTSBooking.unitNumber}
+                                onValueChange={(value) => setNewOTSBooking({ ...newOTSBooking, unitNumber: value })}
+                            >
+                                <SelectTrigger id="ots-unit" className="w-full">
+                                    <SelectValue placeholder="Select Unit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Unit A">Unit A</SelectItem>
+                                    <SelectItem value="Unit B">Unit B</SelectItem>
+                                    <SelectItem value="Unit C">Unit C</SelectItem>
+                                    <SelectItem value="Unit D">Unit D</SelectItem>
+                                    <SelectItem value="Unit E">Unit E</SelectItem>
+                                    <SelectItem value="Unit F">Unit F</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div>
+                            <label htmlFor="ots-totalPerson" className="text-sm font-medium block mb-1">
+                                Total Person <span className="text-red-500">*</span>
+                            </label>
+                            <Input
+                                id="ots-totalPerson"
+                                type="number"
+                                min="1"
+                                value={newOTSBooking.totalPerson}
+                                onChange={(e) => setNewOTSBooking({ ...newOTSBooking, totalPerson: parseInt(e.target.value) || 1 })}
+                                placeholder="Total Person"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="ots-startTime" className="text-sm font-medium block mb-1">
+                                    Start Time <span className="text-red-500">*</span>
+                                </label>
+                                <Select
+                                    value={newOTSBooking.startTime}
+                                    onValueChange={(value) => setNewOTSBooking({ ...newOTSBooking, startTime: value })}
+                                >
+                                    <SelectTrigger id="ots-startTime" className="w-full">
+                                        <SelectValue placeholder="Select Start Time" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[300px]">
+                                        {generateTimeOptions(newOTSBooking.date)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <label htmlFor="ots-duration" className="text-sm font-medium block mb-1">
+                                    Durasi <span className="text-red-500">*</span>
+                                </label>
+                                <Select
+                                    value={newOTSBooking.duration}
+                                    onValueChange={handleDurationChange}
+                                >
+                                    <SelectTrigger id="ots-duration" className="w-full">
+                                        <SelectValue placeholder="Select Duration" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1 hours">1 hour</SelectItem>
+                                        <SelectItem value="2 hours">2 hours</SelectItem>
+                                        <SelectItem value="3 hours">3 hours</SelectItem>
+                                        <SelectItem value="4 hours">4 hours</SelectItem>
+                                        <SelectItem value="5 hours">5 hours</SelectItem>
+                                        <SelectItem value="6 hours">6 hours</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="ots-date" className="text-sm font-medium block mb-1">
+                                Tanggal Booking <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={newOTSBooking.date}
+                                onValueChange={(value) => setNewOTSBooking({ ...newOTSBooking, date: value })}
+                            >
+                                <SelectTrigger id="ots-date" className="w-full">
+                                    <SelectValue placeholder="Select Date" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(() => {
+                                        const dates = [];
+                                        const today = new Date();
+                                        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                                        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+                                        for (let i = 0; i < 7; i++) {
+                                            const nextDate = new Date();
+                                            nextDate.setDate(today.getDate() + i);
+
+                                            const dayName = dayNames[nextDate.getDay()];
+                                            const day = nextDate.getDate();
+                                            const month = monthNames[nextDate.getMonth()];
+                                            const year = nextDate.getFullYear();
+
+                                            const formattedDate = `${year}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                            const displayDate = `${dayName}, ${day} ${month} ${year}`;
+
+                                            dates.push(
+                                                <SelectItem key={formattedDate} value={formattedDate}>
+                                                    {displayDate}
+                                                </SelectItem>
+                                            );
+                                        }
+                                        return dates;
+                                    })()}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div>
+                            <label htmlFor="ots-amount" className="text-sm font-medium block mb-1">
+                                Total Pembayaran <span className="text-red-500">*</span>
+                            </label>
+                            <Input
+                                id="ots-amount"
+                                value={formatCurrency(newOTSBooking.amount)}
+                                className="bg-gray-100"
+                                readOnly
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="ots-payment" className="text-sm font-medium block mb-1">
+                                Metode Pembayaran <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={newOTSBooking.paymentMethod}
+                                onValueChange={(value) => setNewOTSBooking({ ...newOTSBooking, paymentMethod: value })}
+                            >
+                                <SelectTrigger id="ots-payment" className="w-full">
+                                    <SelectValue placeholder="Select Payment Method" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Cash">Cash</SelectItem>
+                                    <SelectItem value="QRIS">QRIS</SelectItem>
+                                    <SelectItem value="BCA Transfer">BCA Transfer</SelectItem>
+                                    <SelectItem value="BRI Transfer">BRI Transfer</SelectItem>
+                                    <SelectItem value="Debit Card">Debit Card</SelectItem>
+                                    <SelectItem value="Credit Card">Credit Card</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="mt-2">
+                        <Button variant="outline" onClick={() => setIsOTSBookingModalOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-[#B99733] hover:bg-[#a38429]"
+                            onClick={saveOTSBooking}
+                            disabled={!newOTSBooking.customerName || !newOTSBooking.phoneNumber || !newOTSBooking.startTime}
+                        >
+                            Book Room
                         </Button>
                     </DialogFooter>
                 </DialogContent>
