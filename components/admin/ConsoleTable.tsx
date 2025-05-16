@@ -1,7 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Search, Pencil, Trash2, Upload } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { toast } from "sonner";
+import {
+  Search,
+  Pencil,
+  Trash2,
+  Upload,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,42 +38,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-interface Console {
-  id: string;
-  name: string;
-  image: string;
-  amount: number;
-}
-
-// Sample data
-const consoleData: Console[] = [
-  {
-    id: "1",
-    name: "Playstation 4",
-    image: "/images/console/ps3.png",
-    amount: 5,
-  },
-  {
-    id: "2",
-    name: "Playstation 5",
-    image: "/images/console/ps4.png",
-    amount: 10,
-  },
-  {
-    id: "3",
-    name: "Nintendo",
-    image: "/images/console/ps5.png",
-    amount: 1,
-  },
-];
+import {
+  Console,
+  getConsoles,
+  deleteConsole,
+  addConsole,
+  updateConsole,
+  ConsolePayload,
+} from "@/api";
+import axios from "axios";
+import { API_BASE_URL } from "@/api/constants";
 
 export function ConsoleTable() {
   // State for data and filtering
-  const [consoles, setConsoles] = useState<Console[]>(consoleData);
+  const [consoles, setConsoles] = useState<Console[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // State for modals
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -72,14 +68,65 @@ export function ConsoleTable() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [currentConsole, setCurrentConsole] = useState<Console | null>(null);
   const [newConsole, setNewConsole] = useState<Partial<Console>>({
-    name: "",
+    model: "",
     image: "",
-    amount: 0,
+    price: "",
+    serial_number: "",
   });
 
   // State for file upload
   const [isDragging, setIsDragging] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Set mounted to true once component has mounted
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Fetch consoles data from API
+  useEffect(() => {
+    // Skip API request during server-side rendering or before mounting
+    if (!mounted) {
+      return;
+    }
+
+    const fetchConsoles = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log("Fetching consoles data...");
+
+        const response = await getConsoles();
+        console.log("API response:", response);
+
+        if (response && Array.isArray(response.consoles)) {
+          setConsoles(response.consoles);
+          setTotalItems(response.total || response.consoles.length);
+          setTotalPages(
+            response.totalPages ||
+              Math.ceil(response.consoles.length / itemsPerPage)
+          );
+        } else {
+          console.error("Invalid API response format:", response);
+          throw new Error("API returned an invalid data format");
+        }
+      } catch (err) {
+        console.error("Error fetching consoles:", err);
+        setError(
+          `Failed to load consoles: ${
+            err instanceof Error ? err.message : "Unknown error"
+          }`
+        );
+        toast.error("Failed to load consoles. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchConsoles();
+  }, [mounted, refreshTrigger, itemsPerPage]);
 
   // Handle file drop
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -113,14 +160,13 @@ export function ConsoleTable() {
 
   // Filter data based on search
   const filteredData = consoles.filter((console) => {
-    return console.name.toLowerCase().includes(searchTerm.toLowerCase());
+    return console.model.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   // Pagination
   const lastIndex = currentPage * itemsPerPage;
   const firstIndex = lastIndex - itemsPerPage;
   const paginatedData = filteredData.slice(firstIndex, lastIndex);
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
 
   // Generate pagination buttons
   const generatePaginationButtons = () => {
@@ -141,7 +187,7 @@ export function ConsoleTable() {
         size="icon"
         className="rounded-full"
         onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-        disabled={currentPage === 1}
+        disabled={currentPage === 1 || loading}
       >
         &lt;
       </Button>
@@ -160,6 +206,7 @@ export function ConsoleTable() {
               : "rounded-full"
           }
           onClick={() => setCurrentPage(i)}
+          disabled={loading}
         >
           {i}
         </Button>
@@ -174,7 +221,7 @@ export function ConsoleTable() {
         size="icon"
         className="rounded-full"
         onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-        disabled={currentPage === totalPages}
+        disabled={currentPage === totalPages || totalPages === 0 || loading}
       >
         &gt;
       </Button>
@@ -192,11 +239,12 @@ export function ConsoleTable() {
   const handleEditConsole = (console: Console) => {
     setCurrentConsole(console);
     setNewConsole({
-      name: console.name,
+      model: console.model,
       image: console.image,
-      amount: console.amount,
+      price: console.price,
+      serial_number: console.serial_number,
     });
-    setPreviewUrl(console.image);
+    setPreviewUrl(console.image || "");
     setIsEditDialogOpen(true);
   };
 
@@ -207,52 +255,157 @@ export function ConsoleTable() {
 
   const resetForm = () => {
     setNewConsole({
-      name: "",
+      model: "",
       image: "",
-      amount: 0,
+      price: "",
+      serial_number: "",
     });
     setPreviewUrl(null);
   };
 
-  const submitAddConsole = () => {
-    const consoleToAdd: Console = {
-      id: String(consoles.length + 1),
-      name: newConsole.name || "",
-      image: newConsole.image || "/images/game-cover.png",
-      amount: newConsole.amount ?? 0,
+  const submitAddConsole = async () => {
+    // Validate required fields
+    if (!newConsole.model || !newConsole.serial_number || !newConsole.price) {
+      toast.error("Please fill all required fields.");
+      return;
+    }
+
+    // Prepare payload
+    const payload: ConsolePayload = {
+      model: newConsole.model!,
+      serial_number: newConsole.serial_number!,
+      price: newConsole.price!,
+      image: previewUrl, // This might need to be handled differently for a real file upload
+      is_available: true,
+      notes: "",
     };
-    setConsoles([...consoles, consoleToAdd]);
-    resetForm();
-    setIsAddDialogOpen(false);
-  };
 
-  const submitEditConsole = () => {
-    if (!currentConsole) return;
-    const updatedConsoles = consoles.map((console) => {
-      if (console.id === currentConsole.id) {
-        return {
-          ...console,
-          name: newConsole.name || console.name,
-          image: newConsole.image || console.image,
-          amount: newConsole.amount ?? console.amount,
-        };
+    try {
+      setLoading(true);
+      const result = await addConsole(payload);
+      if (result) {
+        toast.success("Console added successfully!");
+        setRefreshTrigger((prev) => prev + 1); // Refresh the list
+      } else {
+        throw new Error("Failed to create console");
       }
-      return console;
-    });
-    setConsoles(updatedConsoles);
-    setCurrentConsole(null);
-    resetForm();
-    setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error adding console:", error);
+      toast.error("Failed to add console. Please try again.");
+    } finally {
+      setLoading(false);
+      resetForm();
+      setIsAddDialogOpen(false);
+    }
   };
 
-  const submitDeleteConsole = () => {
+  const submitEditConsole = async () => {
     if (!currentConsole) return;
-    const updatedConsoles = consoles.filter(
-      (console) => console.id !== currentConsole.id
-    );
-    setConsoles(updatedConsoles);
-    setCurrentConsole(null);
-    setIsDeleteDialogOpen(false);
+
+    // Validate required fields
+    if (!newConsole.model || !newConsole.serial_number || !newConsole.price) {
+      toast.error("Please fill all required fields.");
+      return;
+    }
+
+    setLoading(true);
+
+    // Prepare payload - only include fields that the API needs
+    const payload: ConsolePayload = {
+      model: newConsole.model!,
+      serial_number: newConsole.serial_number!,
+      price: newConsole.price!,
+      image: previewUrl, // This might need to be handled differently for a real file upload
+      is_available: currentConsole.is_available,
+      notes: newConsole.notes || currentConsole.notes,
+    };
+
+    try {
+      console.log(`Updating console ID: ${currentConsole.id}`);
+      console.log(
+        `Endpoint: ${API_BASE_URL}/admin/consoles/${currentConsole.id}`
+      );
+      console.log(`Payload:`, payload);
+
+      // Try update with console ID
+      const result = await updateConsole(currentConsole.id.toString(), payload);
+
+      console.log("Update result:", result);
+
+      // Consider any non-null result as success
+      if (result !== null) {
+        toast.success("Console updated successfully!");
+        // Refresh data to get the latest from the backend
+        setRefreshTrigger((prev) => prev + 1);
+      } else {
+        throw new Error("Failed to update console - received null result");
+      }
+    } catch (error) {
+      console.error("Error updating console:", error);
+
+      // More detailed error handling
+      if (axios.isAxiosError(error)) {
+        console.error("Axios error details:", {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          headers: error.response?.headers,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+          },
+        });
+        toast.error(
+          `Update failed: ${error.response?.status} ${error.response?.statusText}`
+        );
+      } else {
+        toast.error(
+          `Failed to update console: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      }
+    } finally {
+      setLoading(false);
+      setCurrentConsole(null);
+      resetForm();
+      setIsEditDialogOpen(false);
+    }
+  };
+
+  const submitDeleteConsole = async () => {
+    if (!currentConsole) return;
+
+    setDeleteLoading(true);
+
+    try {
+      console.log(`Deleting console with ID: ${currentConsole.id}`);
+
+      // Call API to delete console with the numeric ID converted to string
+      const success = await deleteConsole(currentConsole.id.toString());
+
+      if (success) {
+        toast.success("Console deleted successfully!");
+      } else {
+        throw new Error(
+          "Failed to delete console. API returned unsuccessful response."
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting console:", error);
+      toast.error(
+        `Failed to delete console: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setDeleteLoading(false);
+      setCurrentConsole(null);
+      setIsDeleteDialogOpen(false);
+
+      // Always refresh data after delete attempt to ensure we're in sync with backend
+      setRefreshTrigger((prev) => prev + 1);
+    }
   };
 
   return (
@@ -267,6 +420,7 @@ export function ConsoleTable() {
                 setItemsPerPage(Number(value));
                 setCurrentPage(1);
               }}
+              disabled={loading}
             >
               <SelectTrigger className="w-[80px]">
                 <SelectValue placeholder={itemsPerPage} />
@@ -295,6 +449,19 @@ export function ConsoleTable() {
               />
             </div>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRefreshTrigger((prev) => prev + 1)}
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
+              Refresh
+            </Button>
+            <Button
               className="bg-[#B99733] hover:bg-amber-600 flex gap-1 items-center"
               onClick={handleAddConsole}
             >
@@ -305,23 +472,40 @@ export function ConsoleTable() {
       </CardHeader>
 
       <CardContent className="p-0">
+        {error && (
+          <div className="mb-4 p-3 border border-red-500 bg-red-50 rounded text-red-700 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="rounded-md border bg-[#f9f9f7]">
           <Table>
             <TableHeader>
               <TableRow className="bg-[#f9f9f7] hover:bg-[#f9f9f7]">
                 <TableHead className="font-bold text-black">NO</TableHead>
                 <TableHead className="font-bold text-black">IMAGE</TableHead>
-                <TableHead className="font-bold text-black">NAME</TableHead>
-                <TableHead className="font-bold text-black">AMOUNT</TableHead>
+                <TableHead className="font-bold text-black">MODEL</TableHead>
+                <TableHead className="font-bold text-black">PRICE</TableHead>
+                <TableHead className="font-bold text-black">STATUS</TableHead>
                 <TableHead className="font-bold text-black text-center">
                   ACTIONS
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedData.length === 0 ? (
+              {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">
+                  <TableCell colSpan={6} className="text-center h-24">
+                    <div className="flex flex-col items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-amber-500 mb-2" />
+                      <span>Loading consoles...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : paginatedData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center h-24">
                     No console found
                   </TableCell>
                 </TableRow>
@@ -332,17 +516,42 @@ export function ConsoleTable() {
                       {firstIndex + index + 1}
                     </TableCell>
                     <TableCell>
-                      <div className="h-12 w-12 relative overflow-hidden">
-                        <Image
-                          src={console.image}
-                          alt={console.name}
-                          fill
-                          className="object-cover"
-                        />
+                      <div className="h-12 w-12 relative overflow-hidden rounded-md bg-gray-100">
+                        {console.image ? (
+                          <Image
+                            src={console.image}
+                            alt={console.model}
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              // If image fails to load, use console icon as fallback
+                              (e.target as HTMLImageElement).src =
+                                "/images/console/ps4.png";
+                            }}
+                          />
+                        ) : (
+                          <Image
+                            src="/images/console/ps4.png"
+                            alt="Console placeholder"
+                            fill
+                            className="object-contain p-2"
+                          />
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell>{console.name}</TableCell>
-                    <TableCell>{console.amount}</TableCell>
+                    <TableCell>{console.model}</TableCell>
+                    <TableCell>{console.price}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          console.is_available
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {console.is_available ? "Available" : "Not Available"}
+                      </span>
+                    </TableCell>
                     <TableCell className="flex justify-center space-x-2">
                       <Button
                         variant="outline"
@@ -371,8 +580,14 @@ export function ConsoleTable() {
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4">
           <div className="text-sm text-muted-foreground">
-            Showing 1 to {Math.min(lastIndex, filteredData.length)} of{" "}
-            {filteredData.length} entries
+            {loading
+              ? "Loading..."
+              : `Showing ${
+                  filteredData.length > 0 ? firstIndex + 1 : 0
+                } to ${Math.min(
+                  lastIndex,
+                  filteredData.length
+                )} of ${totalItems} entries`}
           </div>
           <div className="flex gap-1">{generatePaginationButtons()}</div>
         </div>
@@ -410,10 +625,17 @@ export function ConsoleTable() {
                       alt="Preview"
                       fill
                       className="object-contain"
+                      onError={(e) => {
+                        // If preview fails to load, use console icon as fallback
+                        (e.target as HTMLImageElement).src =
+                          "/images/console-icon.png";
+                      }}
                     />
                   </div>
                 ) : (
-                  <Upload className="h-8 w-8 text-amber-500 mb-2" />
+                  <div className="h-32 w-32 mb-2 flex items-center justify-center">
+                    <Upload className="h-8 w-8 text-amber-500" />
+                  </div>
                 )}
                 <p className="text-sm text-amber-500 font-medium">
                   Drop files here or click to upload
@@ -429,32 +651,49 @@ export function ConsoleTable() {
             </div>
 
             <div className="mb-4">
-              <Label htmlFor="name" className="block mb-2">
-                Name <span className="text-red-500">*</span>
+              <Label htmlFor="model" className="block mb-2">
+                Model <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="name"
-                placeholder="Name"
-                value={newConsole.name}
+                id="model"
+                placeholder="Model"
+                value={newConsole.model || ""}
                 onChange={(e) =>
-                  setNewConsole({ ...newConsole, name: e.target.value })
+                  setNewConsole({ ...newConsole, model: e.target.value })
                 }
               />
             </div>
 
             <div className="mb-4">
-              <Label htmlFor="amount" className="block mb-2">
-                Amount <span className="text-red-500">*</span>
+              <Label htmlFor="serial_number" className="block mb-2">
+                Serial Number <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="amount"
-                type="number"
-                placeholder="Amount"
-                value={newConsole.amount || 0}
+                id="serial_number"
+                placeholder="Serial Number"
+                value={newConsole.serial_number || ""}
                 onChange={(e) =>
                   setNewConsole({
                     ...newConsole,
-                    amount: parseInt(e.target.value) || 0,
+                    serial_number: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            <div className="mb-4">
+              <Label htmlFor="price" className="block mb-2">
+                Price <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="price"
+                type="text"
+                placeholder="Price"
+                value={newConsole.price || ""}
+                onChange={(e) =>
+                  setNewConsole({
+                    ...newConsole,
+                    price: e.target.value,
                   })
                 }
               />
@@ -465,7 +704,11 @@ export function ConsoleTable() {
             <Button
               onClick={submitAddConsole}
               className="bg-amber-500 hover:bg-amber-600 w-full"
-              disabled={!newConsole.name || !(newConsole.amount ?? 0 > 0)}
+              disabled={
+                !newConsole.model ||
+                !newConsole.serial_number ||
+                !newConsole.price
+              }
             >
               Add Console
             </Button>
@@ -505,10 +748,17 @@ export function ConsoleTable() {
                       alt="Preview"
                       fill
                       className="object-contain"
+                      onError={(e) => {
+                        // If preview fails to load, use console icon as fallback
+                        (e.target as HTMLImageElement).src =
+                          "/images/console-icon.png";
+                      }}
                     />
                   </div>
                 ) : (
-                  <Upload className="h-8 w-8 text-amber-500 mb-2" />
+                  <div className="h-32 w-32 mb-2 flex items-center justify-center">
+                    <Upload className="h-8 w-8 text-amber-500" />
+                  </div>
                 )}
                 <p className="text-sm text-amber-500 font-medium">
                   Drop files here or click to upload
@@ -524,32 +774,49 @@ export function ConsoleTable() {
             </div>
 
             <div className="mb-4">
-              <Label htmlFor="edit-name" className="block mb-2">
-                Name <span className="text-red-500">*</span>
+              <Label htmlFor="edit-model" className="block mb-2">
+                Model <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="edit-name"
-                placeholder="Name"
-                value={newConsole.name}
+                id="edit-model"
+                placeholder="Model"
+                value={newConsole.model || ""}
                 onChange={(e) =>
-                  setNewConsole({ ...newConsole, name: e.target.value })
+                  setNewConsole({ ...newConsole, model: e.target.value })
                 }
               />
             </div>
 
             <div className="mb-4">
-              <Label htmlFor="edit-amount" className="block mb-2">
-                Amount <span className="text-red-500">*</span>
+              <Label htmlFor="edit-serial_number" className="block mb-2">
+                Serial Number <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="edit-amount"
-                type="number"
-                placeholder="Amount"
-                value={newConsole.amount || 0}
+                id="edit-serial_number"
+                placeholder="Serial Number"
+                value={newConsole.serial_number || ""}
                 onChange={(e) =>
                   setNewConsole({
                     ...newConsole,
-                    amount: parseInt(e.target.value) || 0,
+                    serial_number: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            <div className="mb-4">
+              <Label htmlFor="edit-price" className="block mb-2">
+                Price <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="edit-price"
+                type="text"
+                placeholder="Price"
+                value={newConsole.price || ""}
+                onChange={(e) =>
+                  setNewConsole({
+                    ...newConsole,
+                    price: e.target.value,
                   })
                 }
               />
@@ -560,7 +827,11 @@ export function ConsoleTable() {
             <Button
               onClick={submitEditConsole}
               className="bg-amber-500 hover:bg-amber-600 w-full"
-              disabled={!newConsole.name || !(newConsole.amount ?? 0 > 0)}
+              disabled={
+                !newConsole.model ||
+                !newConsole.serial_number ||
+                !newConsole.price
+              }
             >
               Save Changes
             </Button>
@@ -574,7 +845,25 @@ export function ConsoleTable() {
           <DialogHeader>
             <DialogTitle>Delete Console</DialogTitle>
           </DialogHeader>
-          <p className="py-4">
+          {currentConsole && (
+            <div className="py-4 space-y-3">
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-500">Model:</span>
+                <span className="font-bold">{currentConsole.model}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-500">
+                  Serial Number:
+                </span>
+                <span>{currentConsole.serial_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-500">Price:</span>
+                <span>{currentConsole.price}</span>
+              </div>
+            </div>
+          )}
+          <p className="py-2">
             Are you sure you want to delete this console? This action cannot be
             undone.
           </p>
@@ -582,14 +871,22 @@ export function ConsoleTable() {
             <Button
               className="bg-gray-300 hover:bg-gray-400 text-black"
               onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={deleteLoading}
             >
               Cancel
             </Button>
             <Button
               className="bg-red-500 hover:bg-red-600"
               onClick={submitDeleteConsole}
+              disabled={deleteLoading}
             >
-              Delete
+              {deleteLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

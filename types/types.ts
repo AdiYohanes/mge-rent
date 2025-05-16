@@ -7,12 +7,20 @@ export interface Room {
   image: string;
 }
 
+// This interface is deprecated and replaced by the one in api/console/consoleApi.ts
+// Keeping it here for backward compatibility with other parts of the app
 export interface Console {
   id: number;
-  name: string;
-  price: number;
-  description: string;
-  image: string;
+  model: string;
+  serial_number: string;
+  price: string;
+  notes?: string;
+  image: string | null;
+  is_available: boolean;
+  available_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface SpecificRoom {

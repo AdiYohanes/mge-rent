@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -10,20 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
+import { login, LoginRequestData, ErrorResponse } from "@/api";
+import { AxiosError } from "axios";
 
 const Login = () => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LoginRequestData>({
     username: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -46,26 +43,30 @@ const Login = () => {
 
     setLoading(true);
 
-    // Check for test credentials first
-    if (
-      formData.username === "testUser" &&
-      formData.password === "testPassword"
-    ) {
-      toast.success("Login successful!");
-      // Safely access localStorage only in browser
-      if (mounted && typeof window !== "undefined") {
-        localStorage.setItem(
-          "user",
-          JSON.stringify({ username: formData.username })
-        );
-      }
-      router.push("/");
-      return;
-    }
+    // Connect to backend API
+    try {
+      const response = await login(formData);
 
-    // Replace with real login API request or custom logic later
-    toast.error("Invalid credentials. Please try again.");
-    setLoading(false);
+      if (response) {
+        toast.success("Login successful!");
+
+        // Redirect based on user role
+        if (response.user.role === "ADMN" || response.user.role === "SADMN") {
+          router.push("/admin/dashboard");
+        } else {
+          // Default redirect for CUST or any other roles
+          router.push("/");
+        }
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      const axiosError = error as AxiosError<ErrorResponse>;
+      toast.error(
+        axiosError.response?.data?.message || "Login failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -185,26 +186,13 @@ const Login = () => {
               Don&apos;t have an account yet?{" "}
             </span>
             <Link
-              href="/auth/register"
+              href="/register"
               className="text-[#b99733] underline hover:text-[#967515] transition-colors duration-300"
             >
               Register
             </Link>
           </div>
         </form>
-
-        {/* Test Account Credentials */}
-        <div className="mt-6 border border-dashed border-gray-300 p-4 rounded-md text-center bg-gray-50">
-          <p className="text-xs font-medium text-gray-600 mb-1">
-            Test Account Credentials:
-          </p>
-          <p className="text-sm text-gray-800">
-            Username: <span className="font-semibold">testUser</span>
-          </p>
-          <p className="text-sm text-gray-800">
-            Password: <span className="font-semibold">testPassword</span>
-          </p>
-        </div>
       </div>
     </div>
   );

@@ -3,19 +3,21 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import AuthLayout from "../layout";
 import Link from "next/link";
+import { register, RegisterRequestData, ErrorResponse } from "@/api";
+import { AxiosError } from "axios";
 
 const RegisterPage = () => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     username: "",
@@ -25,6 +27,11 @@ const RegisterPage = () => {
     confirmPassword: "",
     agreeToTerms: false,
   });
+
+  // Set mounted state to true when component mounts on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -62,20 +69,76 @@ const RegisterPage = () => {
 
     setLoading(true);
 
-    // Simulate API call
-    try {
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Prepare data for API request
+    const apiRequestData: RegisterRequestData = {
+      username: formData.username,
+      role: "CUST", // Updated to match the expected role format
+      name: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      password: formData.password,
+      password_confirmation: formData.confirmPassword,
+    };
 
-      // Simulate successful registration
+    try {
+      // Make API call to register endpoint
+      const response = await register(apiRequestData);
+
+      // Registration successful
       toast.success("Registration successful! You can now log in.");
       router.push("/signin");
     } catch (error) {
-      toast.error("An error occurred during registration.");
+      console.error("Registration error:", error);
+
+      const axiosError = error as AxiosError<ErrorResponse>;
+
+      // Handle different error formats
+      if (axiosError.response?.data?.errors) {
+        // If the response contains validation errors
+        const errors = axiosError.response.data.errors;
+        const firstErrorKey = Object.keys(errors)[0];
+        const errorMessage = errors[firstErrorKey][0];
+        toast.error(errorMessage || "Registration failed. Please try again.");
+      } else if (axiosError.response?.data) {
+        // Check for specific error formats
+        const data = axiosError.response.data;
+        if (typeof data === "object" && data !== null) {
+          const firstErrorKey = Object.keys(data)[0];
+          if (Array.isArray(data[firstErrorKey])) {
+            toast.error(
+              data[firstErrorKey][0] || "Registration failed. Please try again."
+            );
+          } else {
+            toast.error(
+              data.message || "Registration failed. Please try again."
+            );
+          }
+        } else {
+          toast.error("Registration failed. Please try again.");
+        }
+      } else {
+        toast.error(
+          "An error occurred during registration. Please try again later."
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Return a simple loading state if not mounted yet to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="w-full max-w-lg mx-auto">
+        <div className="bg-white border border-[#1B1010] shadow-lg p-4">
+          <h2 className="text-center text-3xl font-minecraft text-[#b99733]">
+            Register
+          </h2>
+          <div className="h-[500px]"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-lg mx-auto">

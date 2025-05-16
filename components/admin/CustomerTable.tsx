@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   ArrowUpDown,
@@ -10,6 +10,9 @@ import {
   Search,
   Trash,
   UserPlus,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import {
   Table,
@@ -20,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -37,9 +41,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  User,
+  GetUsersParams,
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+} from "@/api";
 
 interface Customer {
-  id: number;
+  id: number | string;
   fullName: string;
   username: string;
   phoneNumber: string;
@@ -57,88 +69,59 @@ interface NewCustomer {
   status: "active" | "inactive";
 }
 
-// Dummy data untuk tabel customer
-const customerData: Customer[] = [
-  {
-    id: 1,
-    fullName: "Asep Subagja",
-    username: "Sandeeps",
-    phoneNumber: "081234567890",
-    email: "ustil@mail.ru",
-    totalSpending: 10000000,
+// Konversi data User dari API menjadi format Customer
+const convertApiUserToCustomer = (user: User): Customer => {
+  return {
+    id: user.id,
+    fullName: user.name || "Unknown",
+    username: user.username || "user" + user.id,
+    phoneNumber: user.phone || "-",
+    email: user.email || "-",
+    totalSpending: user.total_spend
+      ? parseFloat(user.total_spend.replace(/[^0-9]/g, ""))
+      : 0,
     status: "active",
-    registrationDate: "2025-01-10",
-  },
-  {
-    id: 2,
-    fullName: "Asep Subardi",
-    username: "Shivam98",
-    phoneNumber: "081998765432",
-    email: "bertou@yandex.ru",
-    totalSpending: 6000000,
-    status: "active",
-    registrationDate: "2025-01-15",
-  },
-  {
-    id: 3,
-    fullName: "Daniel",
-    username: "LakshitKumar",
-    phoneNumber: "081387654321",
-    email: "irnabela@gmail.com",
-    totalSpending: 1000000,
-    status: "active",
-    registrationDate: "2025-01-20",
-  },
-  {
-    id: 4,
-    fullName: "Cameron",
-    username: "NishitK",
-    phoneNumber: "085565432109",
-    email: "ahana@mail.ru",
-    totalSpending: 950000,
-    status: "active",
-    registrationDate: "2025-02-01",
-  },
-  {
-    id: 5,
-    fullName: "Colleen",
-    username: "HeroCoder",
-    phoneNumber: "081787654321",
-    email: "redaniel@gmail.com",
-    totalSpending: 900000,
-    status: "active",
-    registrationDate: "2025-02-10",
-  },
-  {
-    id: 6,
-    fullName: "Mitchell",
-    username: "Viveka",
-    phoneNumber: "081887654321",
-    email: "ulfaha@mail.ru",
-    totalSpending: 700000,
-    status: "active",
-    registrationDate: "2025-02-15",
-  },
-  {
-    id: 7,
-    fullName: "Aubrey",
-    username: "CodeWithSomya",
-    phoneNumber: "085765432109",
-    email: "igerrin@gmail.com",
-    totalSpending: 600000,
-    status: "active",
-    registrationDate: "2025-03-01",
-  },
-];
+    registrationDate: user.created_at
+      ? user.created_at.split("T")[0]
+      : new Date().toISOString().split("T")[0],
+  };
+};
+
+// Format currency
+const formatCurrency = (amount: number) => {
+  return `Rp${amount.toLocaleString("id-ID")}`;
+};
+
+// Component for status badge
+const StatusBadge = ({ status }: { status: string }) => {
+  return status === "active" ? (
+    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+      Active
+    </Badge>
+  ) : (
+    <Badge
+      variant="secondary"
+      className="bg-gray-200 text-gray-800 hover:bg-gray-200"
+    >
+      Inactive
+    </Badge>
+  );
+};
 
 export function CustomerTable() {
   // State untuk data dan filter
-  const [customers, setCustomers] = useState<Customer[]>(customerData);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortField, setSortField] = useState<keyof Customer>("fullName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // State untuk modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -155,42 +138,124 @@ export function CustomerTable() {
     status: "active",
   });
 
+  // Set mounted to true once component has mounted
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Fetch customers data from API
+  useEffect(() => {
+    // Skip API request during server-side rendering or before mounting
+    if (!mounted) {
+      return;
+    }
+
+    const fetchCustomers = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log("Fetching customers data...");
+
+        const params: GetUsersParams = {
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm || undefined,
+          role: "CUST", // Filter hanya untuk customer
+          sortBy: mapSortFieldToApi(sortField),
+          sortDirection: sortDirection,
+        };
+
+        console.log("API request parameters:", params);
+
+        const response = await getUsers(params);
+        console.log("API response:", response);
+
+        if (response && Array.isArray(response.users)) {
+          const formattedCustomers = response.users
+            .filter((user) => user.role === "CUST")
+            .map(convertApiUserToCustomer);
+          console.log("Processed customers:", formattedCustomers);
+
+          setCustomers(formattedCustomers);
+          setTotalCustomers(formattedCustomers.length);
+          setTotalPages(
+            response.totalPages ||
+              Math.ceil(formattedCustomers.length / itemsPerPage)
+          );
+        } else {
+          console.error("Invalid API response format:", response);
+          throw new Error("API returned an invalid data format");
+        }
+      } catch (err) {
+        console.error("Error fetching customers:", err);
+        setError(
+          `Failed to load customers: ${
+            err instanceof Error ? err.message : "Unknown error"
+          }`
+        );
+        toast.error("Failed to load customers. Please try again.");
+
+        // Jika terjadi error, tetapkan data kosong
+        setCustomers([]);
+        setTotalCustomers(0);
+        setTotalPages(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCustomers();
+  }, [
+    currentPage,
+    itemsPerPage,
+    searchTerm,
+    sortField,
+    sortDirection,
+    mounted,
+    refreshTrigger,
+  ]);
+
+  // Map sort field dari Customer ke field API
+  const mapSortFieldToApi = (field: keyof Customer): string => {
+    const fieldMap: Record<string, string> = {
+      fullName: "name",
+      email: "email",
+      totalSpending: "total_spend",
+      registrationDate: "created_at",
+      // tambahkan mapping lain jika diperlukan
+    };
+
+    return fieldMap[field] || field.toString();
+  };
+
   // Get top 3 customers
   const topCustomers = [...customers]
     .sort((a, b) => b.totalSpending - a.totalSpending)
     .slice(0, 3);
 
-  // Filter dan sort data
-  const filteredData = customers
-    .filter((customer) => {
-      // Text search filter
-      return (
-        customer.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.phoneNumber.includes(searchTerm)
-      );
-    })
-    .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
+  // Filter data (untuk pencarian lokal jika API tidak mendukung pencarian)
+  const filteredData =
+    searchTerm && !loading && customers.length > 0
+      ? customers.filter((customer) => {
+          return (
+            customer.fullName
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+            (customer.username &&
+              customer.username
+                .toLowerCase()
+                .includes(searchTerm.toLowerCase())) ||
+            customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (customer.phoneNumber && customer.phoneNumber.includes(searchTerm))
+          );
+        })
+      : customers;
 
-      if (sortDirection === "asc") {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
+  // Jika API sudah menangani pagination, gunakan data yang sudah ada
+  const paginatedData = filteredData;
 
-  // Pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredData.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
-
-  // Handle sorting
+  // Handle sorting - akan memicu API call melalui useEffect
   const handleSort = (field: keyof Customer) => {
     if (field === sortField) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -211,15 +276,49 @@ export function CustomerTable() {
         variant="outline"
         size="sm"
         onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-        disabled={currentPage === 1}
+        disabled={currentPage === 1 || loading}
         className="h-8 w-8 p-0 rounded-full"
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
     );
 
-    // Page numbers
-    for (let i = 1; i <= totalPages; i++) {
+    // Page numbers - Limit to maximum 5 buttons
+    const maxButtons = 5;
+    const startPage = Math.max(
+      1,
+      Math.min(
+        currentPage - Math.floor(maxButtons / 2),
+        totalPages - maxButtons + 1
+      )
+    );
+    const endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    if (startPage > 1) {
+      buttons.push(
+        <Button
+          key={1}
+          variant={currentPage === 1 ? "default" : "outline"}
+          size="sm"
+          onClick={() => setCurrentPage(1)}
+          className={`h-8 w-8 p-0 rounded-full ${
+            currentPage === 1 ? "bg-[#B99733] text-white" : ""
+          }`}
+        >
+          1
+        </Button>
+      );
+
+      if (startPage > 2) {
+        buttons.push(
+          <span key="ellipsis1" className="mx-1">
+            ...
+          </span>
+        );
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
       buttons.push(
         <Button
           key={i}
@@ -235,6 +334,30 @@ export function CustomerTable() {
       );
     }
 
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        buttons.push(
+          <span key="ellipsis2" className="mx-1">
+            ...
+          </span>
+        );
+      }
+
+      buttons.push(
+        <Button
+          key={totalPages}
+          variant={currentPage === totalPages ? "default" : "outline"}
+          size="sm"
+          onClick={() => setCurrentPage(totalPages)}
+          className={`h-8 w-8 p-0 rounded-full ${
+            currentPage === totalPages ? "bg-[#B99733] text-white" : ""
+          }`}
+        >
+          {totalPages}
+        </Button>
+      );
+    }
+
     // Next button
     buttons.push(
       <Button
@@ -242,7 +365,7 @@ export function CustomerTable() {
         variant="outline"
         size="sm"
         onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-        disabled={currentPage === totalPages || totalPages === 0}
+        disabled={currentPage === totalPages || totalPages === 0 || loading}
         className="h-8 w-8 p-0 rounded-full"
       >
         <ChevronRight className="h-4 w-4" />
@@ -301,25 +424,50 @@ export function CustomerTable() {
       return;
     }
 
-    // Create new customer (in a real app, this would be an API call)
-    const newCustomerObj: Customer = {
-      id: customers.length + 1,
-      ...newCustomer,
-      totalSpending: 0,
-      registrationDate: new Date().toISOString().split("T")[0],
+    // Set loading state
+    setLoading(true);
+
+    // Create user data object for API
+    const userData = {
+      name: newCustomer.fullName,
+      email: newCustomer.email,
+      username: newCustomer.username,
+      phone: newCustomer.phoneNumber,
+      role: "CUST",
+      // Generate a random password that will be changed by the user
+      password: Math.random().toString(36).substring(2, 10) + "Aa1!",
     };
 
-    setCustomers([...customers, newCustomerObj]);
-    setIsAddModalOpen(false);
-    setNewCustomer({
-      fullName: "",
-      username: "",
-      phoneNumber: "",
-      email: "",
-      status: "active",
-    });
+    // Call API to create customer
+    createUser(userData)
+      .then(() => {
+        toast.success("Customer added successfully!");
+        setIsAddModalOpen(false);
 
-    toast.success("Customer added successfully!");
+        // Reset form
+        setNewCustomer({
+          fullName: "",
+          username: "",
+          phoneNumber: "",
+          email: "",
+          status: "active",
+        });
+
+        // Refresh data
+        setCurrentPage(1);
+        setRefreshTrigger((prev) => prev + 1);
+      })
+      .catch((error) => {
+        console.error("Error creating customer:", error);
+        toast.error(
+          `Failed to add customer: ${
+            error.response?.data?.message || "Unknown error"
+          }`
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   const saveEditedCustomer = () => {
@@ -350,46 +498,67 @@ export function CustomerTable() {
 
     if (!selectedCustomer) return;
 
-    // Update customer (in a real app, this would be an API call)
-    const updatedCustomers = customers.map((customer) => {
-      if (customer.id === selectedCustomer.id) {
-        return {
-          ...customer,
-          fullName: newCustomer.fullName,
-          username: newCustomer.username,
-          phoneNumber: newCustomer.phoneNumber,
-          email: newCustomer.email,
-          status: newCustomer.status,
-        };
-      }
-      return customer;
-    });
+    // Set loading state
+    setLoading(true);
 
-    setCustomers(updatedCustomers);
-    setIsEditModalOpen(false);
-    setSelectedCustomer(null);
+    // Create user data object for API
+    const userData = {
+      name: newCustomer.fullName,
+      email: newCustomer.email,
+      phone: newCustomer.phoneNumber,
+      // Don't update password here - should be a separate function
+    };
 
-    toast.success("Customer updated successfully!");
+    // Call API to update customer
+    updateUser(selectedCustomer.id.toString(), userData)
+      .then(() => {
+        toast.success("Customer updated successfully!");
+        setIsEditModalOpen(false);
+        setSelectedCustomer(null);
+
+        // Refresh current page
+        setRefreshTrigger((prev) => prev + 1);
+      })
+      .catch((error) => {
+        console.error("Error updating customer:", error);
+        toast.error(
+          `Failed to update customer: ${
+            error.response?.data?.message || "Unknown error"
+          }`
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   const deleteCustomer = () => {
     if (!selectedCustomer) return;
 
-    // Delete customer (in a real app, this would be an API call)
-    const updatedCustomers = customers.filter(
-      (customer) => customer.id !== selectedCustomer.id
-    );
+    // Set loading state
+    setLoading(true);
 
-    setCustomers(updatedCustomers);
-    setIsDeleteModalOpen(false);
-    setSelectedCustomer(null);
+    // Call API to delete customer
+    deleteUser(selectedCustomer.id.toString())
+      .then(() => {
+        toast.success("Customer deleted successfully!");
+        setIsDeleteModalOpen(false);
+        setSelectedCustomer(null);
 
-    toast.success("Customer deleted successfully!");
-  };
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return `Rp${amount.toLocaleString("id-ID")}`;
+        // Refresh current page
+        setRefreshTrigger((prev) => prev + 1);
+      })
+      .catch((error) => {
+        console.error("Error deleting customer:", error);
+        toast.error(
+          `Failed to delete customer: ${
+            error.response?.data?.message || "Unknown error"
+          }`
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   return (
@@ -397,29 +566,75 @@ export function CustomerTable() {
       {/* Top Users Section */}
       <div>
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Top User</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {topCustomers.map((customer, index) => (
-            <div
-              key={customer.id}
-              className="bg-amber-50 border border-amber-100 rounded-lg p-4 flex items-center space-x-3"
-            >
-              <div className="w-10 h-10 flex items-center justify-center font-bold rounded-full bg-[#B99733] text-white">
-                #{index + 1}
+        {loading ? (
+          <div className="flex justify-center items-center h-28">
+            <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+          </div>
+        ) : topCustomers.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {topCustomers.map((customer, index) => (
+              <div
+                key={customer.id}
+                className="bg-amber-50 border border-amber-100 rounded-lg p-4 flex items-center space-x-3"
+              >
+                <div className="w-10 h-10 flex items-center justify-center font-bold rounded-full bg-[#B99733] text-white">
+                  #{index + 1}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-800">
+                    {customer.fullName}
+                  </h3>
+                  <p className="text-sm text-gray-500">{customer.username}</p>
+                  <p className="text-xs font-medium text-amber-600">
+                    {formatCurrency(customer.totalSpending)}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-800">{customer.fullName}</h3>
-                <p className="text-sm text-gray-500">{customer.username}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-gray-50 rounded-lg p-6 text-center">
+            <p className="text-gray-500">No customer data available</p>
+          </div>
+        )}
       </div>
 
       {/* Customer Table Section */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">
-          Customer MGE Rental
-        </h2>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+          <h2 className="text-2xl font-bold text-gray-800">User List</h2>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full sm:w-64 md:w-80">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search user..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-full"
+              />
+            </div>
+
+            <Button
+              onClick={() => {
+                setLoading(true);
+                setRefreshTrigger((prev) => prev + 1);
+              }}
+              variant="outline"
+              className="h-10 px-3"
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Refresh
+            </Button>
+
+            <Button
+              onClick={handleAddCustomer}
+              className="bg-[#B99733] text-white h-10 hover:bg-amber-600"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add User
+            </Button>
+          </div>
+        </div>
         <div className="bg-white border rounded-lg shadow-sm">
           <div className="p-4 flex flex-wrap items-center justify-between gap-4 border-b">
             {/* Entries selector */}
@@ -431,6 +646,7 @@ export function CustomerTable() {
                   setItemsPerPage(Number(value));
                   setCurrentPage(1);
                 }}
+                disabled={loading}
               >
                 <SelectTrigger className="w-[80px]">
                   <SelectValue placeholder={itemsPerPage} />
@@ -447,31 +663,16 @@ export function CustomerTable() {
 
             {/* Filter and search section */}
             <div className="flex items-center gap-3">
-              {/* Search box */}
-              <div className="relative w-64">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                />
-              </div>
-
-              {/* Add customer button */}
-              <Button
-                className="bg-[#B99733] hover:bg-amber-700 flex gap-1 items-center cursor-pointer"
-                onClick={handleAddCustomer}
-              >
-                <UserPlus className="h-4 w-4" />
-                <span>Add Customer</span>
-              </Button>
+              {/* No buttons needed here since we have them in the header */}
             </div>
           </div>
+
+          {error && (
+            <div className="m-4 p-3 border border-red-500 bg-red-50 rounded text-red-700 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              <span>{error}</span>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <Table>
@@ -555,15 +756,39 @@ export function CustomerTable() {
                       )}
                     </div>
                   </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 uppercase font-semibold"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center">
+                      STATUS
+                      {sortField === "status" && (
+                        <ArrowUpDown
+                          className={`ml-1 h-3 w-3 ${
+                            sortDirection === "desc" ? "rotate-180" : ""
+                          }`}
+                        />
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="uppercase font-semibold text-right">
                     ACTIONS
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedData.length === 0 ? (
+                {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10">
+                    <TableCell colSpan={8} className="text-center py-10">
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-amber-500 mb-2" />
+                        <span>Loading customers...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-10">
                       No customers found
                     </TableCell>
                   </TableRow>
@@ -573,7 +798,9 @@ export function CustomerTable() {
                       key={customer.id}
                       className="border-b hover:bg-gray-50 transition-colors"
                     >
-                      <TableCell>{startIndex + index + 1}</TableCell>
+                      <TableCell>
+                        {(currentPage - 1) * itemsPerPage + index + 1}
+                      </TableCell>
                       <TableCell className="font-medium">
                         {customer.fullName}
                       </TableCell>
@@ -582,6 +809,9 @@ export function CustomerTable() {
                       <TableCell>{customer.email}</TableCell>
                       <TableCell className="font-medium">
                         {formatCurrency(customer.totalSpending)}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={customer.status} />
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -612,13 +842,24 @@ export function CustomerTable() {
 
           <div className="p-4 flex items-center justify-between border-t">
             <div className="text-sm text-gray-500">
-              Showing {paginatedData.length > 0 ? startIndex + 1 : 0} to{" "}
-              {Math.min(startIndex + itemsPerPage, filteredData.length)} of{" "}
-              {filteredData.length} entries
+              {loading ? (
+                "Loading..."
+              ) : (
+                <>
+                  Showing{" "}
+                  {paginatedData.length > 0
+                    ? (currentPage - 1) * itemsPerPage + 1
+                    : 0}{" "}
+                  to {Math.min(currentPage * itemsPerPage, totalCustomers)} of{" "}
+                  {totalCustomers} entries
+                </>
+              )}
             </div>
-            <div className="flex items-center space-x-2">
-              {paginationButtons()}
-            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center space-x-2">
+                {paginationButtons()}
+              </div>
+            )}
           </div>
         </div>
       </div>

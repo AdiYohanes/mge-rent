@@ -19,11 +19,20 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import Cookies from "js-cookie";
+
+interface UserData {
+  id: string;
+  username: string;
+  role: "ADMN" | "SADMN" | "CUST";
+  email?: string;
+}
 
 export function DashboardHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifications] = useState(3);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const router = useRouter();
 
   // Detect scroll for shadow effect on header
@@ -36,10 +45,24 @@ export function DashboardHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Get user data from cookies
+  useEffect(() => {
+    const userCookie = Cookies.get("user");
+    if (userCookie) {
+      try {
+        const parsedUser = JSON.parse(userCookie) as UserData;
+        setUserData(parsedUser);
+      } catch (error) {
+        console.error("Error parsing user data from cookie:", error);
+      }
+    }
+  }, []);
+
   // Handle logout
   const handleLogout = () => {
-    // Clear localStorage
-    localStorage.clear();
+    // Clear cookies
+    Cookies.remove("user");
+    Cookies.remove("token");
 
     // Show success toast
     toast.success("Logged out successfully", {
@@ -48,7 +71,7 @@ export function DashboardHeader() {
     });
 
     // Navigate to login page
-    router.push("/admin");
+    router.push("/signin");
   };
 
   return (
@@ -129,12 +152,12 @@ export function DashboardHeader() {
                   className="object-cover"
                 />
               </div>
-              <div className="flex flex-col items-start text-left hidden md:flex">
+              <div className="flex flex-col items-start text-left  md:flex">
                 <span className="text-base font-medium leading-tight">
-                  Admin
+                  {userData?.username}
                 </span>
                 <span className="text-sm text-muted-foreground leading-tight mt-1">
-                  admin@mge.com
+                  {userData?.email}
                 </span>
               </div>
             </Button>

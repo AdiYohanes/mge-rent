@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   ArrowUpDown,
@@ -10,6 +10,8 @@ import {
   Search,
   Trash,
   UserPlus,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import {
   Table,
@@ -46,7 +48,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getUsers, deleteUser, User, GetUsersParams } from "@/api";
 
+// Mapping API User to Admin interface
 interface Admin {
   id: number;
   fullName: string;
@@ -65,90 +69,53 @@ interface NewAdmin {
   status: "active" | "inactive";
 }
 
-// Dummy data untuk tabel admin
-const adminData: Admin[] = [
-  {
-    id: 1,
-    fullName: "Cody",
-    phoneNumber: "081234567890",
-    email: "ustil@mail.ru",
-    permission: "Superadmin",
+// Helper function to convert User from API to Admin interface
+const convertUserToAdmin = (user: User): Admin => {
+  if (!user) {
+    // Fallback jika user undefined
+    return {
+      id: Math.floor(Math.random() * 1000),
+      fullName: "Unknown User",
+      phoneNumber: "-",
+      email: "-",
+      permission: "Admin",
+      status: "active",
+      registrationDate: new Date().toISOString().split("T")[0],
+    };
+  }
+
+  return {
+    id:
+      typeof user.id === "number"
+        ? user.id
+        : parseInt(user.id as string) || Math.floor(Math.random() * 1000),
+    fullName: user.name || "Unknown",
+    phoneNumber: user.phone || "-",
+    email: user.email || "-",
+    // Map API roles to UI roles
+    permission: user.role === "SADMN" ? "Superadmin" : "Admin",
+    // Default status to active since API might not provide it
     status: "active",
-    registrationDate: "2025-01-10",
-  },
-  {
-    id: 2,
-    fullName: "Darlene",
-    phoneNumber: "081998765432",
-    email: "bertou@yandex.ru",
-    permission: "Admin",
-    status: "active",
-    registrationDate: "2025-01-05",
-  },
-  {
-    id: 3,
-    fullName: "Eduardo",
-    phoneNumber: "081387654321",
-    email: "irnabela@gmail.com",
-    permission: "Superadmin",
-    status: "active",
-    registrationDate: "2025-01-20",
-  },
-  {
-    id: 4,
-    fullName: "Cameron",
-    phoneNumber: "085565432109",
-    email: "ahana@mail.ru",
-    permission: "Admin",
-    status: "active",
-    registrationDate: "2025-02-01",
-  },
-  {
-    id: 5,
-    fullName: "Colleen",
-    phoneNumber: "081787654321",
-    email: "redaniel@gmail.com",
-    permission: "Admin",
-    status: "active",
-    registrationDate: "2025-02-10",
-  },
-  {
-    id: 6,
-    fullName: "Mitchell",
-    phoneNumber: "081887654321",
-    email: "ulfaha@mail.ru",
-    permission: "Superadmin",
-    status: "active",
-    registrationDate: "2025-02-15",
-  },
-  {
-    id: 7,
-    fullName: "Aubrey",
-    phoneNumber: "085765432109",
-    email: "igerrin@gmail.com",
-    permission: "Superadmin",
-    status: "active",
-    registrationDate: "2025-03-01",
-  },
-  {
-    id: 8,
-    fullName: "Operation Admin",
-    phoneNumber: "085765432109",
-    email: "operations@example.com",
-    permission: "Superadmin",
-    status: "active",
-    registrationDate: "2025-03-05",
-  },
-];
+    // Use created_at as registration date
+    registrationDate:
+      user.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
+  };
+};
 
 export function UserAdminTable() {
   // State untuk data dan filter
-  const [admins, setAdmins] = useState<Admin[]>(adminData);
+  const [admins, setAdmins] = useState<Admin[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortField, setSortField] = useState<keyof Admin>("fullName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [totalItems, setTotalItems] = useState(0);
+  const [apiTotalPages, setApiTotalPages] = useState(1);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // State untuk modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -163,35 +130,126 @@ export function UserAdminTable() {
     status: "active",
   });
 
-  // Filter dan sort data
-  const filteredData = admins
-    .filter((admin) => {
-      return (
-        admin.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        admin.phoneNumber.includes(searchTerm)
-      );
-    })
-    .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
+  // Set mounted to true once component has mounted to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-      if (sortDirection === "asc") {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
+  // Fetch admin users from API
+  useEffect(() => {
+    // Skip API request during server-side rendering to avoid hydration mismatch
+    if (!mounted) {
+      return;
+    }
+
+    const fetchAdminUsers = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const params: GetUsersParams = {
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm || undefined,
+          // Filter for admin roles: ADMN and SADMN (super admin)
+          role: "ADMN,SADMN",
+          sortBy: sortField.toString(),
+          sortDirection,
+        };
+
+        console.log("Fetching admin users with params:", params);
+        const responseData = await getUsers(params);
+        console.log("Received admin user data:", responseData);
+
+        // Pastikan responseData dan responseData.users ada sebelum melakukan map
+        if (responseData && Array.isArray(responseData.users)) {
+          // Convert API response to Admin interface and filter to only include admin roles
+          const mappedAdmins = responseData.users
+            .filter((user) => user.role === "ADMN" || user.role === "SADMN")
+            .map(convertUserToAdmin);
+          setAdmins(mappedAdmins);
+          setTotalItems(mappedAdmins.length);
+          setApiTotalPages(responseData.totalPages || 1);
+
+          if (mappedAdmins.length === 0) {
+            console.warn("No admin users found in the response");
+          } else {
+            console.log(
+              `Successfully loaded ${mappedAdmins.length} admin users`
+            );
+          }
+        } else {
+          // Jika responseData.users undefined atau bukan array, tampilkan error
+          const errorMsg =
+            "API response missing users array or not in expected format";
+          console.error(errorMsg, responseData);
+          setError(errorMsg);
+          toast.error("API returned invalid data format.");
+          setAdmins([]);
+          setTotalItems(0);
+        }
+      } catch (err) {
+        console.error("Error fetching admin users:", err);
+        setError("Failed to load admin users. Please try again later.");
+        toast.error("Failed to load admin users.");
+        setAdmins([]);
+        setTotalItems(0);
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-  // Pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    fetchAdminUsers();
+  }, [
+    currentPage,
+    itemsPerPage,
+    searchTerm,
+    sortField,
+    sortDirection,
+    mounted,
+    refreshTrigger,
+  ]);
+
+  // Prevent hydration issues by rendering a simple version on initial load
+  if (!mounted) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-2xl font-bold">
+            Admin User Management
+          </CardTitle>
+          <CardDescription>Loading admin user data...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // For client-side filtering, in case we need it
+  const filteredData = admins
+    ? admins.filter((admin) => {
+        if (!searchTerm) return true;
+
+        return (
+          admin.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          admin.phoneNumber.includes(searchTerm)
+        );
+      })
+    : [];
+
+  // Calculate total pages - use API total pages when available
+  const totalPages =
+    apiTotalPages || Math.ceil((filteredData.length || 1) / itemsPerPage);
+
+  // Calculate pagination indices
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredData.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
 
-  // Handle sorting
+  // Handle sorting - for client-side sorting or to update API params
   const handleSort = (field: keyof Admin) => {
     if (field === sortField) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -199,6 +257,7 @@ export function UserAdminTable() {
       setSortField(field);
       setSortDirection("asc");
     }
+    setCurrentPage(1); // Reset to first page when sorting changes
   };
 
   // Pagination buttons
@@ -365,16 +424,38 @@ export function UserAdminTable() {
   const deleteAdmin = () => {
     if (!selectedAdmin) return;
 
-    // Delete admin (in a real app, this would be an API call)
-    const updatedAdmins = admins.filter(
-      (admin) => admin.id !== selectedAdmin.id
-    );
+    setLoading(true);
 
-    setAdmins(updatedAdmins);
-    setIsDeleteModalOpen(false);
-    setSelectedAdmin(null);
+    // Call the deleteUser API
+    deleteUser(selectedAdmin.id.toString())
+      .then(() => {
+        // Update the local state to remove the deleted admin
+        const updatedAdmins = admins.filter(
+          (admin) => admin.id !== selectedAdmin.id
+        );
+        setAdmins(updatedAdmins);
 
-    toast.success("Admin deleted successfully!");
+        // Close modal and clear selection
+        setIsDeleteModalOpen(false);
+        setSelectedAdmin(null);
+
+        // Show success message
+        toast.success("Admin deleted successfully!");
+
+        // Refresh data to ensure we're in sync with the backend
+        setRefreshTrigger((prev) => prev + 1);
+      })
+      .catch((error) => {
+        console.error("Error deleting admin:", error);
+        toast.error(
+          `Failed to delete admin: ${
+            error.response?.data?.message || "Unknown error"
+          }`
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   // Format date for better display
@@ -449,6 +530,22 @@ export function UserAdminTable() {
                 }}
               />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLoading(true);
+                setRefreshTrigger((prev) => prev + 1);
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
+              Refresh
+            </Button>
             <Button
               className="bg-[#B99733] hover:bg-blue-700 flex gap-1 items-center"
               onClick={handleAddAdmin}
@@ -559,14 +656,42 @@ export function UserAdminTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedData.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-10">
+                    <div className="flex flex-col items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-gray-500 mb-2" />
+                      <span>Loading admin users...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-6">
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="text-red-500 mb-2">{error}</span>
+                      <span className="text-sm text-gray-500">
+                        Please try again later or contact support
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRefreshTrigger((prev) => prev + 1)}
+                        className="mt-3"
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-10">
                     No admin users found
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedData.map((admin, index) => (
+                filteredData.map((admin, index) => (
                   <TableRow
                     key={admin.id}
                     className="border-b hover:bg-gray-50 transition-colors"
@@ -611,11 +736,17 @@ export function UserAdminTable() {
       </CardContent>
       <CardFooter className="flex justify-between items-center">
         <div className="text-sm text-muted-foreground">
-          Showing {paginatedData.length > 0 ? startIndex + 1 : 0} to{" "}
-          {Math.min(startIndex + itemsPerPage, filteredData.length)} of{" "}
-          {filteredData.length} entries
+          {loading ? (
+            "Loading..."
+          ) : (
+            <>
+              Showing {filteredData.length > 0 ? startIndex + 1 : 0} to{" "}
+              {Math.min(startIndex + itemsPerPage, filteredData.length)} of{" "}
+              {totalItems || 0} entries
+            </>
+          )}
         </div>
-        <div className="space-x-1">{paginationButtons()}</div>
+        <div className="space-x-1">{totalPages > 0 && paginationButtons()}</div>
       </CardFooter>
 
       {/* Add Admin Modal */}
@@ -848,19 +979,47 @@ export function UserAdminTable() {
             <DialogHeader>
               <DialogTitle>Delete Admin User</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete {selectedAdmin.fullName}? This
-                action cannot be undone.
+                Are you sure you want to delete this admin user? This action
+                cannot be undone.
               </DialogDescription>
             </DialogHeader>
+
+            <div className="py-4 space-y-3">
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-500">Admin Name:</span>
+                <span className="font-bold">{selectedAdmin.fullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-500">Email:</span>
+                <span>{selectedAdmin.email}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-500">Permission:</span>
+                <span>{selectedAdmin.permission}</span>
+              </div>
+            </div>
+
             <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => setIsDeleteModalOpen(false)}
+                disabled={loading}
               >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={deleteAdmin}>
-                Delete
+              <Button
+                variant="destructive"
+                onClick={deleteAdmin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />{" "}
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
