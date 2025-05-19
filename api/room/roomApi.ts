@@ -1,5 +1,9 @@
 import { get, del, post } from "../apiUtils";
 import { ROOM_ENDPOINTS } from "../constants";
+import axios from "axios";
+import Cookies from "js-cookie";
+import { API_BASE_URL } from "../constants";
+import { getAuthHeader } from "../auth/authApi";
 
 // Types
 export interface Room {
@@ -57,33 +61,38 @@ interface ApiResponse {
 }
 
 // Get all rooms
-export const getRooms = async (): Promise<RoomResponseData> => {
+export const getRooms = async (): Promise<ApiResponse<Room[]>> => {
   try {
-    const response = await get<GetRoomsResponse>(ROOM_ENDPOINTS.GET_ALL);
-
-    console.log("API response for rooms:", response);
-
-    // Check if response has data and meta structure
-    if (response && response.data && Array.isArray(response.data)) {
-      return {
-        rooms: response.data,
-        total: response.meta?.total || response.data.length,
-        page: response.meta?.page || 1,
-        limit: response.meta?.perPage || response.data.length,
-        totalPages: response.meta?.lastPage || 1,
-      };
+    // Validate authentication
+    if (!Cookies.get("token")) {
+      throw new Error(
+        "Anda harus login untuk melihat daftar room. Silakan login terlebih dahulu."
+      );
     }
 
-    throw new Error("Invalid API response format");
+    // Use axios with authentication header
+    const response = await axios.get(`${API_BASE_URL}/admin/rooms`, {
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        ...getAuthHeader(),
+      },
+    });
+
+    return {
+      data: response.data.data || [],
+      meta: response.data.meta,
+    };
   } catch (error) {
     console.error("Error fetching rooms:", error);
-    return {
-      rooms: [],
-      total: 0,
-      page: 1,
-      limit: 10,
-      totalPages: 0,
-    };
+
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      Cookies.remove("token");
+      Cookies.remove("user");
+      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    }
+
+    throw error instanceof Error ? error : new Error("Failed to fetch rooms.");
   }
 };
 

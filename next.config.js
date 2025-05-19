@@ -13,6 +13,10 @@ const nextConfig = {
     // !! WARN !!
     ignoreBuildErrors: true,
   },
+  images: {
+    domains: ['mge.168.231.84.221.sslip.io'],
+    unoptimized: true, // Use this for better handling of external images
+  },
 };
 
 module.exports = nextConfig;

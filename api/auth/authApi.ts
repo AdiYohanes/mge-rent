@@ -51,19 +51,28 @@ export const login = async (data: LoginRequestData): Promise<AuthResponse> => {
   const response = await post<AuthResponse>(AUTH_ENDPOINTS.LOGIN, data);
 
   // Store user data and token in cookies
-  if (response) {
+  if (response && response.token) {
     const userData = response.user;
     const token = response.token;
+
+    console.log(
+      "Login berhasil, menyimpan token:",
+      token.substring(0, 10) + "..."
+    );
 
     // Set secure cookies with 7 days expiration
     Cookies.set("user", JSON.stringify(userData), {
       expires: 7,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
     });
     Cookies.set("token", token, {
       expires: 7,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
     });
+  } else {
+    console.error("Login response tidak memiliki token:", response);
   }
 
   return response;
@@ -93,11 +102,20 @@ export const logout = async (): Promise<void> => {
 
 // Check if user is logged in
 export const isLoggedIn = (): boolean => {
+  // Check if running on server
+  if (typeof window === "undefined") {
+    return false;
+  }
   return !!Cookies.get("token");
 };
 
 // Get current user
 export const getCurrentUser = (): AuthResponse["user"] | null => {
+  // Check if running on server
+  if (typeof window === "undefined") {
+    return null;
+  }
+
   const userJson = Cookies.get("user");
   if (!userJson) return null;
 
@@ -106,4 +124,121 @@ export const getCurrentUser = (): AuthResponse["user"] | null => {
   } catch {
     return null;
   }
+};
+
+// Debug helper untuk memeriksa status token
+export const debugToken = (): string => {
+  // Check if running on server
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return "Running on server (SSR), cookies not accessible";
+  }
+
+  const token = Cookies.get("token");
+  const userJson = Cookies.get("user");
+  let user = null;
+
+  try {
+    if (userJson) {
+      user = JSON.parse(userJson);
+    }
+  } catch (e) {
+    // Ignore parsing errors
+  }
+
+  return `Token: ${
+    token ? `${token.substring(0, 15)}...` : "TIDAK ADA"
+  }, User: ${user ? user.username : "TIDAK ADA"}`;
+};
+
+// Check token validity and health
+export const checkTokenHealth = (): {
+  hasToken: boolean;
+  hasUser: boolean;
+  tokenLength: number;
+  cookieDetails: Record<string, string>;
+  tokenPrefix: string;
+  userRole?: string;
+  issues: string[];
+} => {
+  // Check if running on server
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return {
+      hasToken: false,
+      hasUser: false,
+      tokenLength: 0,
+      cookieDetails: {},
+      tokenPrefix: "",
+      issues: ["Running on server (SSR), cookies not accessible"],
+    };
+  }
+
+  // Get all cookies for debugging
+  const allCookies: Record<string, string> = {};
+  document.cookie.split(";").forEach((cookie) => {
+    const [name, value] = cookie.trim().split("=");
+    if (name) allCookies[name] = value || "";
+  });
+
+  const token = Cookies.get("token") || "";
+  const userJson = Cookies.get("user") || "";
+  const issues: string[] = [];
+  let user = null;
+
+  // Check token
+  if (!token) {
+    issues.push("Token tidak ditemukan dalam cookies");
+  } else if (token.length < 20) {
+    issues.push(`Token terlalu pendek (${token.length} karakter)`);
+  }
+
+  // Check token format
+  const tokenPrefix = token ? token.substring(0, 10) : "";
+  if (token && !token.includes(".")) {
+    issues.push("Token tidak mengikuti format JWT (tidak ada titik)");
+  }
+
+  // Check user data
+  try {
+    if (!userJson) {
+      issues.push("Data user tidak ditemukan dalam cookies");
+    } else {
+      user = JSON.parse(userJson);
+      if (!user.id) issues.push("Data user tidak memiliki ID");
+      if (!user.username) issues.push("Data user tidak memiliki username");
+      if (!user.role) issues.push("Data user tidak memiliki role");
+    }
+  } catch (e) {
+    issues.push(
+      `Error parsing user data: ${
+        e instanceof Error ? e.message : "Unknown error"
+      }`
+    );
+  }
+
+  return {
+    hasToken: !!token,
+    hasUser: !!user,
+    tokenLength: token.length,
+    cookieDetails: allCookies,
+    tokenPrefix,
+    userRole: user?.role,
+    issues,
+  };
+};
+
+// Function to get Authorization header - easy for beginners to use
+export const getAuthHeader = ():
+  | { Authorization: string }
+  | Record<string, never> => {
+  // Check if running on server
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  const token = Cookies.get("token");
+  if (!token) {
+    console.warn("Token tidak ditemukan, autentikasi tidak dapat dilakukan");
+    return {};
+  }
+  return { Authorization: `Bearer ${token}` };
 };

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,6 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
+import useBookingItemStore from "@/store/BookingItemStore"; // Import Zustand store
 
 // Define the type for Console
 interface Console {
@@ -48,15 +48,17 @@ const consolesData: Console[] = [
 ];
 
 const ConsoleSelection = () => {
-  // Define the state with proper typing
-  const [selectedConsole, setSelectedConsole] = useState<Console | null>(null);
+  // Using Zustand store to manage the selected console globally
+  const { selectedConsole, setSelectedConsole, resetSelectedConsole } =
+    useBookingItemStore((state) => state);
 
-  // Handle selection with type safety
-  const handleSelect = (console: Console): void => {
-    if (selectedConsole?.id === console.id) {
-      setSelectedConsole(null);
+  // Handle selection with Zustand global state
+  const handleSelect = (konsol: Console): void => {
+    if (selectedConsole?.id === konsol.id) {
+      resetSelectedConsole(); // Deselect if the same console is clicked
     } else {
-      setSelectedConsole(console);
+      setSelectedConsole({ ...konsol, id: konsol.id }); // Select the new console with explicit id
+      console.log("Console selected:", konsol.name, "with ID:", konsol.id);
     }
   };
 

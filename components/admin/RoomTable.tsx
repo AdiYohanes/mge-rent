@@ -103,25 +103,39 @@ export function RoomTable() {
         const response = await getRooms();
         console.log("API response:", response);
 
-        if (response && Array.isArray(response.rooms)) {
-          setRooms(response.rooms);
-          setTotalItems(response.total || response.rooms.length);
-          setTotalPages(
-            response.totalPages ||
-              Math.ceil(response.rooms.length / itemsPerPage)
-          );
+        if (response && Array.isArray(response.data)) {
+          setRooms(response.data);
+
+          // Handle metadata if available, otherwise use local pagination
+          if (response.meta) {
+            setTotalItems(response.meta.total);
+            setTotalPages(response.meta.lastPage);
+          } else {
+            setTotalItems(response.data.length);
+            setTotalPages(Math.ceil(response.data.length / itemsPerPage));
+          }
         } else {
           console.error("Invalid API response format:", response);
           throw new Error("API returned an invalid data format");
         }
       } catch (err) {
         console.error("Error fetching rooms:", err);
-        setError(
-          `Failed to load rooms: ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`
-        );
-        toast.error("Failed to load rooms. Please try again.");
+
+        // Check for session expiration
+        if (
+          err instanceof Error &&
+          err.message.includes("login sudah berakhir")
+        ) {
+          toast.error(err.message);
+          // Optionally redirect to login page
+        } else {
+          setError(
+            `Failed to load rooms: ${
+              err instanceof Error ? err.message : "Unknown error"
+            }`
+          );
+          toast.error("Failed to load rooms. Please try again.");
+        }
       } finally {
         setLoading(false);
       }

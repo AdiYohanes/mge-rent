@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getUsers, deleteUser, User, GetUsersParams } from "@/api";
+import { useMounted } from "@/hooks/use-mounted";
 
 // Mapping API User to Admin interface
 interface Admin {
@@ -112,10 +113,10 @@ export function UserAdminTable() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
   const [apiTotalPages, setApiTotalPages] = useState(1);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const mounted = useMounted();
 
   // State untuk modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -129,11 +130,6 @@ export function UserAdminTable() {
     permission: "Admin",
     status: "active",
   });
-
-  // Set mounted to true once component has mounted to prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Fetch admin users from API
   useEffect(() => {

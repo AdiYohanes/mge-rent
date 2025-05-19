@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Search, Pencil, Trash2, Eye } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Search, Pencil, Trash2, Eye, Loader2, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,150 +33,33 @@ import { Badge } from "@/components/ui/badge";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { toast } from "sonner";
+import { useMounted } from "@/hooks/use-mounted";
+import axios from "axios";
+import {
+  Unit,
+  UnitPayload,
+  getUnits,
+  addUnit,
+  updateUnit,
+  deleteUnit,
+  Game,
+  getGames,
+  Room,
+  getRooms,
+  Console,
+  getConsoles,
+} from "@/api";
 
-interface Unit {
-  id: string;
-  name: string;
-  room: string;
-  console: string;
-  addOns: string;
-  rentPrice: number;
-  status: "Available" | "On Service";
-  games: Game[];
+// Extend UnitPayload interface to include additional properties used in the component
+interface ExtendedUnitPayload extends Omit<UnitPayload, "status"> {
+  room?: string;
+  console?: string;
+  rentPrice?: number;
+  status: "available" | "booked" | "serviced";
 }
 
-interface Game {
-  id: string;
-  title: string;
-  image: string;
-}
-
-// Sample game data
-const gameData: Game[] = [
-  { id: "1", title: "Netflix", image: "/images/games/1.png" },
-  { id: "2", title: "Fallout", image: "/images/games/2.png" },
-  { id: "3", title: "Grand Theft Auto V", image: "/images/games/3.png" },
-  { id: "4", title: "It Takes Two", image: "/images/games/4.png" },
-  { id: "5", title: "Gran Turismo", image: "/images/games/5.png" },
-  { id: "6", title: "Cuphead", image: "/images/games/6.png" },
-  { id: "7", title: "A Hat in Time", image: "/images/games/7.png" },
-  { id: "8", title: "Fallout", image: "/images/games/8.png" },
-  { id: "9", title: "Grand Theft Auto V", image: "/images/games/9.png" },
-  { id: "10", title: "It Takes Two", image: "/images/games/10.png" },
-  { id: "11", title: "Gran Turismo", image: "/images/games/11.png" },
-  { id: "12", title: "Cuphead", image: "/images/games/12.png" },
-];
-
-// Sample data
-const unitData: Unit[] = [
-  {
-    id: "1",
-    name: "Regular Unit 1",
-    room: "Regular",
-    console: "Playstation 4",
-    addOns: "-",
-    rentPrice: 15000,
-    status: "On Service",
-    games: [gameData[0], gameData[3]],
-  },
-  {
-    id: "2",
-    name: "VIP Unit 1",
-    room: "VIP",
-    console: "Playstation 4",
-    addOns: "Netflix",
-    rentPrice: 15000,
-    status: "On Service",
-    games: [gameData[1], gameData[2]],
-  },
-  {
-    id: "3",
-    name: "Unit 1",
-    room: "VIP",
-    console: "Playstation 4",
-    addOns: "Netflix, Nintendo",
-    rentPrice: 25000,
-    status: "Available",
-    games: [gameData[4], gameData[5]],
-  },
-  {
-    id: "4",
-    name: "Unit 2",
-    room: "Regular",
-    console: "Playstation 5",
-    addOns: "-",
-    rentPrice: 15000,
-    status: "Available",
-    games: [gameData[6], gameData[7]],
-  },
-  {
-    id: "5",
-    name: "Unit 3",
-    room: "VIP",
-    console: "Playstation 5",
-    addOns: "Netflix",
-    rentPrice: 15000,
-    status: "Available",
-    games: [gameData[0], gameData[1]],
-  },
-  {
-    id: "6",
-    name: "Unit 4",
-    room: "VIP",
-    console: "Playstation 5",
-    addOns: "Netflix",
-    rentPrice: 20000,
-    status: "Available",
-    games: [gameData[2], gameData[3]],
-  },
-  {
-    id: "7",
-    name: "Unit 5",
-    room: "VVIP",
-    console: "Playstation 5",
-    addOns: "-",
-    rentPrice: 15000,
-    status: "Available",
-    games: [gameData[4], gameData[5]],
-  },
-];
-
-// Sample room data
-const roomOptions = ["Regular", "VIP", "VVIP"];
-
-// Sample console data
-const consoleOptions = [
-  "Playstation 4",
-  "Playstation 5",
-  "Xbox Series X",
-  "Nintendo Switch",
-];
-
-// Sample add-ons data
-const addOnOptions = ["Netflix", "Nintendo", "Disney+", "Spotify Premium"];
-
-// Pricing configuration
-const basePricing = {
-  room: {
-    Regular: 0,
-    VIP: 5000,
-    VVIP: 10000,
-  },
-  console: {
-    "Playstation 4": 10000,
-    "Playstation 5": 15000,
-    "Xbox Series X": 15000,
-    "Nintendo Switch": 12000,
-  },
-  addOns: {
-    "-": 0,
-    Netflix: 2000,
-    Nintendo: 3000,
-    "Disney+": 2000,
-    "Spotify Premium": 1500,
-    "Netflix, Nintendo": 4500,
-  },
-};
+// Define feature options
+const FEATURE_OPTIONS = ["netflix", "disney+", "nintendo_switch"];
 
 // Game List Item Component with Drag and Drop
 const GameItem = ({
@@ -248,13 +131,12 @@ const GameItem = ({
         <div className="flex-shrink-0">
           <div className="relative h-10 w-10 rounded-md overflow-hidden">
             <Image
-              src={game.image || "/images/game-placeholder.png"}
+              src={game.image || "/placeholder.svg"}
               alt={game.title}
               fill
               className="object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  "/images/game-placeholder.png";
+                (e.target as HTMLImageElement).src = "/placeholder.svg";
               }}
             />
           </div>
@@ -266,16 +148,30 @@ const GameItem = ({
 };
 
 export function UnitTable() {
+  const mounted = useMounted();
+
   // State for data and filtering
-  const [units, setUnits] = useState<Unit[]>(unitData);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // State for related data
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [consoles, setConsoles] = useState<Console[]>([]);
+  const [allGames, setAllGames] = useState<Game[]>([]);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [rawErrorDetails, setRawErrorDetails] = useState<string | null>(null);
 
   // State for game list modal and drag & drop
   const [isGameListOpen, setIsGameListOpen] = useState(false);
-  const [games, setGames] = useState<Game[]>(gameData);
-  const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+  const [selectedGames, setSelectedGames] = useState<Game[]>([]);
+  const [currentUnitGames, setCurrentUnitGames] = useState<Game[]>([]);
   const [gameSearchTerm, setGameSearchTerm] = useState("");
 
   // State for modals
@@ -283,41 +179,150 @@ export function UnitTable() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [currentUnit, setCurrentUnit] = useState<Unit | null>(null);
-  const [newUnit, setNewUnit] = useState<Partial<Unit>>({
+  const [newUnit, setNewUnit] = useState<Partial<ExtendedUnitPayload>>({
     name: "",
-    room: "",
-    console: "",
-    addOns: "",
-    rentPrice: 0,
-    status: "Available",
-    games: [],
+    room_id: 0,
+    console_id: 0,
+    game_ids: [],
+    status: "available" as "available" | "booked" | "serviced",
+    features: [],
+    description: "",
   });
 
   // State for managing selected games in forms
   const [gameSearchInput, setGameSearchInput] = useState("");
-  const [selectedGames, setSelectedGames] = useState<Game[]>([]);
   const [showGameSearchResults, setShowGameSearchResults] = useState(false);
+
+  // Fetch units data
+  useEffect(() => {
+    if (!mounted) return;
+
+    const fetchUnits = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await getUnits(currentPage, itemsPerPage, searchTerm);
+
+        if (response && Array.isArray(response.data)) {
+          setUnits(response.data);
+          setTotalItems(response.meta?.total || response.data.length);
+          setTotalPages(response.meta?.lastPage || 1);
+        } else {
+          throw new Error("Invalid API response format for units");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load units");
+        toast.error(
+          "Failed to load units. " + (err instanceof Error ? err.message : "")
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUnits();
+  }, [mounted, currentPage, itemsPerPage, searchTerm, refreshTrigger]);
+
+  // Fetch rooms, consoles, and games for dropdowns
+  useEffect(() => {
+    if (!mounted) return;
+
+    const fetchRelatedData = async () => {
+      try {
+        // Fetch rooms
+        const roomsResponse = await getRooms();
+        if (roomsResponse && Array.isArray(roomsResponse.data)) {
+          setRooms(roomsResponse.data);
+        }
+
+        // Fetch consoles
+        const consolesResponse = await getConsoles();
+        if (consolesResponse && Array.isArray(consolesResponse.consoles)) {
+          setConsoles(consolesResponse.consoles);
+        }
+
+        // Fetch games
+        const gamesResponse = await getGames();
+        if (gamesResponse && Array.isArray(gamesResponse.games)) {
+          setAllGames(gamesResponse.games);
+        }
+      } catch (err) {
+        console.error("Error fetching related data:", err);
+        toast.error("Failed to load some reference data");
+      }
+    };
+
+    fetchRelatedData();
+  }, [mounted]);
 
   // Format price in IDR
   const formatPrice = (price: number) => {
     return `Rp${price.toLocaleString("id-ID")}`;
   };
 
+  // Map room and console IDs to their names
+  const getRoomNameById = (id: number | string): string => {
+    const room = rooms.find((room) => String(room.id) === String(id));
+    return room?.name || "Unknown Room";
+  };
+
+  const getConsoleNameById = (id: number | string): string => {
+    const consoleItem = consoles.find((c) => String(c.id) === String(id));
+    return consoleItem?.model || "Unknown Console";
+  };
+
+  // Calculate price based on selected options
+  const calculateRentPrice = (
+    roomId: number,
+    consoleId: number,
+    features: string[]
+  ): number => {
+    // Get room price from API data
+    const room = rooms.find((r) => String(r.id) === String(roomId));
+    const roomPrice = room?.price ? parseFloat(String(room.price)) : 0;
+
+    // Get console price from API data
+    const consoleItem = consoles.find(
+      (c) => String(c.id) === String(consoleId)
+    );
+    const consolePrice = consoleItem?.price
+      ? parseFloat(String(consoleItem.price))
+      : 0;
+
+    // Calculate feature price
+    let featurePrice = 0;
+    if (features && features.length > 0) {
+      const feature = features[0]; // We now only support one feature at a time
+
+      if (feature === "netflix") {
+        featurePrice = 2000;
+      } else if (feature === "disney+") {
+        featurePrice = 2500;
+      } else if (feature === "nintendo_switch") {
+        featurePrice = 3000;
+      }
+    }
+
+    return roomPrice + consolePrice + featurePrice;
+  };
+
   // Filter data based on search
   const filteredData = units.filter((unit) => {
+    if (!searchTerm) return true;
+
     const searchLower = searchTerm.toLowerCase();
     return (
-      unit.name.toLowerCase().includes(searchLower) ||
-      unit.room.toLowerCase().includes(searchLower) ||
-      unit.console.toLowerCase().includes(searchLower)
+      (unit.name && unit.name.toLowerCase().includes(searchLower)) ||
+      getRoomNameById(unit.room_id).toLowerCase().includes(searchLower) ||
+      getConsoleNameById(unit.console_id).toLowerCase().includes(searchLower)
     );
   });
 
   // Pagination
   const lastIndex = currentPage * itemsPerPage;
   const firstIndex = lastIndex - itemsPerPage;
-  const paginatedData = filteredData.slice(firstIndex, lastIndex);
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
+  const paginatedData = filteredData.slice(0, itemsPerPage);
 
   // Generate pagination buttons
   const generatePaginationButtons = () => {
@@ -338,7 +343,7 @@ export function UnitTable() {
         size="icon"
         className="rounded-full"
         onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-        disabled={currentPage === 1}
+        disabled={currentPage === 1 || loading}
       >
         &lt;
       </Button>
@@ -357,6 +362,7 @@ export function UnitTable() {
               : "rounded-full"
           }
           onClick={() => setCurrentPage(i)}
+          disabled={loading}
         >
           {i}
         </Button>
@@ -371,7 +377,7 @@ export function UnitTable() {
         size="icon"
         className="rounded-full"
         onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-        disabled={currentPage === totalPages}
+        disabled={currentPage === totalPages || loading}
       >
         &gt;
       </Button>
@@ -382,58 +388,16 @@ export function UnitTable() {
 
   // Get status badge class
   const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case "Available":
+    switch (status.toLowerCase()) {
+      case "available":
         return "bg-green-100 text-green-800 hover:bg-green-100";
-      case "On Service":
+      case "serviced":
         return "bg-red-100 text-red-800 hover:bg-red-100";
-      default:
+      case "booked":
         return "bg-blue-100 text-blue-800 hover:bg-blue-100";
+      default:
+        return "bg-gray-100 text-gray-800 hover:bg-gray-100";
     }
-  };
-
-  // Calculate price based on selected options
-  const calculatePrice = (room: string, console: string, addOns: string) => {
-    const roomPrice = room
-      ? basePricing.room[room as keyof typeof basePricing.room] || 0
-      : 0;
-    const consolePrice = console
-      ? basePricing.console[console as keyof typeof basePricing.console] || 0
-      : 0;
-    const addOnsPrice = addOns
-      ? basePricing.addOns[addOns as keyof typeof basePricing.addOns] || 0
-      : 0;
-
-    return roomPrice + consolePrice + addOnsPrice;
-  };
-
-  // Update price when options change
-  const updatePrice = (updatedUnit: Partial<Unit>) => {
-    const calculatedPrice = calculatePrice(
-      updatedUnit.room || "",
-      updatedUnit.console || "",
-      updatedUnit.addOns || "-"
-    );
-
-    return {
-      ...updatedUnit,
-      rentPrice: calculatedPrice,
-    };
-  };
-
-  // Handle room change
-  const handleRoomChange = (value: string) => {
-    setNewUnit((prev) => updatePrice({ ...prev, room: value }));
-  };
-
-  // Handle console change
-  const handleConsoleChange = (value: string) => {
-    setNewUnit((prev) => updatePrice({ ...prev, console: value }));
-  };
-
-  // Handle add-ons change
-  const handleAddOnsChange = (value: string) => {
-    setNewUnit((prev) => updatePrice({ ...prev, addOns: value }));
   };
 
   // Handler for CRUD operations
@@ -444,16 +408,39 @@ export function UnitTable() {
 
   const handleEditUnit = (unit: Unit) => {
     setCurrentUnit(unit);
+
+    // Get game objects from IDs
+    const unitGames = unit.game_ids
+      ? (unit.game_ids
+          .map((id) => allGames.find((game) => String(game.id) === String(id)))
+          .filter(Boolean) as Game[])
+      : [];
+
+    setSelectedGames(unitGames);
+
+    // Get room and console names
+    const roomName = getRoomNameById(unit.room_id);
+    const consoleName = getConsoleNameById(unit.console_id);
+
+    // Set unit data for form with existing status and prepopulated values
     setNewUnit({
       name: unit.name,
-      room: unit.room,
-      console: unit.console,
-      addOns: unit.addOns,
-      rentPrice: unit.rentPrice,
+      room_id: unit.room_id,
+      room: roomName, // Setting room name for dropdown
+      console_id: unit.console_id,
+      console: consoleName, // Setting console name for dropdown
+      game_ids: unit.game_ids,
+      description: unit.description || "",
       status: unit.status,
-      games: unit.games,
+      features: unit.features || [],
+      // Calculate the rent price based on current data
+      rentPrice: calculateRentPrice(
+        unit.room_id,
+        unit.console_id,
+        unit.features || []
+      ),
     });
-    setSelectedGames(unit.games || []);
+
     setIsEditDialogOpen(true);
   };
 
@@ -463,125 +450,339 @@ export function UnitTable() {
   };
 
   const resetForm = () => {
+    setFormError(null);
+    setRawErrorDetails(null);
     setNewUnit({
       name: "",
-      room: "",
-      console: "",
-      addOns: "",
-      rentPrice: 0,
-      status: "Available",
-      games: [],
+      room_id: 0,
+      console_id: 0,
+      game_ids: [],
+      description: "",
+      status: "available" as "available" | "booked" | "serviced",
+      features: [],
     });
     setSelectedGames([]);
     setGameSearchInput("");
   };
 
-  const submitAddUnit = () => {
-    const unitToAdd: Unit = {
-      id: String(units.length + 1),
-      name: newUnit.name || "",
-      room: newUnit.room || "",
-      console: newUnit.console || "",
-      addOns: newUnit.addOns || "-",
-      rentPrice: newUnit.rentPrice || 0,
-      status: newUnit.status || "Available",
-      games: selectedGames,
+  const submitAddUnit = async () => {
+    // Reset errors
+    setFormError(null);
+    setRawErrorDetails(null);
+
+    if (
+      !newUnit.name ||
+      !newUnit.room_id ||
+      !newUnit.console_id ||
+      selectedGames.length === 0
+    ) {
+      setFormError("Please fill in all required fields!");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Calculate the unit price
+      const unitPrice = calculateRentPrice(
+        newUnit.room_id,
+        newUnit.console_id,
+        newUnit.features || []
+      );
+
+      const payload = {
+        name: newUnit.name!,
+        room_id: newUnit.room_id!,
+        console_id: newUnit.console_id!,
+        game_ids: selectedGames.map((game) => Number(game.id)),
+        description: newUnit.description || "",
+        status: newUnit.status || "available",
+        features: newUnit.features || [],
+        rent_price: unitPrice, // Use rent_price for API
+      };
+
+      console.log("Sending unit data to API:", payload);
+      const result = await addUnit(payload);
+
+      toast.success("Unit added successfully!");
+      resetForm();
+      setIsAddDialogOpen(false);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      handleApiError(error, "Failed to add unit");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitEditUnit = async () => {
+    // Reset errors
+    setFormError(null);
+    setRawErrorDetails(null);
+
+    if (!currentUnit) return;
+
+    // Use current unit data for any missing fields in the edit form
+    const updatedUnit = {
+      name: newUnit.name || currentUnit.name,
+      room_id: newUnit.room_id || currentUnit.room_id,
+      console_id: newUnit.console_id || currentUnit.console_id,
+      description:
+        newUnit.description !== undefined
+          ? newUnit.description
+          : currentUnit.description || "",
+      status: newUnit.status || currentUnit.status,
+      features: newUnit.features || currentUnit.features || [],
+      // Use the selected games or fall back to current unit's game IDs
+      game_ids:
+        selectedGames.length > 0
+          ? selectedGames.map((game) => Number(game.id))
+          : currentUnit.game_ids,
     };
-    setUnits([...units, unitToAdd]);
-    resetForm();
-    setIsAddDialogOpen(false);
 
-    // Tambahkan toast notification sukses
-    toast.success("Unit added successfully!", {
-      description: `Unit "${unitToAdd.name}" has been added to the system.`,
-      duration: 3000,
-    });
+    setLoading(true);
+
+    try {
+      // Calculate the unit price based on updated fields
+      const unitPrice = calculateRentPrice(
+        updatedUnit.room_id,
+        updatedUnit.console_id,
+        updatedUnit.features
+      );
+
+      // Prepare the payload with proper data types
+      const payload = {
+        name: updatedUnit.name,
+        room_id: Number(updatedUnit.room_id),
+        console_id: Number(updatedUnit.console_id),
+        game_ids: updatedUnit.game_ids, // This will be stringified in the API
+        description: updatedUnit.description,
+        status: updatedUnit.status,
+        features: updatedUnit.features, // This will be stringified in the API
+        rent_price: unitPrice,
+        // No need to add _method: "PUT" as the API will handle it
+      };
+
+      console.log("Updating unit data:", payload);
+      console.log("Unit ID:", currentUnit.id);
+      const result = await updateUnit(currentUnit.id, payload);
+
+      toast.success("Unit updated successfully!");
+      resetForm();
+      setCurrentUnit(null);
+      setIsEditDialogOpen(false);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      handleApiError(error, "Failed to update unit");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const submitEditUnit = () => {
+  const submitDeleteUnit = async () => {
     if (!currentUnit) return;
-    const updatedUnits = units.map((unit) => {
-      if (unit.id === currentUnit.id) {
-        return {
-          ...unit,
-          name: newUnit.name || unit.name,
-          room: newUnit.room || unit.room,
-          console: newUnit.console || unit.console,
-          addOns: newUnit.addOns || unit.addOns,
-          rentPrice: newUnit.rentPrice ?? unit.rentPrice,
-          status: newUnit.status || unit.status,
-          games: selectedGames,
-        };
+
+    setLoading(true);
+
+    try {
+      await deleteUnit(currentUnit.id);
+
+      toast.success("Unit deleted successfully!");
+      setCurrentUnit(null);
+      setIsDeleteDialogOpen(false);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      handleApiError(error, "Failed to delete unit");
+      setLoading(false);
+    }
+  };
+
+  // Handle API errors
+  const handleApiError = (error: unknown, defaultMessage: string) => {
+    let errorMessage = error instanceof Error ? error.message : defaultMessage;
+
+    // Check for session expiration errors
+    if (
+      error instanceof Error &&
+      error.message.includes("login sudah berakhir")
+    ) {
+      toast.error("Sesi login sudah berakhir. Silakan login kembali.");
+      // Optionally redirect to login page
+      return;
+    }
+
+    toast.error(errorMessage);
+
+    // Set form error for display
+    setFormError(errorMessage);
+
+    // Set raw error details for debugging
+    if (axios.isAxiosError(error) && error.response) {
+      try {
+        setRawErrorDetails(
+          `Status: ${error.response.status}\n` +
+            `Response: ${JSON.stringify(error.response.data, null, 2)}\n` +
+            `Headers: ${JSON.stringify(error.response.headers, null, 2)}`
+        );
+      } catch {
+        setRawErrorDetails(`Error: ${errorMessage}`);
       }
-      return unit;
-    });
-    setUnits(updatedUnits);
-    setCurrentUnit(null);
-    resetForm();
-    setIsEditDialogOpen(false);
+    }
 
-    // Tambahkan toast notification sukses edit
-    toast.success("Unit updated successfully!", {
-      description: `Unit "${newUnit.name}" has been updated.`,
-      duration: 3000,
-    });
-  };
-
-  const submitDeleteUnit = () => {
-    if (!currentUnit) return;
-    const updatedUnits = units.filter((unit) => unit.id !== currentUnit.id);
-    setUnits(updatedUnits);
-    setCurrentUnit(null);
-    setIsDeleteDialogOpen(false);
-
-    // Tambahkan toast notification sukses delete
-    toast.success("Unit deleted successfully!", {
-      description: `Unit "${currentUnit.name}" has been removed from the system.`,
-      duration: 3000,
-    });
+    console.error("API Error:", error);
   };
 
   // Handle opening game list modal
   const handleOpenGameList = (unit: Unit) => {
-    setSelectedUnit(unit);
-    setGames(unit.games || gameData);
+    // Find the games by IDs
+    const unitGames = unit.game_ids
+      ? (unit.game_ids
+          .map((id) => allGames.find((game) => String(game.id) === String(id)))
+          .filter(Boolean) as Game[])
+      : [];
+
+    setCurrentUnitGames(unitGames);
+    setCurrentUnit(unit);
     setIsGameListOpen(true);
   };
 
   // Move game function for drag and drop
   const moveGame = (dragIndex: number, hoverIndex: number) => {
-    const dragGame = games[dragIndex];
-    const newGames = [...games];
+    const dragGame = currentUnitGames[dragIndex];
+    const newGames = [...currentUnitGames];
     newGames.splice(dragIndex, 1);
     newGames.splice(hoverIndex, 0, dragGame);
-    setGames(newGames);
+    setCurrentUnitGames(newGames);
   };
 
   // Filter games based on search
-  const filteredGames = games.filter((game) =>
+  const filteredGames = currentUnitGames.filter((game) =>
     game.title.toLowerCase().includes(gameSearchTerm.toLowerCase())
   );
 
   // Filter games for search results
-  const gameSearchResults = gameData
+  const gameSearchResults = allGames
     .filter(
       (game) =>
         (gameSearchInput.length === 0 ||
           game.title.toLowerCase().includes(gameSearchInput.toLowerCase())) &&
-        !selectedGames.some((sg) => sg.id === game.id)
+        !selectedGames.some((sg) => String(sg.id) === String(game.id))
     )
     .slice(0, 8); // Limit to 8 results
 
   // Add game to selection
   const handleAddGame = (game: Game) => {
-    setSelectedGames([...selectedGames, game]);
+    if (!selectedGames.some((g) => String(g.id) === String(game.id))) {
+      setSelectedGames([...selectedGames, game]);
+    }
     setGameSearchInput("");
-    // Don't hide search results after adding a game
   };
 
   // Remove game from selection
-  const handleRemoveGame = (gameId: string) => {
-    setSelectedGames(selectedGames.filter((game) => game.id !== gameId));
+  const handleRemoveGame = (gameId: string | number) => {
+    setSelectedGames(
+      selectedGames.filter((game) => String(game.id) !== String(gameId))
+    );
+  };
+
+  // Handle room selection
+  const handleRoomChange = (value: string) => {
+    const roomObj = rooms.find((room) => room.name === value);
+    const roomId = roomObj?.id || 0;
+
+    setNewUnit((prev) => {
+      // Calculate new rent price based on selected room and console
+      const consoleId = prev.console_id || 0;
+      const features = prev.features || [];
+      const rentPrice = calculateRentPrice(roomId, consoleId, features);
+
+      return {
+        ...prev,
+        room_id: roomId,
+        room: value,
+        rentPrice: rentPrice,
+      };
+    });
+  };
+
+  // Handle console selection
+  const handleConsoleChange = (value: string) => {
+    const consoleObj = consoles.find((c) => c.model === value);
+    const consoleId = consoleObj?.id || 0;
+
+    setNewUnit((prev) => {
+      // Calculate new rent price based on selected room and console
+      const roomId = prev.room_id || 0;
+      const features = prev.features || [];
+      const rentPrice = calculateRentPrice(roomId, consoleId, features);
+
+      return {
+        ...prev,
+        console_id: consoleId,
+        console: value,
+        rentPrice: rentPrice,
+      };
+    });
+  };
+
+  // Handle features selection
+  const handleFeatureToggle = (feature: string) => {
+    setNewUnit((prev) => {
+      const features = [...(prev.features || [])];
+
+      // Toggle the feature
+      let newFeatures: string[];
+      if (features.includes(feature)) {
+        newFeatures = features.filter((f) => f !== feature);
+      } else {
+        newFeatures = [...features, feature];
+      }
+
+      // Recalculate rent price with updated features
+      const roomId = prev.room_id || 0;
+      const consoleId = prev.console_id || 0;
+      const rentPrice = calculateRentPrice(roomId, consoleId, newFeatures);
+
+      return {
+        ...prev,
+        features: newFeatures,
+        rentPrice: rentPrice,
+      };
+    });
+  };
+
+  // Render a simple skeleton UI while not mounted to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <Card className="border-none shadow-none">
+        <CardHeader className="pb-3 px-0">
+          <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-4"></div>
+          <div className="flex justify-between">
+            <div className="h-10 w-64 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-10 w-36 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="h-80 bg-gray-100 rounded animate-pulse"></div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Type safety for price calculations
+  const calculatePrice = (
+    roomPrice: number | string,
+    consolePrice: number | string
+  ): number => {
+    const roomValue =
+      typeof roomPrice === "string"
+        ? parseInt(roomPrice, 10) || 0
+        : roomPrice || 0;
+    const consoleValue =
+      typeof consolePrice === "string"
+        ? parseInt(consolePrice, 10) || 0
+        : consolePrice || 0;
+    return roomValue + consoleValue;
   };
 
   return (
@@ -625,6 +826,20 @@ export function UnitTable() {
                 />
               </div>
               <Button
+                variant="outline"
+                className="flex gap-1 items-center"
+                onClick={() => {
+                  toast.info("Refreshing units list...");
+                  setRefreshTrigger((prev) => prev + 1);
+                }}
+                disabled={loading}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                />
+                <span>{loading ? "Refreshing..." : "Refresh"}</span>
+              </Button>
+              <Button
                 className="bg-[#B99733] hover:bg-amber-600 flex gap-1 items-center"
                 onClick={handleAddUnit}
               >
@@ -648,10 +863,11 @@ export function UnitTable() {
                     CONSOLE
                   </TableHead>
                   <TableHead className="font-bold text-black">
-                    ADD-ONS
+                    FEATURES
                   </TableHead>
+                  <TableHead className="font-bold text-black">PRICE</TableHead>
                   <TableHead className="font-bold text-black">
-                    RENT PRICE
+                    GAME COUNT
                   </TableHead>
                   <TableHead className="font-bold text-black text-center">
                     GAME LIST
@@ -665,9 +881,34 @@ export function UnitTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedData.length === 0 ? (
+                {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center h-24">
+                    <TableCell colSpan={10} className="text-center h-40">
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-gray-500 mb-2" />
+                        <span>Loading units...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center h-40">
+                      <div className="flex flex-col items-center justify-center">
+                        <span className="text-red-500 mb-2">{error}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRefreshTrigger((prev) => prev + 1)}
+                          className="mt-3"
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center h-24">
                       No unit found
                     </TableCell>
                   </TableRow>
@@ -678,10 +919,27 @@ export function UnitTable() {
                         {firstIndex + index + 1}
                       </TableCell>
                       <TableCell>{unit.name}</TableCell>
-                      <TableCell>{unit.room}</TableCell>
-                      <TableCell>{unit.console}</TableCell>
-                      <TableCell>{unit.addOns}</TableCell>
-                      <TableCell>{formatPrice(unit.rentPrice)}</TableCell>
+                      <TableCell>{getRoomNameById(unit.room_id)}</TableCell>
+                      <TableCell>
+                        {getConsoleNameById(unit.console_id)}
+                      </TableCell>
+                      <TableCell>
+                        {unit.features && unit.features.length > 0
+                          ? unit.features.join(", ")
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {unit.rent_price
+                          ? formatPrice(unit.rent_price)
+                          : formatPrice(
+                              calculateRentPrice(
+                                unit.room_id,
+                                unit.console_id,
+                                unit.features || []
+                              )
+                            )}
+                      </TableCell>
+                      <TableCell>{unit.game_ids?.length || 0} games</TableCell>
                       <TableCell className="text-center">
                         <Button
                           variant="outline"
@@ -694,7 +952,13 @@ export function UnitTable() {
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClass(unit.status)}>
-                          {unit.status}
+                          {unit.status === "available"
+                            ? "Available"
+                            : unit.status === "booked"
+                            ? "Booked"
+                            : unit.status === "serviced"
+                            ? "In Service"
+                            : unit.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="flex justify-center space-x-2">
@@ -726,8 +990,7 @@ export function UnitTable() {
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
               Showing {filteredData.length > 0 ? firstIndex + 1 : 0} to{" "}
-              {Math.min(lastIndex, filteredData.length)} of{" "}
-              {filteredData.length} entries
+              {Math.min(lastIndex, filteredData.length)} of {totalItems} entries
             </div>
             <div className="flex gap-1">{generatePaginationButtons()}</div>
           </div>
@@ -743,7 +1006,8 @@ export function UnitTable() {
           >
             <DialogHeader>
               <DialogTitle className="text-xl font-bold">
-                {selectedUnit?.console} Unit {selectedUnit?.name} Game List
+                {getConsoleNameById(currentUnit?.console_id || 0)} Unit{" "}
+                {currentUnit?.name} Game List
               </DialogTitle>
             </DialogHeader>
 
@@ -824,18 +1088,20 @@ export function UnitTable() {
                       <SelectValue placeholder="Select room" />
                     </SelectTrigger>
                     <SelectContent>
-                      {roomOptions.map((room) => (
-                        <SelectItem key={room} value={room}>
-                          {room}{" "}
-                          {room !== "Regular"
-                            ? `(+${formatPrice(
-                                basePricing.room[
-                                  room as keyof typeof basePricing.room
-                                ]
-                              )})`
-                            : ""}
+                      {rooms.length > 0 ? (
+                        rooms.map((room) => (
+                          <SelectItem key={room.id} value={room.name}>
+                            {room.name}{" "}
+                            {typeof room.price === "number" &&
+                              room.price > 0 &&
+                              `(+${formatPrice(room.price)})`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          Loading rooms...
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -854,48 +1120,63 @@ export function UnitTable() {
                       <SelectValue placeholder="Select console" />
                     </SelectTrigger>
                     <SelectContent>
-                      {consoleOptions.map((console) => (
-                        <SelectItem key={console} value={console}>
-                          {console} (+
-                          {formatPrice(
-                            basePricing.console[
-                              console as keyof typeof basePricing.console
-                            ]
-                          )}
-                          )
+                      {consoles.length > 0 ? (
+                        consoles.map((console) => (
+                          <SelectItem key={console.id} value={console.model}>
+                            {console.model}{" "}
+                            {typeof console.price === "number" &&
+                              console.price > 0 &&
+                              `(+${formatPrice(console.price)})`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          Loading consoles...
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <Label htmlFor="addOns" className="text-sm font-medium">
-                    Add-Ons
+                  <Label htmlFor="features" className="text-sm font-medium">
+                    Features
                   </Label>
                   <Select
-                    value={newUnit.addOns || ""}
-                    onValueChange={handleAddOnsChange}
+                    value={
+                      newUnit.features && newUnit.features.length > 0
+                        ? newUnit.features[0]
+                        : "none"
+                    }
+                    onValueChange={(value) => {
+                      if (value === "none") {
+                        // Clear features
+                        setNewUnit((prev) => ({
+                          ...prev,
+                          features: [],
+                        }));
+                      } else {
+                        // Set the selected feature
+                        setNewUnit((prev) => ({
+                          ...prev,
+                          features: [value],
+                        }));
+                      }
+                    }}
                   >
-                    <SelectTrigger id="addOns" className="mt-1">
-                      <SelectValue placeholder="Select add-ons" />
+                    <SelectTrigger id="features" className="mt-1">
+                      <SelectValue placeholder="Select a feature" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="-">None</SelectItem>
-                      {addOnOptions.map((addon) => (
-                        <SelectItem key={addon} value={addon}>
-                          {addon} (+
-                          {formatPrice(
-                            basePricing.addOns[
-                              addon as keyof typeof basePricing.addOns
-                            ]
-                          )}
-                          )
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="Netflix, Nintendo">
-                        Netflix, Nintendo (+
-                        {formatPrice(basePricing.addOns["Netflix, Nintendo"])})
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="netflix">
+                        Netflix (+Rp2.000)
+                      </SelectItem>
+                      <SelectItem value="disney+">
+                        Disney+ (+Rp2.500)
+                      </SelectItem>
+                      <SelectItem value="nintendo_switch">
+                        Nintendo Switch (+Rp3.000)
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -913,17 +1194,71 @@ export function UnitTable() {
                       type="number"
                       placeholder="Rent Price"
                       value={newUnit.rentPrice || ""}
-                      onChange={(e) =>
-                        setNewUnit({
-                          ...newUnit,
-                          rentPrice: Number(e.target.value),
-                        })
-                      }
+                      readOnly
                       className="bg-gray-100"
-                      disabled
                     />
                     <div className="absolute right-3 top-2 text-xs text-gray-500">
                       Auto calculated
+                    </div>
+                  </div>
+
+                  {/* Price breakdown */}
+                  <div className="mt-2 text-xs text-gray-500">
+                    <div className="grid grid-cols-2 gap-1">
+                      <div>Room: </div>
+                      <div className="text-right">
+                        {newUnit.room_id
+                          ? formatPrice(
+                              rooms.find((r) => r.id === newUnit.room_id)?.price
+                                ? parseFloat(
+                                    String(
+                                      rooms.find(
+                                        (r) => r.id === newUnit.room_id
+                                      )?.price
+                                    )
+                                  )
+                                : 0
+                            )
+                          : "Rp0"}
+                      </div>
+
+                      <div>Console: </div>
+                      <div className="text-right">
+                        {newUnit.console_id
+                          ? formatPrice(
+                              consoles.find((c) => c.id === newUnit.console_id)
+                                ?.price
+                                ? parseFloat(
+                                    String(
+                                      consoles.find(
+                                        (c) => c.id === newUnit.console_id
+                                      )?.price
+                                    )
+                                  )
+                                : 0
+                            )
+                          : "Rp0"}
+                      </div>
+
+                      <div>Features: </div>
+                      <div className="text-right">
+                        {newUnit.features && newUnit.features.length > 0
+                          ? formatPrice(
+                              newUnit.features.includes("netflix")
+                                ? 2000
+                                : newUnit.features.includes("disney+")
+                                ? 2500
+                                : newUnit.features.includes("nintendo_switch")
+                                ? 3000
+                                : 0
+                            )
+                          : "Rp0"}
+                      </div>
+
+                      <div className="font-medium">Total: </div>
+                      <div className="text-right font-medium">
+                        {formatPrice(newUnit.rentPrice || 0)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -933,11 +1268,11 @@ export function UnitTable() {
                     Status <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={newUnit.status || "Available"}
-                    onValueChange={(value) =>
+                    value={newUnit.status || "available"}
+                    onValueChange={(value: string) =>
                       setNewUnit({
                         ...newUnit,
-                        status: value as "Available" | "On Service",
+                        status: value as "available" | "booked" | "serviced",
                       })
                     }
                   >
@@ -945,8 +1280,9 @@ export function UnitTable() {
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Available">Available</SelectItem>
-                      <SelectItem value="On Service">On Service</SelectItem>
+                      <SelectItem value="available">Available</SelectItem>
+                      <SelectItem value="booked">Booked</SelectItem>
+                      <SelectItem value="serviced">In Service</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1080,6 +1416,10 @@ export function UnitTable() {
           <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
             <DialogHeader className="pb-2">
               <DialogTitle>Edit Unit</DialogTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                You can edit one or more fields. Only changed fields will be
+                updated.
+              </p>
             </DialogHeader>
 
             <div className="grid gap-3 py-2">
@@ -1111,18 +1451,20 @@ export function UnitTable() {
                       <SelectValue placeholder="Select room" />
                     </SelectTrigger>
                     <SelectContent>
-                      {roomOptions.map((room) => (
-                        <SelectItem key={room} value={room}>
-                          {room}{" "}
-                          {room !== "Regular"
-                            ? `(+${formatPrice(
-                                basePricing.room[
-                                  room as keyof typeof basePricing.room
-                                ]
-                              )})`
-                            : ""}
+                      {rooms.length > 0 ? (
+                        rooms.map((room) => (
+                          <SelectItem key={room.id} value={room.name}>
+                            {room.name}{" "}
+                            {typeof room.price === "number" &&
+                              room.price > 0 &&
+                              `(+${formatPrice(room.price)})`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          Loading rooms...
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1141,48 +1483,63 @@ export function UnitTable() {
                       <SelectValue placeholder="Select console" />
                     </SelectTrigger>
                     <SelectContent>
-                      {consoleOptions.map((console) => (
-                        <SelectItem key={console} value={console}>
-                          {console} (+
-                          {formatPrice(
-                            basePricing.console[
-                              console as keyof typeof basePricing.console
-                            ]
-                          )}
-                          )
+                      {consoles.length > 0 ? (
+                        consoles.map((console) => (
+                          <SelectItem key={console.id} value={console.model}>
+                            {console.model}{" "}
+                            {typeof console.price === "number" &&
+                              console.price > 0 &&
+                              `(+${formatPrice(console.price)})`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          Loading consoles...
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <Label htmlFor="edit-addOns" className="text-sm font-medium">
-                    Add-Ons
+                  <Label htmlFor="features" className="text-sm font-medium">
+                    Features
                   </Label>
                   <Select
-                    value={newUnit.addOns || ""}
-                    onValueChange={handleAddOnsChange}
+                    value={
+                      newUnit.features && newUnit.features.length > 0
+                        ? newUnit.features[0]
+                        : "none"
+                    }
+                    onValueChange={(value) => {
+                      if (value === "none") {
+                        // Clear features
+                        setNewUnit((prev) => ({
+                          ...prev,
+                          features: [],
+                        }));
+                      } else {
+                        // Set the selected feature
+                        setNewUnit((prev) => ({
+                          ...prev,
+                          features: [value],
+                        }));
+                      }
+                    }}
                   >
-                    <SelectTrigger id="edit-addOns" className="mt-1">
-                      <SelectValue placeholder="Select add-ons" />
+                    <SelectTrigger id="features" className="mt-1">
+                      <SelectValue placeholder="Select a feature" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="-">None</SelectItem>
-                      {addOnOptions.map((addon) => (
-                        <SelectItem key={addon} value={addon}>
-                          {addon} (+
-                          {formatPrice(
-                            basePricing.addOns[
-                              addon as keyof typeof basePricing.addOns
-                            ]
-                          )}
-                          )
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="Netflix, Nintendo">
-                        Netflix, Nintendo (+
-                        {formatPrice(basePricing.addOns["Netflix, Nintendo"])})
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="netflix">
+                        Netflix (+Rp2.000)
+                      </SelectItem>
+                      <SelectItem value="disney+">
+                        Disney+ (+Rp2.500)
+                      </SelectItem>
+                      <SelectItem value="nintendo_switch">
+                        Nintendo Switch (+Rp3.000)
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -1191,29 +1548,80 @@ export function UnitTable() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label
-                    htmlFor="edit-rentPrice"
-                    className="text-sm font-medium"
-                  >
+                  <Label htmlFor="rentPrice" className="text-sm font-medium">
                     Rent Price <span className="text-red-500">*</span>
                   </Label>
                   <div className="relative mt-1">
                     <Input
-                      id="edit-rentPrice"
+                      id="rentPrice"
                       type="number"
                       placeholder="Rent Price"
                       value={newUnit.rentPrice || ""}
-                      onChange={(e) =>
-                        setNewUnit({
-                          ...newUnit,
-                          rentPrice: Number(e.target.value),
-                        })
-                      }
+                      readOnly
                       className="bg-gray-100"
-                      disabled
                     />
                     <div className="absolute right-3 top-2 text-xs text-gray-500">
                       Auto calculated
+                    </div>
+                  </div>
+
+                  {/* Price breakdown */}
+                  <div className="mt-2 text-xs text-gray-500">
+                    <div className="grid grid-cols-2 gap-1">
+                      <div>Room: </div>
+                      <div className="text-right">
+                        {newUnit.room_id
+                          ? formatPrice(
+                              rooms.find((r) => r.id === newUnit.room_id)?.price
+                                ? parseFloat(
+                                    String(
+                                      rooms.find(
+                                        (r) => r.id === newUnit.room_id
+                                      )?.price
+                                    )
+                                  )
+                                : 0
+                            )
+                          : "Rp0"}
+                      </div>
+
+                      <div>Console: </div>
+                      <div className="text-right">
+                        {newUnit.console_id
+                          ? formatPrice(
+                              consoles.find((c) => c.id === newUnit.console_id)
+                                ?.price
+                                ? parseFloat(
+                                    String(
+                                      consoles.find(
+                                        (c) => c.id === newUnit.console_id
+                                      )?.price
+                                    )
+                                  )
+                                : 0
+                            )
+                          : "Rp0"}
+                      </div>
+
+                      <div>Features: </div>
+                      <div className="text-right">
+                        {newUnit.features && newUnit.features.length > 0
+                          ? formatPrice(
+                              newUnit.features.includes("netflix")
+                                ? 2000
+                                : newUnit.features.includes("disney+")
+                                ? 2500
+                                : newUnit.features.includes("nintendo_switch")
+                                ? 3000
+                                : 0
+                            )
+                          : "Rp0"}
+                      </div>
+
+                      <div className="font-medium">Total: </div>
+                      <div className="text-right font-medium">
+                        {formatPrice(newUnit.rentPrice || 0)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1223,11 +1631,11 @@ export function UnitTable() {
                     Status <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={newUnit.status || "Available"}
-                    onValueChange={(value) =>
+                    value={newUnit.status || "available"}
+                    onValueChange={(value: string) =>
                       setNewUnit({
                         ...newUnit,
-                        status: value as "Available" | "On Service",
+                        status: value as "available" | "booked" | "serviced",
                       })
                     }
                   >
@@ -1235,8 +1643,9 @@ export function UnitTable() {
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Available">Available</SelectItem>
-                      <SelectItem value="On Service">On Service</SelectItem>
+                      <SelectItem value="available">Available</SelectItem>
+                      <SelectItem value="booked">Booked</SelectItem>
+                      <SelectItem value="serviced">In Service</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1352,12 +1761,6 @@ export function UnitTable() {
               <Button
                 onClick={submitEditUnit}
                 className="bg-amber-500 hover:bg-amber-600 w-full"
-                disabled={
-                  !newUnit.name ||
-                  !newUnit.room ||
-                  !newUnit.console ||
-                  selectedGames.length === 0
-                }
               >
                 Save Changes
               </Button>

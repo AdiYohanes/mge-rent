@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { usePathname } from "next/navigation";
+import useBookingItemStore from "@/store/BookingItemStore";
 
 interface BookingSummaryProps {
   className?: string;
@@ -43,16 +44,33 @@ interface UnitOption {
 
 // Define type for promo codes
 type PromoCodeKey = "DISCOUNT10" | "DISCOUNT20" | "DISCOUNT30";
+
 type PromoCodesType = {
   [key in PromoCodeKey]: number;
 };
 
 export default function BookingSummary({
   className,
-  selectedDate,
+  selectedDate: selectedDateProp,
 }: BookingSummaryProps) {
   const pathname = usePathname();
   const showPromoCode = pathname === "/booking-confirm";
+
+  const selectedConsole = useBookingItemStore((state) => state.selectedConsole);
+  const selectedRoom = useBookingItemStore((state) => state.selectedRoom);
+  const selectedUnitName = useBookingItemStore(
+    (state) => state.selectedUnitName
+  );
+  const selectedDateFromStore = useBookingItemStore(
+    (state) => state.selectedDate
+  );
+  const duration = useBookingItemStore((state) => state.duration);
+  const selectedTime = useBookingItemStore((state) => state.selectedTime);
+  const foodCart = useBookingItemStore((state) => state.foodCart);
+  const getFoodCartTotalPrice = useBookingItemStore(
+    (state) => state.getFoodCartTotalPrice
+  );
+  const endTime = useBookingItemStore((state) => state.endTime);
 
   const [isOpen, setIsOpen] = useState(true);
   const [highlightTotal, setHighlightTotal] = useState(false);
@@ -83,38 +101,65 @@ export default function BookingSummary({
     { id: "F", label: "Xbox - Unit F", status: "available" },
   ];
 
+  // Helper function to parse console price string (e.g., "18k") into a number
+  const parseConsolePrice = (priceStr: string | undefined): number => {
+    if (!priceStr) return 0;
+    const priceLower = priceStr.toLowerCase();
+    if (priceLower.endsWith("k")) {
+      return parseFloat(priceLower.replace("k", "")) * 1000;
+    }
+    return parseFloat(priceLower) || 0;
+  };
+
   const items = [
     {
       type: "Console",
-      description: `PlayStation 4${
-        selectedConsoleUnit ? ` (Unit ${selectedConsoleUnit})` : ""
-      }`,
+      description: selectedConsole
+        ? `${selectedConsole.name}${
+            selectedConsoleUnit ? ` ( ${selectedConsoleUnit})` : ""
+          }`
+        : `No console selected${
+            selectedConsoleUnit ? ` ( ${selectedConsoleUnit})` : ""
+          }`,
       quantity: 1,
-      total: 10000,
+      total: selectedConsole ? parseConsolePrice(selectedConsole.price) : 0,
       icon: <Gamepad2 size={16} className="text-indigo-500" />,
       hasUnitSelection: true,
       unitType: "console",
     },
     {
       type: "Room Type",
-      description: "Premium Suite",
+      description: selectedRoom
+        ? `${selectedRoom.category}${
+            selectedUnitName ? ` ( ${selectedUnitName})` : ""
+          }`
+        : `No room selected${
+            selectedUnitName ? ` ( ${selectedUnitName})` : ""
+          }`,
       quantity: 1,
-      total: 25000,
+      total: selectedRoom ? selectedRoom.price : 0,
       icon: <Home size={16} className="text-emerald-500" />,
-      hasUnitSelection: false,
+      hasUnitSelection: false, // This refers to the console's specific unit selector, not the room's unit
     },
     {
       type: "Duration",
-      description: "3 Hours",
+      description: `${duration} Hour${duration > 1 ? "s" : ""}${
+        selectedTime ? ` | Start From ${selectedTime}` : ""
+      }${endTime ? ` (Ends at ${format(endTime, "HH:mm")})` : ""}`,
       quantity: 1,
-      total: 30000,
+      total: 30000, // This total seems static, assuming duration cost is calculated elsewhere or included in room/console
       icon: <Clock size={16} className="text-amber-500" />,
     },
     {
       type: "Food & Drinks",
-      description: "Snack Combo",
-      quantity: 2,
-      total: 15000,
+      description:
+        foodCart.length > 0
+          ? foodCart
+              .map((item) => `${item.name} (x${item.quantity})`)
+              .join(", ")
+          : "No food or drinks selected",
+      quantity: foodCart.reduce((acc, item) => acc + item.quantity, 0),
+      total: getFoodCartTotalPrice(),
       icon: <Coffee size={16} className="text-rose-500" />,
     },
   ];
@@ -181,7 +226,9 @@ export default function BookingSummary({
   };
 
   // If selectedDate is not provided, use a mock date
-  const dateToDisplay = selectedDate || new Date("2025-05-10");
+  // Prioritize store date, then prop, then mock date
+  const dateToDisplay =
+    selectedDateFromStore || selectedDateProp || new Date("2025-05-10");
 
   return (
     <div

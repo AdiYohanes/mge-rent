@@ -591,7 +591,7 @@ const GameDetailModal: React.FC<GameDetailModalProps> = ({
           >
             <div className="relative h-64 sm:h-80">
               <Image
-                src={game.image || "/placeholder.svg"}
+                src={game.image || "/images/games/1.png"}
                 alt={game.title}
                 fill
                 className="object-cover"

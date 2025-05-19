@@ -44,10 +44,12 @@ import {
   deleteConsole,
   addConsole,
   updateConsole,
-  ConsolePayload,
+  uploadConsoleImage,
 } from "@/api";
-import axios from "axios";
-import { API_BASE_URL } from "@/api/constants";
+
+interface ConsoleState extends Partial<Console> {
+  imageFile?: File;
+}
 
 export function ConsoleTable() {
   // State for data and filtering
@@ -55,7 +57,7 @@ export function ConsoleTable() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [loading, setLoading] = useState(true);
+  const [loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
@@ -67,7 +69,7 @@ export function ConsoleTable() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [currentConsole, setCurrentConsole] = useState<Console | null>(null);
-  const [newConsole, setNewConsole] = useState<Partial<Console>>({
+  const [newConsole, setNewConsole] = useState<ConsoleState>({
     model: "",
     image: "",
     price: "",
@@ -92,7 +94,7 @@ export function ConsoleTable() {
     }
 
     const fetchConsoles = async () => {
-      setLoading(true);
+      setIsLoading(true);
       setError(null);
 
       try {
@@ -103,25 +105,41 @@ export function ConsoleTable() {
 
         if (response && Array.isArray(response.consoles)) {
           setConsoles(response.consoles);
-          setTotalItems(response.total || response.consoles.length);
-          setTotalPages(
-            response.totalPages ||
-              Math.ceil(response.consoles.length / itemsPerPage)
-          );
+
+          // Handle metadata if available
+          if (response.total !== undefined) {
+            setTotalItems(response.total);
+            setTotalPages(
+              response.totalPages || Math.ceil(response.total / itemsPerPage)
+            );
+          } else {
+            setTotalItems(response.consoles.length);
+            setTotalPages(Math.ceil(response.consoles.length / itemsPerPage));
+          }
         } else {
           console.error("Invalid API response format:", response);
           throw new Error("API returned an invalid data format");
         }
       } catch (err) {
         console.error("Error fetching consoles:", err);
-        setError(
-          `Failed to load consoles: ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`
-        );
-        toast.error("Failed to load consoles. Please try again.");
+
+        // Check for session expiration
+        if (
+          err instanceof Error &&
+          err.message.includes("login sudah berakhir")
+        ) {
+          toast.error(err.message);
+          // Optionally redirect to login page
+        } else {
+          setError(
+            `Failed to load consoles: ${
+              err instanceof Error ? err.message : "Unknown error"
+            }`
+          );
+          toast.error("Failed to load consoles. Please try again.");
+        }
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
@@ -142,10 +160,15 @@ export function ConsoleTable() {
   // Handle file selection
   const handleFileChange = (file: File) => {
     if (file && file.type.startsWith("image/")) {
+      // Store the file directly instead of converting to base64
+      setNewConsole((prev) => ({ ...prev, imageFile: file }));
+
+      // Still create preview URL for display
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-        setNewConsole((prev) => ({ ...prev, image: reader.result as string }));
+        if (typeof reader.result === "string") {
+          setPreviewUrl(reader.result);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -236,20 +259,21 @@ export function ConsoleTable() {
     setIsAddDialogOpen(true);
   };
 
-  const handleEditConsole = (console: Console) => {
-    setCurrentConsole(console);
+  const handleEditConsole = (consoleItem: Console) => {
+    setCurrentConsole(consoleItem);
     setNewConsole({
-      model: console.model,
-      image: console.image,
-      price: console.price,
-      serial_number: console.serial_number,
+      model: consoleItem.model,
+      image: consoleItem.image,
+      price: consoleItem.price,
+      serial_number: consoleItem.serial_number,
+      notes: consoleItem.notes || "",
     });
-    setPreviewUrl(console.image || "");
+    setPreviewUrl(consoleItem.image || "");
     setIsEditDialogOpen(true);
   };
 
-  const handleDeleteConsole = (console: Console) => {
-    setCurrentConsole(console);
+  const handleDeleteConsole = (consoleItem: Console) => {
+    setCurrentConsole(consoleItem);
     setIsDeleteDialogOpen(true);
   };
 
@@ -264,112 +288,139 @@ export function ConsoleTable() {
   };
 
   const submitAddConsole = async () => {
-    // Validate required fields
-    if (!newConsole.model || !newConsole.serial_number || !newConsole.price) {
-      toast.error("Please fill all required fields.");
-      return;
-    }
-
-    // Prepare payload
-    const payload: ConsolePayload = {
-      model: newConsole.model!,
-      serial_number: newConsole.serial_number!,
-      price: newConsole.price!,
-      image: previewUrl, // This might need to be handled differently for a real file upload
-      is_available: true,
-      notes: "",
-    };
-
     try {
-      setLoading(true);
-      const result = await addConsole(payload);
-      if (result) {
-        toast.success("Console added successfully!");
-        setRefreshTrigger((prev) => prev + 1); // Refresh the list
-      } else {
-        throw new Error("Failed to create console");
+      if (!newConsole.model || !newConsole.serial_number || !newConsole.price) {
+        toast.error("Please fill in all required fields");
+        return;
       }
-    } catch (error) {
-      console.error("Error adding console:", error);
-      toast.error("Failed to add console. Please try again.");
-    } finally {
-      setLoading(false);
-      resetForm();
+
+      // Create payload object for JSON request
+      const payload = {
+        model: newConsole.model,
+        serial_number: newConsole.serial_number,
+        price: newConsole.price,
+        notes: newConsole.notes || "",
+      };
+
+      console.log("Sending console data to API:", payload);
+
+      // Step 1: Call the addConsole API function
+      const result = await addConsole(payload);
+
+      if (!result) {
+        toast.error("Failed to add console. Please try again.");
+        return;
+      }
+
+      // Step 2: If there's an image file and we have a console ID, upload the image
+      let imageSuccess = true;
+      if (newConsole.imageFile && result.id) {
+        console.log("Uploading image for new console ID:", result.id);
+        imageSuccess = await uploadConsoleImage(
+          result.id.toString(),
+          newConsole.imageFile
+        );
+        
+        if (!imageSuccess) {
+          toast.warning("Console added but image upload failed");
+        }
+      }
+
+      if (imageSuccess) {
+        toast.success("Console added successfully");
+      }
+      
       setIsAddDialogOpen(false);
+      resetForm();
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err) {
+      console.error("Error adding console:", err);
+
+      // Check for session expiration
+      if (
+        err instanceof Error &&
+        err.message.includes("login sudah berakhir")
+      ) {
+        toast.error(err.message);
+        // Optionally redirect to login page
+      } else {
+        toast.error(
+          `Failed to add console: ${
+            err instanceof Error ? err.message : "Unknown error"
+          }`
+        );
+      }
     }
   };
 
   const submitEditConsole = async () => {
-    if (!currentConsole) return;
-
-    // Validate required fields
-    if (!newConsole.model || !newConsole.serial_number || !newConsole.price) {
-      toast.error("Please fill all required fields.");
-      return;
-    }
-
-    setLoading(true);
-
-    // Prepare payload - only include fields that the API needs
-    const payload: ConsolePayload = {
-      model: newConsole.model!,
-      serial_number: newConsole.serial_number!,
-      price: newConsole.price!,
-      image: previewUrl, // This might need to be handled differently for a real file upload
-      is_available: currentConsole.is_available,
-      notes: newConsole.notes || currentConsole.notes,
-    };
-
     try {
-      console.log(`Updating console ID: ${currentConsole.id}`);
-      console.log(
-        `Endpoint: ${API_BASE_URL}/admin/consoles/${currentConsole.id}`
-      );
-      console.log(`Payload:`, payload);
+      if (!currentConsole || !currentConsole.id) {
+        toast.error("No console selected for editing");
+        return;
+      }
 
-      // Try update with console ID
+      if (!newConsole.model || !newConsole.serial_number || !newConsole.price) {
+        toast.error("Please fill in all required fields");
+        return;
+      }
+
+      // Create payload for JSON request
+      const payload = {
+        model: newConsole.model,
+        serial_number: newConsole.serial_number,
+        price: newConsole.price,
+        notes: newConsole.notes || "",
+      };
+
+      console.log("Updating console with ID:", currentConsole.id, payload);
+
+      // Step 1: Update console data
       const result = await updateConsole(currentConsole.id.toString(), payload);
 
-      console.log("Update result:", result);
-
-      // Consider any non-null result as success
-      if (result !== null) {
-        toast.success("Console updated successfully!");
-        // Refresh data to get the latest from the backend
-        setRefreshTrigger((prev) => prev + 1);
-      } else {
-        throw new Error("Failed to update console - received null result");
+      if (!result) {
+        toast.error("Failed to update console. Please try again.");
+        return;
       }
-    } catch (error) {
-      console.error("Error updating console:", error);
 
-      // More detailed error handling
-      if (axios.isAxiosError(error)) {
-        console.error("Axios error details:", {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          headers: error.response?.headers,
-          config: {
-            url: error.config?.url,
-            method: error.config?.method,
-          },
-        });
-        toast.error(
-          `Update failed: ${error.response?.status} ${error.response?.statusText}`
+      // Step 2: If there's a new image file, upload it separately
+      let imageSuccess = true;
+      if (newConsole.imageFile) {
+        console.log("Uploading new image for console");
+        imageSuccess = await uploadConsoleImage(
+          currentConsole.id.toString(),
+          newConsole.imageFile
         );
+
+        if (!imageSuccess) {
+          toast.warning("Console updated but image upload failed");
+        }
+      }
+
+      if (imageSuccess) {
+        toast.success("Console updated successfully");
+      }
+
+      setIsEditDialogOpen(false);
+      resetForm();
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err) {
+      console.error("Error updating console:", err);
+
+      // Check for session expiration
+      if (
+        err instanceof Error &&
+        err.message.includes("login sudah berakhir")
+      ) {
+        toast.error(err.message);
+        // Optionally redirect to login page
       } else {
         toast.error(
           `Failed to update console: ${
-            error instanceof Error ? error.message : "Unknown error"
+            err instanceof Error ? err.message : "Unknown error"
           }`
         );
       }
-    } finally {
-      setLoading(false);
-      setCurrentConsole(null);
-      resetForm();
-      setIsEditDialogOpen(false);
     }
   };
 
@@ -382,13 +433,15 @@ export function ConsoleTable() {
       console.log(`Deleting console with ID: ${currentConsole.id}`);
 
       // Call API to delete console with the numeric ID converted to string
-      const success = await deleteConsole(currentConsole.id.toString());
+      const result = await deleteConsole(currentConsole.id.toString());
 
-      if (success) {
+      if (result.success) {
         toast.success("Console deleted successfully!");
       } else {
+        // Show specific error message if available
         throw new Error(
-          "Failed to delete console. API returned unsuccessful response."
+          result.message ||
+            "Failed to delete console. API returned unsuccessful response."
         );
       }
     } catch (error) {
@@ -523,19 +576,11 @@ export function ConsoleTable() {
                             alt={console.model}
                             fill
                             className="object-cover"
-                            onError={(e) => {
-                              // If image fails to load, use console icon as fallback
-                              (e.target as HTMLImageElement).src =
-                                "/images/console/ps4.png";
-                            }}
                           />
                         ) : (
-                          <Image
-                            src="/images/console/ps4.png"
-                            alt="Console placeholder"
-                            fill
-                            className="object-contain p-2"
-                          />
+                          <div className="h-full w-full flex items-center justify-center text-gray-400 text-xs">
+                            No image
+                          </div>
                         )}
                       </div>
                     </TableCell>
@@ -625,11 +670,6 @@ export function ConsoleTable() {
                       alt="Preview"
                       fill
                       className="object-contain"
-                      onError={(e) => {
-                        // If preview fails to load, use console icon as fallback
-                        (e.target as HTMLImageElement).src =
-                          "/images/console-icon.png";
-                      }}
                     />
                   </div>
                 ) : (
@@ -748,11 +788,6 @@ export function ConsoleTable() {
                       alt="Preview"
                       fill
                       className="object-contain"
-                      onError={(e) => {
-                        // If preview fails to load, use console icon as fallback
-                        (e.target as HTMLImageElement).src =
-                          "/images/console-icon.png";
-                      }}
                     />
                   </div>
                 ) : (

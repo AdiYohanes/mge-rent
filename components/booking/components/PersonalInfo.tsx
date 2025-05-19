@@ -11,7 +11,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -36,17 +36,18 @@ const FormSchema = z.object({
   }),
 });
 
-interface UserData {
+interface UserDataFromCookie {
   username?: string;
   email?: string;
-  phoneNumber?: string;
+  phone?: string;
 }
 
-const PersonalInfo = () => {
-  const [useLoginInfo, setUseLoginInfo] = useState(false);
-  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
+interface PersonalInfoProps {
+  initialData?: UserDataFromCookie | null;
+  onValidityChange?: (isValid: boolean) => void;
+}
 
+const PersonalInfo = ({ initialData, onValidityChange }: PersonalInfoProps) => {
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -56,33 +57,32 @@ const PersonalInfo = () => {
       phoneNumber: "",
       terms: false,
     },
+    mode: "onChange",
   });
 
-  // Check if user is logged in when component mounts
   useEffect(() => {
-    try {
-      const storedUserData = localStorage.getItem("user");
-      if (storedUserData) {
-        const parsedUserData = JSON.parse(storedUserData);
-        setUserData(parsedUserData);
-        setIsUserLoggedIn(true);
-      }
-    } catch (error) {
-      console.error("Error reading from localStorage:", error);
+    if (onValidityChange) {
+      onValidityChange(form.formState.isValid);
     }
-  }, []);
+  }, [form.formState.isValid, onValidityChange]);
 
-  // Apply user data to form if checkbox is checked and user is logged in
   useEffect(() => {
-    if (useLoginInfo && isUserLoggedIn && userData) {
-      form.setValue("fullName", userData.username || "");
-      // Only set email and phone if they exist
-      if (userData.email) form.setValue("email", userData.email);
-      if (userData.phoneNumber)
-        form.setValue("phoneNumber", userData.phoneNumber);
-      form.setValue("username", userData.username || "");
+    if (initialData) {
+      form.setValue("fullName", initialData.username || "");
+      form.setValue("email", initialData.email || "");
+      form.setValue("username", initialData.username || "");
+      form.setValue("phoneNumber", initialData.phone || "");
+      form.trigger();
+    } else {
+      form.reset({
+        fullName: "",
+        email: "",
+        username: "",
+        phoneNumber: "",
+        terms: form.getValues("terms"),
+      });
     }
-  }, [useLoginInfo, isUserLoggedIn, userData, form]);
+  }, [initialData, form]);
 
   function onSubmit(data: z.infer<typeof FormSchema>) {
     toast(
@@ -94,27 +94,6 @@ const PersonalInfo = () => {
       </div>
     );
   }
-
-  const handleUseLoginInfoChange = (checked: boolean) => {
-    setUseLoginInfo(checked);
-
-    if (checked) {
-      if (isUserLoggedIn) {
-        // Apply user data from local storage to form
-        if (userData) {
-          form.setValue("fullName", userData.username || "");
-          // Only set email and phone if they exist
-          if (userData.email) form.setValue("email", userData.email);
-          if (userData.phoneNumber)
-            form.setValue("phoneNumber", userData.phoneNumber);
-          form.setValue("username", userData.username || "");
-        }
-      } else {
-        // Show toast message if user is not logged in
-        toast.error("You must log in to use this information.");
-      }
-    }
-  };
 
   return (
     <div className="flex flex-col w-full justify-start border border-[#B99733] p-6 md:p-8">
@@ -132,32 +111,6 @@ const PersonalInfo = () => {
             onSubmit={form.handleSubmit(onSubmit)}
             className="w-full max-w-md space-y-6"
           >
-            {/* Checkbox for Use login information */}
-            <FormField
-              control={form.control}
-              name="email"
-              render={() => (
-                <FormItem>
-                  <FormControl>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="useLoginInfo"
-                        className="cursor-pointer"
-                        checked={useLoginInfo}
-                        onCheckedChange={handleUseLoginInfoChange}
-                      />
-                      <label
-                        htmlFor="useLoginInfo"
-                        className="text-sm font-medium text-gray-700"
-                      >
-                        Use login information
-                      </label>
-                    </div>
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
             {/* Full Name */}
             <FormField
               control={form.control}
@@ -166,11 +119,7 @@ const PersonalInfo = () => {
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="John Doe"
-                      {...field}
-                      disabled={useLoginInfo && isUserLoggedIn} // Disable field if checkbox is checked and user is logged in
-                    />
+                    <Input placeholder="John Doe" {...field} />
                   </FormControl>
                   <FormMessage role="banner" />
                 </FormItem>
@@ -187,8 +136,8 @@ const PersonalInfo = () => {
                   <FormControl>
                     <Input
                       placeholder="john.doe@example.com"
+                      type="email"
                       {...field}
-                      disabled={useLoginInfo && isUserLoggedIn}
                     />
                   </FormControl>
                   <FormMessage role="banner" />
@@ -204,11 +153,7 @@ const PersonalInfo = () => {
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="shadcn"
-                      {...field}
-                      disabled={useLoginInfo && isUserLoggedIn}
-                    />
+                    <Input placeholder="shadcn" {...field} />
                   </FormControl>
                   <FormDescription>
                     This is your public display name.
@@ -226,11 +171,7 @@ const PersonalInfo = () => {
                 <FormItem>
                   <FormLabel>Phone Number</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="+62 81234567890"
-                      {...field}
-                      disabled={useLoginInfo && isUserLoggedIn}
-                    />
+                    <Input placeholder="+62 81234567890" {...field} />
                   </FormControl>
                   <FormMessage role="banner" />
                 </FormItem>

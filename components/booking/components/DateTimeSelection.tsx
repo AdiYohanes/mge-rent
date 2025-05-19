@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { format, isToday, startOfDay } from "date-fns";
+import { format, isToday, startOfDay, addHours } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useMounted } from "@/hooks/use-mounted";
+import useBookingItemStore from "@/store/BookingItemStore";
 
 // Define types for time slots and hour slots
 interface MinuteSlot {
@@ -46,29 +48,54 @@ type TimeOfDay = "all" | "morning" | "afternoon" | "evening";
 
 // Main component
 export default function DateTimeSelection() {
-  // Using null as initial value but will store a Date object
   const [today, setToday] = useState<Date | null>(null);
-  // Using undefined as initial value but will store a Date object
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedTime, setSelectedTime] = useState<string>("");
-  const [duration, setDuration] = useState<number>(1);
+  const { selectedDate, setSelectedDate } = useBookingItemStore();
+  const { selectedTime, setSelectedTime } = useBookingItemStore();
+  const { duration, setDuration } = useBookingItemStore();
+  const { setEndTime } = useBookingItemStore();
   const [hourSlots, setHourSlots] = useState<HourSlot[]>([]);
-  const [mounted, setMounted] = useState<boolean>(false);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("all");
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  const mounted = useMounted();
 
-  // Set today and initial selected date after component mounts
   useEffect(() => {
-    setMounted(true);
-    const now = new Date();
-    // Use a temporary variable to convert to Date type before setting state
-    const currentDate = now;
-    setToday(currentDate);
-    setSelectedDate(currentDate);
-  }, []);
+    if (mounted) {
+      const now = new Date();
+      const currentDate = now;
+      setToday(currentDate);
+      if (selectedDate === undefined) {
+        setSelectedDate(currentDate);
+      }
+    }
+  }, [mounted, setSelectedDate, selectedDate]);
+
+  useEffect(() => {
+    if (selectedDate && selectedTime && duration > 0) {
+      try {
+        const [hoursStr, minutesStr] = selectedTime.split(":");
+        const hours = parseInt(hoursStr, 10);
+        const minutes = parseInt(minutesStr, 10);
+
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          const startDate = new Date(selectedDate);
+          startDate.setHours(hours, minutes, 0, 0);
+
+          const calculatedEndTime = addHours(startDate, duration);
+          setEndTime(calculatedEndTime);
+        } else {
+          setEndTime(null);
+        }
+      } catch (error) {
+        console.error("Error calculating end time:", error);
+        setEndTime(null);
+      }
+    } else {
+      setEndTime(null);
+    }
+  }, [selectedDate, selectedTime, duration, setEndTime]);
 
   const fetchTimeSlots = useCallback(
-    (date: Date) => {
+    (date: Date | undefined) => {
       if (date && mounted) {
         const isWeekend = [0, 6].includes(date.getDay()); // 0 is Sunday, 6 is Saturday
         const startHour = isWeekend ? 9 : 8; // 9AM for weekends, 8AM for weekdays
@@ -131,7 +158,7 @@ export default function DateTimeSelection() {
         setSelectedTime("");
       }
     },
-    [mounted]
+    [mounted, setSelectedDate, selectedDate]
   );
 
   useEffect(() => {

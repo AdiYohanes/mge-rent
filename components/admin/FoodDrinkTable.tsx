@@ -1,7 +1,15 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { Search, Pencil, Trash2, PlusCircle, Upload } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import {
+  Search,
+  Pencil,
+  Trash2,
+  PlusCircle,
+  Upload,
+  RefreshCw,
+  Loader2,
+} from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,156 +43,14 @@ import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-// Sample data - updated with both food and drink items
-const sampleData = [
-  // Food items
-  {
-    id: "1",
-    name: "Taco",
-    price: 10000,
-    image: "/images/food/beef.jpg",
-    category: "Food",
-    status: "Available",
-  },
-  {
-    id: "2",
-    name: "Nasi Goreng",
-    price: 15000,
-    image: "/images/food/chicken.jpg",
-    category: "Food",
-    status: "Sold Out",
-  },
-  {
-    id: "3",
-    name: "Sate Ayam (10)",
-    price: 25000,
-    image: "/images/food/noodle1.jpg",
-    category: "Food",
-    status: "Available",
-  },
-  {
-    id: "4",
-    name: "Roti Bakar Vanilla",
-    price: 12000,
-    image: "/images/food/bread.jpg",
-    category: "Food",
-    status: "Sold Out",
-  },
-  {
-    id: "5",
-    name: "Roti Bakar Coklat",
-    price: 12000,
-    image: "/images/food/bread.jpg",
-    category: "Food",
-    status: "Available",
-  },
-  {
-    id: "6",
-    name: "French Fries",
-    price: 10000,
-    image: "/images/food/popcorn.jpg",
-    category: "Food",
-    status: "Sold Out",
-  },
-  {
-    id: "7",
-    name: "Sosis Goreng (5)",
-    price: 15000,
-    image: "/images/food/noodle2.jpg",
-    category: "Food",
-    status: "Available",
-  },
-  {
-    id: "8",
-    name: "Burger Beef",
-    price: 20000,
-    image: "/images/food/beef.jpg",
-    category: "Food",
-    status: "Available",
-  },
-  {
-    id: "9",
-    name: "Chicken Wings",
-    price: 18000,
-    image: "/images/food/chicken.jpg",
-    category: "Food",
-    status: "Available",
-  },
-  // Drink items
-  {
-    id: "10",
-    name: "Es Teh Manis",
-    price: 8000,
-    image: "/images/food/tea.jpg",
-    category: "Drink",
-    status: "Available",
-  },
-  {
-    id: "11",
-    name: "Soda Gembira",
-    price: 12000,
-    image: "/images/food/soda.jpg",
-    category: "Drink",
-    status: "Available",
-  },
-  {
-    id: "12",
-    name: "Mineral Water",
-    price: 5000,
-    image: "/images/food/mineral.jpg",
-    category: "Drink",
-    status: "Available",
-  },
-  {
-    id: "13",
-    name: "Hot Cappuccino",
-    price: 15000,
-    image: "/images/food/coffee.jpg",
-    category: "Drink",
-    status: "Available",
-  },
-  {
-    id: "14",
-    name: "Ice Latte",
-    price: 18000,
-    image: "/images/food/coffee.jpg",
-    category: "Drink",
-    status: "Sold Out",
-  },
-  {
-    id: "15",
-    name: "Orange Juice",
-    price: 10000,
-    image: "/images/food/juice.jpg",
-    category: "Drink",
-    status: "Available",
-  },
-  {
-    id: "16",
-    name: "Strawberry Milkshake",
-    price: 15000,
-    image: "/images/food/juice.jpg",
-    category: "Drink",
-    status: "Available",
-  },
-  {
-    id: "17",
-    name: "Bubble Tea",
-    price: 16000,
-    image: "/images/food/tea.jpg",
-    category: "Drink",
-    status: "Available",
-  },
-  {
-    id: "18",
-    name: "Hot Chocolate",
-    price: 14000,
-    image: "/images/food/coffee.jpg",
-    category: "Drink",
-    status: "Sold Out",
-  },
-];
+import {
+  getFoodDrinkItems,
+  addFoodDrinkItem,
+  updateFoodDrinkItem,
+  deleteFoodDrinkItem,
+  FoodDrinkItem as FoodDrinkItemType,
+} from "@/api";
+import { prepareFileForUpload } from "@/api";
 
 // Food Item Component with Drag and Drop functionality
 const FoodDrinkItem = ({
@@ -194,11 +60,11 @@ const FoodDrinkItem = ({
   handleEdit,
   handleDelete,
 }: {
-  item: FoodDrinkItem;
+  item: FoodDrinkItemType;
   index: number;
   moveItem: (dragIndex: number, hoverIndex: number) => void;
-  handleEdit: (item: FoodDrinkItem) => void;
-  handleDelete: (item: FoodDrinkItem) => void;
+  handleEdit: (item: FoodDrinkItemType) => void;
+  handleDelete: (item: FoodDrinkItemType) => void;
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
@@ -255,7 +121,7 @@ const FoodDrinkItem = ({
       <TableCell>
         <div className="relative h-16 w-16 rounded-sm overflow-hidden">
           <Image
-            src={item.image || "/placeholder.svg"}
+            src={item.image || "/images/food/1.png"}
             alt={item.name}
             fill
             className="object-cover"
@@ -431,7 +297,7 @@ interface FoodDrinkTableProps {
 }
 
 export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
-  const [items, setItems] = useState<FoodDrinkItem[]>(sampleData);
+  const [items, setItems] = useState<FoodDrinkItemType[]>([]);
   const [currentTab, setCurrentTab] = useState<"all" | "food" | "drink">(
     initialTab
   );
@@ -442,14 +308,91 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const [currentItem, setCurrentItem] = useState<FoodDrinkItem | null>(null);
-  const [newItem, setNewItem] = useState<Partial<FoodDrinkItem>>({
+  const [currentItem, setCurrentItem] = useState<FoodDrinkItemType | null>(
+    null
+  );
+  const [newItem, setNewItem] = useState<Partial<FoodDrinkItemType>>({
     name: "",
     price: 0,
     image: "",
     category: "Food",
     status: "Available",
   });
+
+  // Add loading state
+  const [loading, setLoading] = useState(false);
+  // Add error state
+  const [error, setError] = useState<string | null>(null);
+  // Add totalItems state
+  const [totalItems, setTotalItems] = useState(0);
+  // Add totalPages state
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Fetch data from API when component mounts
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log("Fetching food and drink items...");
+        const response = await getFoodDrinkItems(
+          currentPage,
+          itemsPerPage,
+          searchTerm,
+          currentTab !== "all" ? currentTab : ""
+        );
+
+        console.log("API response:", response);
+
+        // Handle different possible response formats
+        let itemsArray = [];
+        let total = 0;
+        let pages = 1;
+
+        if (response && Array.isArray(response.items)) {
+          // Standard expected format
+          itemsArray = response.items;
+          total = response.total || response.items.length;
+          pages = response.totalPages || Math.ceil(total / itemsPerPage);
+        } else if (response && Array.isArray(response.data)) {
+          // Alternative format with data property
+          itemsArray = response.data;
+          total = response.total || response.data.length;
+          pages = response.totalPages || Math.ceil(total / itemsPerPage);
+        } else if (Array.isArray(response)) {
+          // Direct array response
+          itemsArray = response;
+          total = response.length;
+          pages = Math.ceil(total / itemsPerPage);
+        } else {
+          throw new Error("Unexpected API response format");
+        }
+
+        setItems(itemsArray);
+        setTotalItems(total);
+        setTotalPages(pages || 1);
+
+        if (itemsArray.length === 0 && total > 0 && currentPage > 1) {
+          // If we're on a page with no items but there are items on earlier pages,
+          // go back to the first page
+          setCurrentPage(1);
+        }
+      } catch (err) {
+        console.error("Error fetching items:", err);
+        setError(
+          `Failed to load items: ${
+            err instanceof Error ? err.message : "Unknown error"
+          }`
+        );
+        toast.error("Failed to load items. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [currentPage, itemsPerPage, searchTerm, currentTab]);
 
   // Filter data berdasarkan tab dan pencarian
   const filteredData = items.filter((item) => {
@@ -472,7 +415,6 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   const lastIndex = currentPage * itemsPerPage;
   const firstIndex = lastIndex - itemsPerPage;
   const paginatedData = filteredData.slice(firstIndex, lastIndex);
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
 
   // Format price ke Rupiah
   const formatPrice = (price: number) => {
@@ -546,7 +488,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     setIsAddDialogOpen(true);
   };
 
-  const handleEditItem = (item: FoodDrinkItem) => {
+  const handleEditItem = (item: FoodDrinkItemType) => {
     setCurrentItem(item);
     setNewItem({
       name: item.name,
@@ -558,7 +500,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     setIsEditDialogOpen(true);
   };
 
-  const handleDeleteItem = (item: FoodDrinkItem) => {
+  const handleDeleteItem = (item: FoodDrinkItemType) => {
     setCurrentItem(item);
     setIsDeleteDialogOpen(true);
   };
@@ -582,74 +524,168 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   };
 
   // Submit functions
-  const submitAddItem = () => {
+  const submitAddItem = async () => {
     if (!newItem.name || !newItem.price || !newItem.category) {
       toast.error("Please fill in all required fields!");
       return;
     }
 
-    // If using the actual image data from drag and drop
-    const itemToAdd: FoodDrinkItem = {
-      id: String(items.length + 1),
-      name: newItem.name || "",
-      price: newItem.price || 0,
-      image: newItem.image || `/images/food/beef.jpg`,
-      category: newItem.category || "",
-      status: (newItem.status as "Available" | "Sold Out") || "Available",
-    };
+    try {
+      setLoading(true);
 
-    setItems([...items, itemToAdd]);
-    resetForm();
-    setIsAddDialogOpen(false);
+      // Create FormData for API request
+      const formData = new FormData();
+      formData.append("name", newItem.name);
+      formData.append("category", newItem.category);
+      formData.append("price", newItem.price.toString());
+      formData.append("status", newItem.status || "Available");
 
-    toast.success("Item added successfully!", {
-      description: `${itemToAdd.name} has been added to the menu.`,
-    });
-  };
-
-  const submitEditItem = () => {
-    if (!currentItem) return;
-
-    if (!newItem.name || !newItem.price || !newItem.category) {
-      toast.error("Please fill in all required fields!");
-      return;
-    }
-
-    const updatedItems = items.map((item) => {
-      if (item.id === currentItem.id) {
-        return {
-          ...item,
-          name: newItem.name || item.name,
-          price: newItem.price ?? item.price,
-          image: newItem.image || item.image,
-          category: newItem.category || item.category,
-          status: (newItem.status as "Available" | "Sold Out") || item.status,
-        };
+      // Handle image if exists
+      if (newItem.imageFile) {
+        const preparedFile = prepareFileForUpload(newItem.imageFile);
+        formData.append("image", preparedFile);
       }
-      return item;
-    });
 
-    setItems(updatedItems);
-    setCurrentItem(null);
-    resetForm();
-    setIsEditDialogOpen(false);
+      const response = await addFoodDrinkItem(formData);
 
-    toast.success("Item updated successfully!", {
-      description: `${newItem.name} has been updated.`,
-    });
+      if (response) {
+        toast.success("Item added successfully!", {
+          description: `${newItem.name} has been added to the menu.`,
+        });
+
+        // Refresh data
+        const updatedData = await getFoodDrinkItems(
+          currentPage,
+          itemsPerPage,
+          searchTerm,
+          currentTab !== "all" ? currentTab : ""
+        );
+
+        if (updatedData && Array.isArray(updatedData.items)) {
+          setItems(updatedData.items);
+        }
+
+        resetForm();
+        setIsAddDialogOpen(false);
+      } else {
+        toast.error("Failed to add item. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error adding item:", err);
+      toast.error(
+        `Failed to add item: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const submitDeleteItem = () => {
+  const submitEditItem = async () => {
     if (!currentItem) return;
 
-    const updatedItems = items.filter((item) => item.id !== currentItem.id);
-    setItems(updatedItems);
-    setCurrentItem(null);
-    setIsDeleteDialogOpen(false);
+    if (!newItem.name || !newItem.price || !newItem.category) {
+      toast.error("Please fill in all required fields!");
+      return;
+    }
 
-    toast.success("Item deleted successfully!", {
-      description: `${currentItem.name} has been removed from the menu.`,
-    });
+    try {
+      setLoading(true);
+
+      // Create FormData for API request
+      const formData = new FormData();
+      formData.append("name", newItem.name);
+      formData.append("category", newItem.category);
+      formData.append("price", newItem.price.toString());
+      formData.append("status", newItem.status || "Available");
+
+      // Handle image if exists
+      if (newItem.imageFile) {
+        const preparedFile = prepareFileForUpload(newItem.imageFile);
+        formData.append("image", preparedFile);
+      }
+
+      const response = await updateFoodDrinkItem(
+        currentItem.id.toString(),
+        formData
+      );
+
+      if (response) {
+        toast.success("Item updated successfully!", {
+          description: `${newItem.name} has been updated.`,
+        });
+
+        // Refresh data
+        const updatedData = await getFoodDrinkItems(
+          currentPage,
+          itemsPerPage,
+          searchTerm,
+          currentTab !== "all" ? currentTab : ""
+        );
+
+        if (updatedData && Array.isArray(updatedData.items)) {
+          setItems(updatedData.items);
+        }
+
+        resetForm();
+        setCurrentItem(null);
+        setIsEditDialogOpen(false);
+      } else {
+        toast.error("Failed to update item. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error updating item:", err);
+      toast.error(
+        `Failed to update item: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitDeleteItem = async () => {
+    if (!currentItem) return;
+
+    try {
+      setLoading(true);
+
+      const success = await deleteFoodDrinkItem(currentItem.id.toString());
+
+      if (success) {
+        toast.success("Item deleted successfully!", {
+          description: `${currentItem.name} has been removed from the menu.`,
+        });
+
+        // Refresh data
+        const updatedData = await getFoodDrinkItems(
+          currentPage,
+          itemsPerPage,
+          searchTerm,
+          currentTab !== "all" ? currentTab : ""
+        );
+
+        if (updatedData && Array.isArray(updatedData.items)) {
+          setItems(updatedData.items);
+        }
+
+        setCurrentItem(null);
+        setIsDeleteDialogOpen(false);
+      } else {
+        toast.error("Failed to delete item. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error deleting item:", err);
+      toast.error(
+        `Failed to delete item: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Drag and drop handler
@@ -762,7 +798,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -774,6 +810,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     setSearchTerm(e.target.value);
                     setCurrentPage(1); // Reset ke halaman pertama saat pencarian
                   }}
+                  disabled={loading}
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -784,6 +821,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     setItemsPerPage(Number(value));
                     setCurrentPage(1);
                   }}
+                  disabled={loading}
                 >
                   <SelectTrigger className="w-[80px]">
                     <SelectValue placeholder={itemsPerPage} />
@@ -798,8 +836,23 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                 <Label>entries</Label>
               </div>
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchData()}
+                disabled={loading}
+                className="h-9"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                )}
+                Refresh
+              </Button>
+              <Button
                 className="bg-[#B99733] hover:bg-amber-600 flex gap-1 items-center w-full sm:w-auto"
                 onClick={handleAddItem}
+                disabled={loading}
               >
                 <PlusCircle className="h-4 w-4" />
                 <span>Add Item</span>
@@ -830,7 +883,35 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedData.length === 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center h-24">
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-amber-500 mb-2" />
+                        <span>Loading items...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center h-24 text-red-500"
+                    >
+                      <div className="flex flex-col items-center justify-center">
+                        <span className="font-medium">{error}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={fetchData}
+                          className="mt-2"
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center h-24">
                       No items found

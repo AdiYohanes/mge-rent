@@ -4,21 +4,13 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search } from "lucide-react";
 import BookingSummary from "@/components/restaurant/BookingSummary";
-import FoodItem from "@/components/restaurant/FoodItem";
+import FoodItemComponent from "@/components/restaurant/FoodItem";
 import { useRouter } from "next/navigation";
+import useRestaurantStore, { FoodItem } from "@/store/RestaurantStore";
 
 // Types
-type FoodItem = {
-  id: number;
-  name: string;
-  price: number;
-  image: string;
-  category: string;
-};
-
-type CartItem = FoodItem & {
-  quantity: number;
-};
+// type FoodItem = { ... };
+// type CartItem = FoodItem & { ... };
 
 type BookingInfo = {
   console: string;
@@ -141,10 +133,19 @@ const containerVariants = {
 export default function RestaurantPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState("Ricebowl");
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [isBookingSummaryOpen, setIsBookingSummaryOpen] = useState(true);
   const [bookingInfo, setBookingInfo] = useState<BookingInfo | null>(null);
   const router = useRouter();
+
+  // Zustand store integration
+  const {
+    cart,
+    addToCart: addToCartStore,
+    removeFromCart: removeFromCartStore,
+    getItemQuantity: getItemQuantityFromStore,
+    getCartTotalPrice: getCartTotalPriceFromStore,
+    getCartTotalItems: getCartTotalItemsFromStore,
+  } = useRestaurantStore();
 
   // Fetch booking info from localStorage
   useEffect(() => {
@@ -159,49 +160,19 @@ export default function RestaurantPage() {
       (activeCategory === "All" || item.category === activeCategory)
   );
 
-  // Handle adding item to cart
-  const addToCart = (item: FoodItem) => {
-    setCart((prevCart) => {
-      const existingItem = prevCart.find((cartItem) => cartItem.id === item.id);
-      if (existingItem) {
-        return prevCart.map((cartItem) =>
-          cartItem.id === item.id
-            ? { ...cartItem, quantity: cartItem.quantity + 1 }
-            : cartItem
-        );
-      } else {
-        return [...prevCart, { ...item, quantity: 1 }];
-      }
-    });
+  // Handle adding item to cart (now uses store action)
+  const handleAddToCart = (item: FoodItem) => {
+    addToCartStore(item);
   };
 
-  // Handle removing item from cart
-  const removeFromCart = (itemId: number) => {
-    setCart((prevCart) => {
-      const existingItem = prevCart.find((cartItem) => cartItem.id === itemId);
-      if (existingItem && existingItem.quantity > 1) {
-        return prevCart.map((cartItem) =>
-          cartItem.id === itemId
-            ? { ...cartItem, quantity: cartItem.quantity - 1 }
-            : cartItem
-        );
-      } else {
-        return prevCart.filter((cartItem) => cartItem.id !== itemId);
-      }
-    });
+  // Handle removing item from cart (now uses store action)
+  const handleRemoveFromCart = (itemId: number) => {
+    removeFromCartStore(itemId);
   };
 
-  // Get item quantity in cart
-  const getItemQuantity = (itemId: number) => {
-    const item = cart.find((cartItem) => cartItem.id === itemId);
-    return item ? item.quantity : 0;
-  };
-
-  // Calculate total price
-  const totalPrice = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  // Calculate total price (now uses store getter)
+  const totalPrice = getCartTotalPriceFromStore();
+  const totalItems = getCartTotalItemsFromStore();
 
   // Categories
   const categories = ["Ricebowl", "Noodles", "Snacks", "Drinks"];
@@ -289,15 +260,15 @@ export default function RestaurantPage() {
           animate="visible"
         >
           {filteredItems.map((item) => (
-            <FoodItem
+            <FoodItemComponent
               key={item.id}
               id={item.id}
               name={item.name}
               price={item.price}
               image={item.image}
-              quantity={getItemQuantity(item.id)}
-              onAdd={() => addToCart(item)}
-              onRemove={() => removeFromCart(item.id)}
+              quantity={getItemQuantityFromStore(item.id)}
+              onAdd={() => handleAddToCart(item)}
+              onRemove={() => handleRemoveFromCart(item.id)}
             />
           ))}
         </motion.div>
@@ -325,10 +296,7 @@ export default function RestaurantPage() {
           onClick={handleSubmitOrder}
         >
           {cart.length > 0
-            ? `Order (${cart.reduce(
-                (sum, item) => sum + item.quantity,
-                0
-              )} items): Rp${totalPrice.toLocaleString()}`
+            ? `Order (${totalItems} items): Rp${totalPrice.toLocaleString()}`
             : "Order"}
         </motion.button>
       </div>

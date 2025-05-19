@@ -1,62 +1,48 @@
 // Re-export all API functions and constants
 export * from "./constants";
-export * from "./apiUtils";
+export { prepareFileForUpload } from "./apiUtils";
 
-// Re-export auth API
-export * from "./auth/authApi";
+// Auth API
+export {
+  login,
+  register,
+  logout,
+  isLoggedIn,
+  getCurrentUser,
+  debugToken,
+  checkTokenHealth,
+  getAuthHeader,
+  type AuthResponse,
+  type LoginRequestData,
+  type RegisterRequestData,
+  type RegisterResponse,
+  type ErrorResponse,
+} from "./auth/authApi";
 
-// Import User type dari userApi
-import {
-  User,
-  GetUsersParams,
-  getUsers,
-  createUser,
-  updateUser,
-  deleteUser,
-} from "./user/userApi";
-
-// Re-export user API - fokus pada getUsers
+// User API
 export {
   getUsers,
+  getUser,
   createUser,
   updateUser,
   deleteUser,
   type User,
-  type GetUsersParams,
-};
+  type UserResponseData,
+} from "./user/userApi";
 
-// Import and export console API
-import {
-  Console,
-  ConsolePayload,
-  getConsoles,
-  getConsole,
-  addConsole,
-  updateConsole,
-  deleteConsole,
-} from "./console/consoleApi";
-
+// Console API
 export {
   getConsoles,
   getConsole,
   addConsole,
   updateConsole,
   deleteConsole,
+  uploadConsoleImage,
   type Console,
   type ConsolePayload,
-};
+} from "./console/consoleApi";
 
-// Import and export room API
-import {
-  Room,
-  RoomPayload,
-  getRooms,
-  getRoom,
-  addRoom,
-  updateRoom,
-  deleteRoom,
-} from "./room/roomApi";
-
+// Room API
 export {
   getRooms,
   getRoom,
@@ -64,10 +50,71 @@ export {
   updateRoom,
   deleteRoom,
   type Room,
+  type RoomResponseData,
   type RoomPayload,
-};
+} from "./room/roomApi";
 
-// Tambahkan status untuk kompatibilitas UserTable (tanpa data dummy)
+// Game API
+export {
+  getGames,
+  addGame,
+  updateGame,
+  deleteGame,
+  type Game,
+  type GamePayload,
+} from "./game/gameApi";
+
+// Food & Drink API
+export {
+  getFoodDrinkItems,
+  getFoodDrinkItem,
+  addFoodDrinkItem,
+  updateFoodDrinkItem,
+  deleteFoodDrinkItem,
+  type FoodDrinkItem,
+  type FoodDrinkResponseData,
+  type FoodDrinkPayload,
+} from "./fnb/fnbApi";
+
+// Promo API
+export {
+  getPromos,
+  getPromo,
+  addPromo,
+  updatePromo,
+  togglePromoStatus,
+  deletePromo,
+  type Promo,
+  type PromoResponseData,
+  type PromoPayload,
+} from "./promo/promoApi";
+
+// FAQ API
+export {
+  getFAQs,
+  getFAQ,
+  addFAQ,
+  updateFAQ,
+  deleteFAQ,
+  type FAQ,
+  type FAQResponseData,
+  type FAQPayload,
+} from "./faq/faqApi";
+
+// Unit API
+export {
+  getUnits,
+  addUnit,
+  updateUnit,
+  deleteUnit,
+  type Unit,
+  type UnitPayload,
+} from "./unit/unitApi";
+
+// Import User for the extended interface
+import { User } from "./user/userApi";
+
+// Extended interfaces for components
 export interface UserWithStatus extends User {
   status?: "active" | "inactive" | "suspended";
   avatar?: string;

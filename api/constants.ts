@@ -36,3 +36,44 @@ export const ROOM_ENDPOINTS = {
   UPDATE_ROOM: (id: string) => `${API_BASE_URL}/admin/rooms/${id}`,
   DELETE_ROOM: (id: string) => `${API_BASE_URL}/admin/rooms/${id}`,
 };
+
+// Game endpoints
+export const GAME_ENDPOINTS = {
+  GET_ALL: `${API_BASE_URL}/admin/games`,
+  GET_ONE: (id: string) => `${API_BASE_URL}/admin/games/${id}`,
+  CREATE_GAME: `${API_BASE_URL}/admin/games`,
+  UPDATE_GAME: (id: string) => `${API_BASE_URL}/admin/games/${id}`,
+  DELETE_GAME: (id: string) => `${API_BASE_URL}/admin/games/${id}`,
+};
+
+// Food and Drink endpoints
+export const FNB_ENDPOINTS = {
+  GET_ALL: `${API_BASE_URL}/admin/fnb`,
+  GET_ONE: (id: string) => `${API_BASE_URL}/admin/fnb/${id}`,
+  CREATE_FNB: `${API_BASE_URL}/admin/fnb`,
+  UPDATE_FNB: (id: string) => `${API_BASE_URL}/admin/fnb/${id}`,
+  DELETE_FNB: (id: string) => `${API_BASE_URL}/admin/fnb/${id}`,
+};
+
+// Promo endpoints
+export const PROMO_ENDPOINTS = {
+  GET_ALL: `${API_BASE_URL}/admin/promos`,
+  GET_ONE: (id: string) => `${API_BASE_URL}/admin/promos/${id}`,
+  CREATE_PROMO: `${API_BASE_URL}/admin/promos`,
+  UPDATE_PROMO: (id: string) => `${API_BASE_URL}/admin/promos/${id}`,
+  DELETE_PROMO: (id: string) => `${API_BASE_URL}/admin/promos/${id}`,
+};
+
+// FAQ endpoints
+export const FAQ_ENDPOINTS = {
+  GET_ALL: `${API_BASE_URL}/admin/faqs`,
+  GET_ONE: (id: string) => `${API_BASE_URL}/admin/faqs/${id}`,
+  CREATE_FAQ: `${API_BASE_URL}/admin/faqs`,
+  UPDATE_FAQ: (id: string) => `${API_BASE_URL}/admin/faqs/${id}`,
+  DELETE_FAQ: (id: string) => `${API_BASE_URL}/admin/faqs/${id}`,
+};
+
+// Public endpoints for customer-facing features
+export const PUBLIC_ENDPOINTS = {
+  GET_FAQS: `${API_BASE_URL}/customer/faq`,
+};

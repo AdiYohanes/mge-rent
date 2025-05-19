@@ -8,18 +8,9 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Minus, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import useBookingItemStore, { FoodItem } from "@/store/BookingItemStore";
 
-type FoodItem = {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  category: string;
-  outOfStock?: boolean;
-  popular?: boolean;
-};
-
-const foodItems: FoodItem[] = [
+const foodItemsData: FoodItem[] = [
   {
     id: "1",
     name: "Blackpepper Ricebowl",
@@ -141,54 +132,33 @@ const foodItems: FoodItem[] = [
   },
 ];
 
-type CartItem = {
-  id: string;
-  quantity: number;
-};
-
 export default function FoodSelection() {
   const [activeTab, setActiveTab] = useState("ricebowl");
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
-  const handleAddToCart = (id: string) => {
-    setCart((prev) => {
-      const existingItem = prev.find((item) => item.id === id);
-      if (existingItem) {
-        return prev.map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { id, quantity: 1 }];
-    });
+  const {
+    foodCart,
+    addFoodToCart,
+    removeFoodFromCart,
+    getFoodItemQuantity,
+    getFoodCartTotalItems,
+    getFoodCartTotalPrice,
+  } = useBookingItemStore();
+
+  const handleAddToCart = (item: FoodItem) => {
+    addFoodToCart(item);
   };
 
   const handleRemoveFromCart = (id: string) => {
-    setCart((prev) => {
-      const existingItem = prev.find((item) => item.id === id);
-      if (existingItem && existingItem.quantity > 1) {
-        return prev.map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
-        );
-      }
-      return prev.filter((item) => item.id !== id);
-    });
-  };
-
-  const getItemQuantity = (id: string) => {
-    const item = cart.find((item) => item.id === id);
-    return item ? item.quantity : 0;
+    removeFoodFromCart(id);
   };
 
   const formatPrice = (price: number) => {
     return `Rp${price.toLocaleString("id-ID")}`;
   };
 
-  const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const totalPrice = cart.reduce((acc, item) => {
-    const foodItem = foodItems.find((food) => food.id === item.id);
-    return acc + (foodItem?.price || 0) * item.quantity;
-  }, 0);
+  const totalItemsInCart = getFoodCartTotalItems();
+  const totalPriceOfCart = getFoodCartTotalPrice();
 
   return (
     <div className="container mx-auto p-4">
@@ -200,8 +170,10 @@ export default function FoodSelection() {
             className="border-[#B99733] text-[#B99733] hover:bg-[#B99733]/10"
           >
             <ShoppingCart className="mr-2 h-4 w-4" />
-            <span>{totalItems} items</span>
-            <span className="ml-2 font-bold">{formatPrice(totalPrice)}</span>
+            <span>{totalItemsInCart} items</span>
+            <span className="ml-2 font-bold">
+              {formatPrice(totalPriceOfCart)}
+            </span>
           </Button>
         </div>
       </div>
@@ -253,7 +225,7 @@ export default function FoodSelection() {
         {["ricebowl", "noodles", "snacks", "drinks"].map((category) => (
           <TabsContent key={category} value={category} className="mt-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {foodItems
+              {foodItemsData
                 .filter((item) => item.category === category)
                 .map((item) => (
                   <Card
@@ -307,21 +279,21 @@ export default function FoodSelection() {
                             className={cn(
                               "h-8 w-8 rounded-full border-[#B99733]/50 text-[#B99733] cursor-pointer",
                               "hover:bg-[#B99733]/10 transition-colors",
-                              getItemQuantity(item.id) === 0 && "opacity-50"
+                              getFoodItemQuantity(item.id) === 0 && "opacity-50"
                             )}
                             onClick={() => handleRemoveFromCart(item.id)}
-                            disabled={getItemQuantity(item.id) === 0}
+                            disabled={getFoodItemQuantity(item.id) === 0}
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
                           <span className="w-8 text-center">
-                            {getItemQuantity(item.id)}
+                            {getFoodItemQuantity(item.id)}
                           </span>
                           <Button
                             variant="outline"
                             size="icon"
                             className="h-8 w-8 rounded-full border-[#B99733]/50 text-[#B99733] hover:bg-[#B99733]/10 transition-colors cursor-pointer"
-                            onClick={() => handleAddToCart(item.id)}
+                            onClick={() => handleAddToCart(item)}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>

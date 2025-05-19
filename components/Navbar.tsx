@@ -7,49 +7,88 @@ import { HiMenuAlt3 } from "react-icons/hi";
 import { RiCloseFill } from "react-icons/ri";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMounted } from "@/hooks/use-mounted";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [mounted, setMounted] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const router = useRouter();
-  const profileMenuRef = useRef(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const mounted = useMounted();
 
-  useEffect(() => {
-    setMounted(true);
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+  // Helper function to get a cookie by name
+  const getCookie = (name: string): string | null => {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(";");
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === " ") c = c.substring(1, c.length);
+      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
     }
-  }, []);
+    return null;
+  };
 
   useEffect(() => {
-    function handleClickOutside(event) {
+    // Only access localStorage/cookies after component has mounted on client
+    if (mounted) {
+      const userCookie = getCookie("loggedInUser");
+      if (userCookie) {
+        try {
+          setUser(JSON.parse(userCookie));
+        } catch (e) {
+          console.error("Error parsing user cookie:", e);
+          localStorage.removeItem("user"); // Clear potentially corrupted cookie/LS
+          document.cookie =
+            "loggedInUser=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;"; // Clear cookie
+        }
+      } else {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch (e) {
+            console.error("Error parsing user from localStorage:", e);
+            localStorage.removeItem("user");
+          }
+        }
+      }
+    }
+  }, [mounted]);
+
+  useEffect(() => {
+    // Only add document event listeners after component has mounted
+    if (!mounted) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         profileMenuRef.current &&
-        !profileMenuRef.current.contains(event.target)
+        !profileMenuRef.current.contains(event.target as Node)
       ) {
         setIsProfileMenuOpen(false);
       }
-    }
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [mounted]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
+    // Clear the cookie
+    document.cookie =
+      "loggedInUser=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
     setUser(null);
     setIsProfileMenuOpen(false);
     router.push("/signin");
   };
 
-  // Prevent hydration mismatch by not rendering until mounted
+  // Render a stripped-down version until mounted to prevent hydration mismatch
   if (!mounted) {
     return (
-      <header className="bg-white text-black shadow-md font-minecraft">
+      <header className="bg-white text-black shadow-md font-minecraft sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/">
             <Image
@@ -67,7 +106,7 @@ export default function Navbar() {
   }
 
   return (
-    <header className="bg-white text-black shadow-md font-minecraft">
+    <header className="bg-white text-black shadow-md font-minecraft sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
         <Link href="/">
           <Image
@@ -223,8 +262,8 @@ export default function Navbar() {
                   <button
                     onClick={handleLogout}
                     className="w-full text-left px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
-              >
-                Logout
+                  >
+                    Logout
                   </button>
                 </div>
               )}

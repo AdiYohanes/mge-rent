@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from 'react';
-import { Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { Search, Plus, Pencil, Trash2, RefreshCw, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
     Table,
@@ -24,33 +24,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-
-// Sample FAQ data
-const initialFAQs = [
-    {
-        id: 1,
-        question: "Lorem Ipsum?",
-        answer: "Nec ullamcorper sit amet risus nullam eget. Gravida in fermentum et sollicitudin ac orci phasellus."
-    },
-    {
-        id: 2,
-        question: "Lorem Ipsum?",
-        answer: "Nec ullamcorper sit amet risus nullam eget. Gravida in fermentum et sollicitudin ac orci phasellus."
-    },
-    {
-        id: 3,
-        question: "Lorem Ipsum?",
-        answer: "Nec ullamcorper sit amet risus nullam eget. Gravida in fermentum et sollicitudin ac orci phasellus."
-    }
-];
+import { getFAQs, addFAQ, updateFAQ, deleteFAQ } from "@/api";
 
 export function FAQTable() {
-    const [faqs, setFaqs] = useState(initialFAQs);
+    const [faqs, setFaqs] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
 
-    // Add FAQ dialog state
+    // Dialog states
     const [isAddFAQOpen, setIsAddFAQOpen] = useState(false);
     const [isEditFAQOpen, setIsEditFAQOpen] = useState(false);
     const [isDeleteFAQOpen, setIsDeleteFAQOpen] = useState(false);
@@ -61,72 +47,171 @@ export function FAQTable() {
         answer: ""
     });
 
-    // Filter FAQs based on search term
-    const filteredFAQs = faqs.filter(faq =>
-        faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Fetch FAQs from API
+    useEffect(() => {
+        fetchFAQs();
+    }, [currentPage, itemsPerPage, searchTerm]);
 
-    // Pagination logic
-    const lastIndex = currentPage * itemsPerPage;
-    const firstIndex = lastIndex - itemsPerPage;
-    const currentFAQs = filteredFAQs.slice(firstIndex, lastIndex);
-    const totalPages = Math.ceil(filteredFAQs.length / itemsPerPage);
+    const fetchFAQs = async () => {
+        setLoading(true);
+        setError(null);
 
-    // Handle adding new FAQ
-    const handleAddFAQ = () => {
-        if (!newFAQ.question || !newFAQ.answer) {
-            return; // Don't add incomplete FAQs
+        try {
+            console.log("Fetching FAQs...");
+            const response = await getFAQs(currentPage, itemsPerPage, searchTerm);
+
+            console.log("API response:", response);
+
+            // Handle different possible response formats
+            let faqsArray = [];
+            let total = 0;
+            let pages = 1;
+
+            if (response && Array.isArray(response.faqs)) {
+                // Standard expected format
+                faqsArray = response.faqs;
+                total = response.total || response.faqs.length;
+                pages = response.totalPages || Math.ceil(total / itemsPerPage);
+            } else if (response && Array.isArray(response.data)) {
+                // Alternative format with data property
+                faqsArray = response.data;
+                total = response.total || response.data.length;
+                pages = response.totalPages || Math.ceil(total / itemsPerPage);
+            } else if (Array.isArray(response)) {
+                // Direct array response
+                faqsArray = response;
+                total = response.length;
+                pages = Math.ceil(total / itemsPerPage);
+            } else {
+                throw new Error("Unexpected API response format");
+            }
+
+            setFaqs(faqsArray);
+            setTotalItems(total);
+            setTotalPages(pages || 1);
+
+            if (faqsArray.length === 0 && total > 0 && currentPage > 1) {
+                // If we're on a page with no items but there are items on earlier pages,
+                // go back to the first page
+                setCurrentPage(1);
+            }
+        } catch (err) {
+            console.error("Error fetching FAQs:", err);
+            setError(`Failed to load FAQs: ${err?.message || "Unknown error"}`);
+            toast.error("Failed to load FAQs. Please try again.");
+        } finally {
+            setLoading(false);
         }
-
-        const newId = faqs.length > 0 ? Math.max(...faqs.map(f => f.id)) + 1 : 1;
-        setFaqs([...faqs, { ...newFAQ, id: newId }]);
-        setNewFAQ({ question: "", answer: "" });
-        setIsAddFAQOpen(false);
-
-        // Show success toast
-        toast.success("Question added successfully", {
-            description: "The new question has been added to the FAQ list.",
-            duration: 3000
-        });
     };
 
-    // Handle editing FAQ
-    const handleEditFAQ = () => {
-        if (!currentFAQ || !newFAQ.question || !newFAQ.answer) {
+    // Filter FAQs based on search term (client-side filtering as backup)
+    const filteredFAQs = faqs.filter(faq =>
+        faq.question?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        faq.answer?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Handle adding new FAQ
+    const handleAddFAQ = async () => {
+        if (!newFAQ.question || !newFAQ.answer) {
+            toast.error("Please fill in all required fields");
             return;
         }
 
-        const updatedFAQs = faqs.map(faq =>
-            faq.id === currentFAQ.id ? { ...faq, question: newFAQ.question, answer: newFAQ.answer } : faq
-        );
+        try {
+            setLoading(true);
 
-        setFaqs(updatedFAQs);
-        setCurrentFAQ(null);
-        setNewFAQ({ question: "", answer: "" });
-        setIsEditFAQOpen(false);
+            const faqData = {
+                question: newFAQ.question,
+                answer: newFAQ.answer
+            };
 
-        // Show success toast
-        toast.success("Question updated successfully", {
-            description: "The FAQ has been updated with new information.",
-            duration: 3000
-        });
+            const response = await addFAQ(faqData);
+
+            if (response) {
+                toast.success("Question added successfully", {
+                    description: "The new question has been added to the FAQ list.",
+                    duration: 3000
+                });
+
+                setIsAddFAQOpen(false);
+                setNewFAQ({ question: "", answer: "" });
+                fetchFAQs(); // Refresh data
+            } else {
+                toast.error("Failed to add question");
+            }
+        } catch (err) {
+            console.error("Error adding FAQ:", err);
+            toast.error(`Error: ${err.message || "Unknown error"}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle editing FAQ
+    const handleEditFAQ = async () => {
+        if (!currentFAQ || !newFAQ.question || !newFAQ.answer) {
+            toast.error("Please fill in all required fields");
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const faqData = {
+                question: newFAQ.question,
+                answer: newFAQ.answer
+            };
+
+            const response = await updateFAQ(currentFAQ.id.toString(), faqData);
+
+            if (response) {
+                toast.success("Question updated successfully", {
+                    description: "The FAQ has been updated with new information.",
+                    duration: 3000
+                });
+
+                setCurrentFAQ(null);
+                setNewFAQ({ question: "", answer: "" });
+                setIsEditFAQOpen(false);
+                fetchFAQs(); // Refresh data
+            } else {
+                toast.error("Failed to update question");
+            }
+        } catch (err) {
+            console.error("Error updating FAQ:", err);
+            toast.error(`Error: ${err.message || "Unknown error"}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Handle deleting FAQ
-    const handleDeleteFAQ = () => {
+    const handleDeleteFAQ = async () => {
         if (!currentFAQ) return;
 
-        const updatedFAQs = faqs.filter(faq => faq.id !== currentFAQ.id);
-        setFaqs(updatedFAQs);
-        setCurrentFAQ(null);
-        setIsDeleteFAQOpen(false);
+        try {
+            setLoading(true);
 
-        // Show success toast
-        toast.success("Question deleted successfully", {
-            description: "The question has been removed from the FAQ list.",
-            duration: 3000
-        });
+            const success = await deleteFAQ(currentFAQ.id.toString());
+
+            if (success) {
+                toast.success("Question deleted successfully", {
+                    description: "The question has been removed from the FAQ list.",
+                    duration: 3000
+                });
+
+                setCurrentFAQ(null);
+                setIsDeleteFAQOpen(false);
+                fetchFAQs(); // Refresh data
+            } else {
+                toast.error("Failed to delete question");
+            }
+        } catch (err) {
+            console.error("Error deleting FAQ:", err);
+            toast.error(`Error: ${err.message || "Unknown error"}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Open edit dialog
@@ -154,7 +239,7 @@ export function FAQTable() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
+                disabled={currentPage === 1 || loading}
                 className="h-8 w-8 p-0 rounded-full"
             >
                 &lt;
@@ -171,6 +256,7 @@ export function FAQTable() {
                         size="sm"
                         onClick={() => setCurrentPage(i)}
                         className={`h-8 w-8 p-0 rounded-full ${currentPage === i ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+                        disabled={loading}
                     >
                         {i}
                     </Button>
@@ -189,7 +275,7 @@ export function FAQTable() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
+                disabled={currentPage === totalPages || loading}
                 className="h-8 w-8 p-0 rounded-full"
             >
                 &gt;
@@ -214,6 +300,7 @@ export function FAQTable() {
                                     setItemsPerPage(Number(value));
                                     setCurrentPage(1);
                                 }}
+                                disabled={loading}
                             >
                                 <SelectTrigger className="h-8 w-[70px]">
                                     <SelectValue placeholder={itemsPerPage} />
@@ -238,12 +325,29 @@ export function FAQTable() {
                                     setSearchTerm(e.target.value);
                                     setCurrentPage(1);
                                 }}
+                                disabled={loading}
                             />
                         </div>
 
                         <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={fetchFAQs}
+                            disabled={loading}
+                            className="h-8"
+                        >
+                            {loading ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : (
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                            )}
+                            Refresh
+                        </Button>
+
+                        <Button
                             className="bg-amber-500 hover:bg-amber-600 h-9"
                             onClick={() => setIsAddFAQOpen(true)}
+                            disabled={loading}
                         >
                             <Plus className="h-4 w-4 mr-1" /> Add Question
                         </Button>
@@ -263,10 +367,22 @@ export function FAQTable() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {currentFAQs.length > 0 ? (
-                                currentFAQs.map((faq, index) => (
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center py-6">
+                                        Loading FAQs...
+                                    </TableCell>
+                                </TableRow>
+                            ) : error ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center py-6 text-red-500">
+                                        {error}
+                                    </TableCell>
+                                </TableRow>
+                            ) : filteredFAQs.length > 0 ? (
+                                filteredFAQs.map((faq, index) => (
                                     <TableRow key={faq.id}>
-                                        <TableCell>{firstIndex + index + 1}</TableCell>
+                                        <TableCell>{(currentPage - 1) * itemsPerPage + index + 1}</TableCell>
                                         <TableCell className="font-medium">{faq.question}</TableCell>
                                         <TableCell>{faq.answer}</TableCell>
                                         <TableCell>
@@ -276,6 +392,7 @@ export function FAQTable() {
                                                     size="icon"
                                                     className="h-8 w-8 text-amber-500 border-amber-500"
                                                     onClick={() => openEditDialog(faq)}
+                                                    disabled={loading}
                                                 >
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
@@ -284,6 +401,7 @@ export function FAQTable() {
                                                     size="icon"
                                                     className="h-8 w-8 text-red-500 border-red-500"
                                                     onClick={() => openDeleteDialog(faq)}
+                                                    disabled={loading}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -304,7 +422,7 @@ export function FAQTable() {
 
                 <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t">
                     <div className="text-sm text-gray-500 mb-4 sm:mb-0">
-                        Showing {filteredFAQs.length > 0 ? firstIndex + 1 : 0} to {Math.min(lastIndex, filteredFAQs.length)} of {filteredFAQs.length} entries
+                        Showing {totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} entries
                     </div>
 
                     <div className="flex gap-1">
@@ -350,8 +468,9 @@ export function FAQTable() {
                             type="submit"
                             className="bg-amber-500 hover:bg-amber-600 w-full md:w-auto"
                             onClick={handleAddFAQ}
+                            disabled={loading}
                         >
-                            Add Question
+                            {loading ? "Adding..." : "Add Question"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -394,8 +513,9 @@ export function FAQTable() {
                             type="submit"
                             className="bg-amber-500 hover:bg-amber-600 w-full md:w-auto"
                             onClick={handleEditFAQ}
+                            disabled={loading}
                         >
-                            Save Changes
+                            {loading ? "Saving..." : "Save Changes"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -423,6 +543,7 @@ export function FAQTable() {
                             variant="outline"
                             onClick={() => setIsDeleteFAQOpen(false)}
                             className="w-full md:w-auto"
+                            disabled={loading}
                         >
                             Cancel
                         </Button>
@@ -430,8 +551,9 @@ export function FAQTable() {
                             type="submit"
                             className="bg-red-500 hover:bg-red-600 w-full md:w-auto"
                             onClick={handleDeleteFAQ}
+                            disabled={loading}
                         >
-                            Delete
+                            {loading ? "Deleting..." : "Delete"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -2,20 +2,45 @@ import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
 import Cookies from "js-cookie";
 import { API_BASE_URL } from "./constants";
 
+// Safe environment detection
+const isServer =
+  typeof window === "undefined" || typeof document === "undefined";
+const isDev = process.env.NODE_ENV !== "production";
+
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  // Don't send credentials by default - let each request decide
+  withCredentials: false,
 });
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = Cookies.get("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Skip token handling on server to prevent hydration issues
+    if (!isServer) {
+      const token = Cookies.get("token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        // Add debug logging to track token usage
+        console.log(
+          `Auth: Using token (first 10 chars): ${token.substring(0, 10)}...`
+        );
+      } else {
+        console.warn(
+          "Auth: No token found in cookies for request to",
+          config.url
+        );
+      }
+
+      // Minimal debug logging in development only
+      if (isDev) {
+        // Log only the method and URL, avoid logging sensitive data
+        console.log(`Request: ${config.method?.toUpperCase()} ${config.url}`);
+      }
     }
     return config;
   },
@@ -28,15 +53,31 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    // Handle unauthorized errors (401)
-    if (error.response?.status === 401) {
+    // Skip auth handling on server to prevent hydration issues
+    if (!isServer && error.response?.status === 401) {
+      // Handle unauthorized errors (401)
+      console.error("401 Unauthorized error detected", {
+        url: error.config?.url,
+        method: error.config?.method,
+        responseMessage: error.response?.data
+          ? (error.response.data as any).message || "No message"
+          : "No data",
+        hasToken: !!Cookies.get("token"),
+      });
+
+      // Clear authentication data
       Cookies.remove("token");
       Cookies.remove("user");
 
-      // Optional: Redirect to login
-      if (typeof window !== "undefined") {
-        window.location.href = "/signin";
+      // Show message to user
+      if (typeof window !== "undefined" && window.alert) {
+        window.alert(
+          "Sesi login Anda telah berakhir. Anda akan dialihkan ke halaman login."
+        );
       }
+
+      // Redirect to login on client side only
+      window.location.href = "/signin";
     }
     return Promise.reject(error);
   }
@@ -65,6 +106,48 @@ export const apiRequest = async <T>(
   }
 };
 
+/**
+ * Make an API request with support for FormData file uploads
+ */
+export const makeApiRequest = async <T>(
+  method: string,
+  url: string,
+  data?: unknown,
+  isFormData = false,
+  config?: AxiosRequestConfig
+): Promise<T> => {
+  try {
+    // Create a config object with the right content type for FormData
+    const requestConfig: AxiosRequestConfig = {
+      ...config,
+      headers: {
+        ...config?.headers,
+      },
+    };
+
+    // Only set content type if it's not FormData
+    if (!isFormData) {
+      requestConfig.headers = {
+        ...requestConfig.headers,
+        "Content-Type": "application/json",
+      };
+    } else {
+      // FormData case - add necessary headers for Laravel
+      requestConfig.headers = {
+        ...requestConfig.headers,
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-XSRF-TOKEN": !isServer ? Cookies.get("XSRF-TOKEN") || "" : "",
+      };
+    }
+
+    const response = await apiRequest<T>(method, url, data, requestConfig);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Convenience methods
 export const get = <T>(url: string, config?: AxiosRequestConfig) =>
   apiRequest<T>("get", url, undefined, config);
@@ -89,3 +172,93 @@ export const patch = <T>(
 
 export const del = <T>(url: string, config?: AxiosRequestConfig) =>
   apiRequest<T>("delete", url, undefined, config);
+
+/**
+ * Helper function to prepare a file for upload
+ */
+export const prepareFileForUpload = (
+  file: File,
+  acceptedTypes: string[] = [
+    "image/jpeg",
+    "image/png",
+    "image/jpg",
+    "image/gif",
+  ]
+): File => {
+  if (!file || isServer) return file;
+
+  try {
+    console.log("PrepareFileForUpload input:", {
+      name: file.name,
+      type: file.type,
+      size: `${(file.size / 1024).toFixed(2)} KB`,
+      extension: file.name.split(".").pop()?.toLowerCase() || "unknown",
+    });
+
+    // Check file type
+    if (!acceptedTypes.includes(file.type)) {
+      console.warn(
+        `File type ${file.type} not in accepted types:`,
+        acceptedTypes
+      );
+      throw new Error(`File type ${file.type} not supported`);
+    }
+
+    // Ensure file has correct extension
+    let fileName = file.name;
+    const fileExt = fileName.split(".").pop()?.toLowerCase();
+
+    // Map mime types to extensions
+    const mimeToExt: Record<string, string> = {
+      "image/jpeg": ".jpg",
+      "image/jpg": ".jpg",
+      "image/png": ".png",
+      "image/gif": ".gif",
+    };
+
+    const correctExt = mimeToExt[file.type];
+    if (!correctExt) {
+      console.warn(`No extension mapping for MIME type: ${file.type}`);
+      return file;
+    }
+
+    // Fix extension if needed
+    if (!fileExt || !correctExt.includes(fileExt)) {
+      console.log(
+        `Extension mismatch: file has "${fileExt}", should have "${correctExt}"`
+      );
+
+      const baseName = fileName.includes(".")
+        ? fileName.substring(0, fileName.lastIndexOf("."))
+        : fileName;
+
+      fileName = `${baseName}${correctExt}`;
+      console.log(`Corrected filename: ${fileName}`);
+
+      // Create new file with correct name
+      const correctedFile = new File([file], fileName, { type: file.type });
+
+      console.log("PrepareFileForUpload output (corrected):", {
+        name: correctedFile.name,
+        type: correctedFile.type,
+        size: `${(correctedFile.size / 1024).toFixed(2)} KB`,
+        extension: correctedFile.name.split(".").pop()?.toLowerCase(),
+      });
+
+      return correctedFile;
+    }
+
+    console.log("PrepareFileForUpload output (unchanged):", {
+      name: file.name,
+      type: file.type,
+      size: `${(file.size / 1024).toFixed(2)} KB`,
+      extension: file.name.split(".").pop()?.toLowerCase(),
+    });
+
+    return file;
+  } catch (error) {
+    // Log the error and return original file
+    console.error("Error in prepareFileForUpload:", error);
+    return file;
+  }
+};

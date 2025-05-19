@@ -13,6 +13,17 @@ import Link from "next/link";
 import { login, LoginRequestData, ErrorResponse } from "@/api";
 import { AxiosError } from "axios";
 
+// Helper function to set a cookie
+const setCookie = (name: string, value: string, days?: number) => {
+  let expires = "";
+  if (days) {
+    const date = new Date();
+    date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+    expires = "; expires=" + date.toUTCString();
+  }
+  document.cookie = name + "=" + (value || "") + expires + "; path=/";
+};
+
 const Login = () => {
   const [formData, setFormData] = useState<LoginRequestData>({
     username: "",
@@ -49,6 +60,11 @@ const Login = () => {
 
       if (response) {
         toast.success("Login successful!");
+
+        // Store user data in localStorage (as per existing logic from api.ts, assumed)
+        // localStorage.setItem("user", JSON.stringify(response.user));
+        // Also store user data in a cookie
+        setCookie("loggedInUser", JSON.stringify(response.user), 1); // Store for 1 day
 
         // Redirect based on user role
         if (response.user.role === "ADMN" || response.user.role === "SADMN") {

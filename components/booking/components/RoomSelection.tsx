@@ -17,6 +17,8 @@ import { roomsData, specificRoomsData, gamesData } from "@/data/mockData";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Gamepad2, Check } from "lucide-react";
+import { useMounted } from "@/hooks/use-mounted";
+import useBookingItemStore from "@/store/BookingItemStore";
 
 // Define types for room data
 type Room = {
@@ -133,17 +135,13 @@ const extendedGames: Game[] = [
 
 const RoomSelection: React.FC = () => {
   const [numberOfPeople, setNumberOfPeople] = useState<number | null>(null);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const { selectedRoom, setSelectedRoom } = useBookingItemStore();
+  const { selectedUnitName: selectedUnit, setSelectedUnitName } =
+    useBookingItemStore();
+  const { selectedGame, setSelectedGame } = useBookingItemStore();
   const [availableUnits, setAvailableUnits] = useState<SpecificRoom[]>([]);
-  const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
   const [filteredGames, setFilteredGames] = useState<Game[]>([]);
-  const [mounted, setMounted] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
-
-  // Handle client-side rendering to prevent hydration issues
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   // Update available units when room selection changes
   useEffect(() => {
@@ -152,7 +150,7 @@ const RoomSelection: React.FC = () => {
         (unit) => unit.type === selectedRoom.category && unit.available
       );
       setAvailableUnits(filteredUnits);
-      setSelectedUnit("all"); // Reset selected unit when room changes
+      setSelectedUnitName("all"); // Reset selected unit when room changes
 
       // Show all games for the selected room type
       const roomTypeUnits = filteredUnits.map((unit) => unit.name);
@@ -163,7 +161,7 @@ const RoomSelection: React.FC = () => {
       setSelectedGame(null); // Reset selected game when room changes
     } else {
       setAvailableUnits([]);
-      setSelectedUnit(null);
+      setSelectedUnitName(null);
       setFilteredGames([]);
       setSelectedGame(null);
     }
@@ -197,17 +195,36 @@ const RoomSelection: React.FC = () => {
 
   // Handle room selection
   const handleRoomSelect = (room: Room) => {
-    setSelectedRoom(room);
+    if (selectedRoom?.id === room.id) {
+      setSelectedRoom(null);
+    } else {
+      setSelectedRoom(room);
+      console.log("Room selected:", room.category, "with ID:", room.id);
+    }
   };
 
   // Handle unit selection
   const handleUnitChange = (value: string) => {
-    setSelectedUnit(value);
+    setSelectedUnitName(value === "all" ? null : value);
+    console.log("Unit selected:", value);
   };
 
   // Handle game selection
   const handleGameSelect = (game: Game) => {
-    setSelectedGame(game);
+    if (selectedGame?.id === game.id) {
+      setSelectedGame(null);
+      console.log("Game deselected:", game.name);
+    } else {
+      setSelectedGame(game);
+      console.log(
+        "Game selected:",
+        game.name,
+        "ID:",
+        game.id,
+        "Unit:",
+        game.unit
+      );
+    }
   };
 
   // Render skeleton for consistent server/client UI
@@ -354,7 +371,9 @@ const RoomSelection: React.FC = () => {
                     Game List{" "}
                     {selectedUnit && selectedUnit !== "all"
                       ? selectedUnit
-                      : "for " + selectedRoom.category}
+                      : selectedRoom
+                      ? "for " + selectedRoom.category
+                      : ""}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
                     Please select the first game you want to play:
