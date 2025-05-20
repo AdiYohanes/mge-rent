@@ -55,7 +55,6 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     // Skip auth handling on server to prevent hydration issues
     if (!isServer && error.response?.status === 401) {
-      // Handle unauthorized errors (401)
       console.error("401 Unauthorized error detected", {
         url: error.config?.url,
         method: error.config?.method,
@@ -65,19 +64,29 @@ apiClient.interceptors.response.use(
         hasToken: !!Cookies.get("token"),
       });
 
-      // Clear authentication data
-      Cookies.remove("token");
-      Cookies.remove("user");
+      // Check if this is a login attempt or already on login page
+      const isLoginAttempt = error.config?.url?.includes("/auth/login");
+      const isOnLoginPage =
+        typeof window !== "undefined" &&
+        (window.location.pathname.includes("/signin") ||
+          window.location.pathname.includes("/login"));
 
-      // Show message to user
-      if (typeof window !== "undefined" && window.alert) {
-        window.alert(
-          "Sesi login Anda telah berakhir. Anda akan dialihkan ke halaman login."
-        );
+      // Don't show alert or redirect for login attempts
+      if (!isLoginAttempt && !isOnLoginPage) {
+        // Clear authentication data
+        Cookies.remove("token");
+        Cookies.remove("user");
+
+        // Show message to user
+        if (typeof window !== "undefined" && window.alert) {
+          window.alert(
+            "Sesi login Anda telah berakhir. Anda akan dialihkan ke halaman login."
+          );
+        }
+
+        // Redirect to login on client side only
+        window.location.href = "/signin";
       }
-
-      // Redirect to login on client side only
-      window.location.href = "/signin";
     }
     return Promise.reject(error);
   }

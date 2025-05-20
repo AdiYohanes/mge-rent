@@ -44,7 +44,6 @@ import {
   deleteConsole,
   addConsole,
   updateConsole,
-  uploadConsoleImage,
 } from "@/api";
 
 interface ConsoleState extends Partial<Console> {
@@ -304,32 +303,15 @@ export function ConsoleTable() {
 
       console.log("Sending console data to API:", payload);
 
-      // Step 1: Call the addConsole API function
-      const result = await addConsole(payload);
+      // Call the addConsole API function with both data and image
+      const result = await addConsole(payload, newConsole.imageFile);
 
       if (!result) {
         toast.error("Failed to add console. Please try again.");
         return;
       }
 
-      // Step 2: If there's an image file and we have a console ID, upload the image
-      let imageSuccess = true;
-      if (newConsole.imageFile && result.id) {
-        console.log("Uploading image for new console ID:", result.id);
-        imageSuccess = await uploadConsoleImage(
-          result.id.toString(),
-          newConsole.imageFile
-        );
-        
-        if (!imageSuccess) {
-          toast.warning("Console added but image upload failed");
-        }
-      }
-
-      if (imageSuccess) {
-        toast.success("Console added successfully");
-      }
-      
+      toast.success("Console added successfully");
       setIsAddDialogOpen(false);
       resetForm();
       setRefreshTrigger((prev) => prev + 1);
@@ -375,32 +357,19 @@ export function ConsoleTable() {
 
       console.log("Updating console with ID:", currentConsole.id, payload);
 
-      // Step 1: Update console data
-      const result = await updateConsole(currentConsole.id.toString(), payload);
+      // Pass both data and image file (if any) in a single call
+      const result = await updateConsole(
+        currentConsole.id.toString(),
+        payload,
+        newConsole.imageFile
+      );
 
       if (!result) {
         toast.error("Failed to update console. Please try again.");
         return;
       }
 
-      // Step 2: If there's a new image file, upload it separately
-      let imageSuccess = true;
-      if (newConsole.imageFile) {
-        console.log("Uploading new image for console");
-        imageSuccess = await uploadConsoleImage(
-          currentConsole.id.toString(),
-          newConsole.imageFile
-        );
-
-        if (!imageSuccess) {
-          toast.warning("Console updated but image upload failed");
-        }
-      }
-
-      if (imageSuccess) {
-        toast.success("Console updated successfully");
-      }
-
+      toast.success("Console updated successfully");
       setIsEditDialogOpen(false);
       resetForm();
       setRefreshTrigger((prev) => prev + 1);

@@ -48,8 +48,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getUsers, deleteUser, User, GetUsersParams } from "@/api";
+import { getUsers, deleteUser, createUser, User } from "@/api";
 import { useMounted } from "@/hooks/use-mounted";
+import axios from "axios";
+
+// Define type alias for the parameters of getUsers
+type GetUsersParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  status?: string;
+  sortBy?: string;
+  sortDirection?: "asc" | "desc";
+};
 
 // Mapping API User to Admin interface
 interface Admin {
@@ -66,6 +78,9 @@ interface NewAdmin {
   fullName: string;
   phoneNumber: string;
   email: string;
+  username: string;
+  password: string;
+  passwordConfirmation: string;
   permission: "Superadmin" | "Admin";
   status: "active" | "inactive";
 }
@@ -127,9 +142,13 @@ export function UserAdminTable() {
     fullName: "",
     phoneNumber: "",
     email: "",
+    username: "",
+    password: "",
+    passwordConfirmation: "",
     permission: "Admin",
     status: "active",
   });
+  const [formLoading, setFormLoading] = useState(false);
 
   // Fetch admin users from API
   useEffect(() => {
@@ -319,6 +338,9 @@ export function UserAdminTable() {
       fullName: admin.fullName,
       phoneNumber: admin.phoneNumber,
       email: admin.email,
+      username: "",
+      password: "",
+      passwordConfirmation: "",
       permission: admin.permission,
       status: admin.status,
     });
@@ -331,9 +353,14 @@ export function UserAdminTable() {
   };
 
   // Save functions
-  const saveNewAdmin = () => {
+  const saveNewAdmin = async () => {
     // Validate fields
-    if (!newAdmin.fullName || !newAdmin.email || !newAdmin.phoneNumber) {
+    if (
+      !newAdmin.fullName ||
+      !newAdmin.email ||
+      !newAdmin.phoneNumber ||
+      !newAdmin.username
+    ) {
       toast.error("Please fill in all required fields!");
       return;
     }
@@ -352,24 +379,83 @@ export function UserAdminTable() {
       return;
     }
 
-    // Create new admin (in a real app, this would be an API call)
-    const newAdminObj: Admin = {
-      id: admins.length + 1,
-      ...newAdmin,
-      registrationDate: new Date().toISOString().split("T")[0],
-    };
+    // Password validation - if password is provided, confirmation must match
+    if (
+      newAdmin.password &&
+      newAdmin.password !== newAdmin.passwordConfirmation
+    ) {
+      toast.error("Passwords do not match!");
+      return;
+    }
 
-    setAdmins([...admins, newAdminObj]);
-    setIsAddModalOpen(false);
-    setNewAdmin({
-      fullName: "",
-      phoneNumber: "",
-      email: "",
-      permission: "Admin",
-      status: "active",
-    });
+    setFormLoading(true);
 
-    toast.success("Admin added successfully!");
+    try {
+      // Use provided username or generate from email
+      const username = newAdmin.username || newAdmin.email.split("@")[0];
+      // Use provided password or generate a default one
+      const password = newAdmin.password || `${username}123!`;
+
+      // Create payload for API
+      const userData = {
+        name: newAdmin.fullName,
+        email: newAdmin.email,
+        phone: newAdmin.phoneNumber,
+        username: username,
+        role: newAdmin.permission === "Superadmin" ? "SADMN" : "ADMN",
+        password: password,
+        password_confirmation: password, // Add password confirmation matching password
+      };
+
+      console.log("Creating new admin with data:", userData);
+
+      // Call API to create user
+      const createdUser = await createUser(userData);
+
+      console.log("Admin created successfully:", createdUser);
+
+      // Close modal
+      setIsAddModalOpen(false);
+
+      // Reset form
+      setNewAdmin({
+        fullName: "",
+        phoneNumber: "",
+        email: "",
+        username: "",
+        password: "",
+        passwordConfirmation: "",
+        permission: "Admin",
+        status: "active",
+      });
+
+      // Show success message with password info if we generated one
+      if (!newAdmin.password) {
+        toast.success(
+          `Admin added successfully! Default password: ${userData.password}`
+        );
+      } else {
+        toast.success("Admin added successfully!");
+      }
+
+      // Refresh the admin list
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error creating admin:", error);
+
+      // Show user-friendly error message
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        toast.error(`Failed to add admin: ${error.response.data.message}`);
+      } else if (axios.isAxiosError(error) && error.response?.data?.errors) {
+        // Handle validation errors
+        const errors = Object.values(error.response.data.errors).flat();
+        toast.error(`Failed to add admin: ${errors[0]}`);
+      } else {
+        toast.error("Failed to add admin. Please try again.");
+      }
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   const saveEditedAdmin = () => {
@@ -800,6 +886,61 @@ export function UserAdminTable() {
                   setNewAdmin({
                     ...newAdmin,
                     email: e.target.value,
+                    // Auto-generate username suggestion from email
+                    username: !newAdmin.username
+                      ? e.target.value.split("@")[0]
+                      : newAdmin.username,
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="username">
+                Username <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="username"
+                placeholder="Enter username"
+                value={newAdmin.username}
+                onChange={(e) =>
+                  setNewAdmin({
+                    ...newAdmin,
+                    username: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">
+                Password <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter password (or leave empty for auto-generated)"
+                value={newAdmin.password}
+                onChange={(e) =>
+                  setNewAdmin({
+                    ...newAdmin,
+                    password: e.target.value,
+                  })
+                }
+              />
+              <p className="text-xs text-gray-500">
+                Leave empty to auto-generate a password
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="passwordConfirmation">Confirm Password</Label>
+              <Input
+                id="passwordConfirmation"
+                type="password"
+                placeholder="Confirm password"
+                value={newAdmin.passwordConfirmation}
+                onChange={(e) =>
+                  setNewAdmin({
+                    ...newAdmin,
+                    passwordConfirmation: e.target.value,
                   })
                 }
               />
@@ -846,10 +987,23 @@ export function UserAdminTable() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddModalOpen(false)}
+              disabled={formLoading}
+            >
               Cancel
             </Button>
-            <Button onClick={saveNewAdmin}>Add Admin</Button>
+            <Button onClick={saveNewAdmin} disabled={formLoading}>
+              {formLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Adding...
+                </>
+              ) : (
+                "Add Admin"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

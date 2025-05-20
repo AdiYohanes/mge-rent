@@ -169,23 +169,49 @@ export const getConsole = async (id: string): Promise<Console | null> => {
 
 // Create a new console
 export const addConsole = async (
-  consoleData: ConsolePayload
+  consoleData: ConsolePayload,
+  imageFile?: File
 ): Promise<Console | null> => {
   try {
     console.log("Creating console with data:", consoleData);
 
-    const response = await axios.post(
-      CONSOLE_ENDPOINTS.CREATE_CONSOLE,
-      consoleData,
-      {
+    let response;
+    const endpoint = CONSOLE_ENDPOINTS.CREATE_CONSOLE;
+
+    // If we have an image file, use FormData to send both data and image
+    if (imageFile) {
+      const formData = new FormData();
+
+      // Add all console data to FormData
+      Object.entries(consoleData).forEach(([key, value]) => {
+        if (value !== undefined) {
+          formData.append(key, value.toString());
+        }
+      });
+
+      // Add the image file
+      formData.append("image", imageFile);
+
+      // Using POST with FormData for multipart/form-data
+      response = await axios.post(endpoint, formData, {
+        headers: {
+          Accept: "application/json",
+          // Don't set Content-Type here, it will be set automatically with boundary
+          "X-Requested-With": "XMLHttpRequest",
+          ...getAuthHeader(),
+        },
+      });
+    } else {
+      // Regular JSON create without image
+      response = await axios.post(endpoint, consoleData, {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
           ...getAuthHeader(),
         },
-      }
-    );
+      });
+    }
 
     console.log("Add console response:", response.data);
 
@@ -200,10 +226,11 @@ export const addConsole = async (
   }
 };
 
-// Update a console using POST
+// Update a console using POST with support for both data and image
 export const updateConsole = async (
   id: string,
-  consoleData: ConsolePayload
+  consoleData: ConsolePayload,
+  imageFile?: File
 ): Promise<Console | null> => {
   try {
     // Log endpoint and payload for debugging
@@ -211,15 +238,42 @@ export const updateConsole = async (
     console.log(`Making POST request to endpoint: ${endpoint}`);
     console.log(`With payload:`, consoleData);
 
-    // Using POST method without method spoofing
-    const response = await axios.post(endpoint, consoleData, {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        ...getAuthHeader(),
-      },
-    });
+    let response;
+
+    // If we have an image file, use FormData to send both data and image
+    if (imageFile) {
+      const formData = new FormData();
+
+      // Add all console data to FormData
+      Object.entries(consoleData).forEach(([key, value]) => {
+        if (value !== undefined) {
+          formData.append(key, value.toString());
+        }
+      });
+
+      // Add the image file
+      formData.append("image", imageFile);
+
+      // Using POST with FormData for multipart/form-data
+      response = await axios.post(endpoint, formData, {
+        headers: {
+          Accept: "application/json",
+          // Don't set Content-Type here, it will be set automatically with boundary
+          "X-Requested-With": "XMLHttpRequest",
+          ...getAuthHeader(),
+        },
+      });
+    } else {
+      // Regular JSON update without image
+      response = await axios.post(endpoint, consoleData, {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          ...getAuthHeader(),
+        },
+      });
+    }
 
     console.log("Update response:", response.data);
 

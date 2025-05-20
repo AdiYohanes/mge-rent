@@ -49,6 +49,18 @@ import {
 import axios from "axios";
 import { API_BASE_URL } from "@/api/constants";
 
+// Helper function to format image URLs correctly
+const formatImageUrl = (imageUrl: string | null): string => {
+  if (!imageUrl) return "/images/room-icon.png";
+
+  // If it's a relative path, make it absolute
+  if (!imageUrl.startsWith("http")) {
+    return `${API_BASE_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
+  }
+
+  return imageUrl;
+};
+
 export function RoomTable() {
   // State for data and filtering
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -546,6 +558,7 @@ export function RoomTable() {
               <TableRow className="bg-[#f9f9f7] hover:bg-[#f9f9f7]">
                 <TableHead className="font-bold text-black">NO</TableHead>
                 <TableHead className="font-bold text-black">NAME</TableHead>
+                <TableHead className="font-bold text-black">IMAGE</TableHead>
                 <TableHead className="font-bold text-black">TYPE</TableHead>
                 <TableHead className="font-bold text-black">PRICE</TableHead>
                 <TableHead className="font-bold text-black">
@@ -563,7 +576,7 @@ export function RoomTable() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center h-24">
+                  <TableCell colSpan={9} className="text-center h-24">
                     <div className="flex flex-col items-center justify-center">
                       <Loader2 className="h-8 w-8 animate-spin text-amber-500 mb-2" />
                       <span>Loading rooms...</span>
@@ -572,7 +585,7 @@ export function RoomTable() {
                 </TableRow>
               ) : paginatedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center h-24">
+                  <TableCell colSpan={9} className="text-center h-24">
                     No room found
                   </TableCell>
                 </TableRow>
@@ -583,6 +596,27 @@ export function RoomTable() {
                       {firstIndex + index + 1}
                     </TableCell>
                     <TableCell>{room.name}</TableCell>
+                    <TableCell>
+                      <div className="h-12 w-12 relative overflow-hidden rounded-md bg-gray-100">
+                        {room.image ? (
+                          <Image
+                            src={formatImageUrl(room.image)}
+                            alt={room.name}
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              // Fallback if image fails to load
+                              (e.target as HTMLImageElement).src =
+                                "/images/room-icon.png";
+                            }}
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-gray-400 text-xs">
+                            No image
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="capitalize">
                       {room.room_type}
                     </TableCell>
@@ -671,7 +705,12 @@ export function RoomTable() {
                 {previewUrl ? (
                   <div className="relative h-32 w-32 mb-2">
                     <Image
-                      src={previewUrl}
+                      src={
+                        typeof previewUrl === "string" &&
+                        !previewUrl.startsWith("data:")
+                          ? formatImageUrl(previewUrl)
+                          : previewUrl
+                      }
                       alt="Preview"
                       fill
                       className="object-contain"
@@ -831,7 +870,12 @@ export function RoomTable() {
                 {previewUrl ? (
                   <div className="relative h-32 w-32 mb-2">
                     <Image
-                      src={previewUrl}
+                      src={
+                        typeof previewUrl === "string" &&
+                        !previewUrl.startsWith("data:")
+                          ? formatImageUrl(previewUrl)
+                          : previewUrl
+                      }
                       alt="Preview"
                       fill
                       className="object-contain"

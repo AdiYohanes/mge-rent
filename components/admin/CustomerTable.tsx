@@ -45,10 +45,11 @@ import {
   User,
   GetUsersParams,
   getUsers,
-  createUser,
   updateUser,
   deleteUser,
+  register,
 } from "@/api";
+import axios from "axios";
 
 interface Customer {
   id: number | string;
@@ -66,6 +67,8 @@ interface NewCustomer {
   username: string;
   phoneNumber: string;
   email: string;
+  password: string;
+  passwordConfirmation: string;
   status: "active" | "inactive";
 }
 
@@ -135,6 +138,8 @@ export function CustomerTable() {
     username: "",
     phoneNumber: "",
     email: "",
+    password: "",
+    passwordConfirmation: "",
     status: "active",
   });
 
@@ -398,7 +403,7 @@ export function CustomerTable() {
   };
 
   // Save functions
-  const saveNewCustomer = () => {
+  const saveNewCustomer = async () => {
     // Validate fields
     if (
       !newCustomer.fullName ||
@@ -424,50 +429,82 @@ export function CustomerTable() {
       return;
     }
 
+    // Password validation - if password is provided, confirmation must match
+    if (
+      newCustomer.password &&
+      newCustomer.password !== newCustomer.passwordConfirmation
+    ) {
+      toast.error("Passwords do not match!");
+      return;
+    }
+
     // Set loading state
     setLoading(true);
 
-    // Create user data object for API
-    const userData = {
-      name: newCustomer.fullName,
-      email: newCustomer.email,
-      username: newCustomer.username,
-      phone: newCustomer.phoneNumber,
-      role: "CUST",
-      // Generate a random password that will be changed by the user
-      password: Math.random().toString(36).substring(2, 10) + "Aa1!",
-    };
+    try {
+      // Generate default password if not provided
+      const password = newCustomer.password || `${newCustomer.username}123!`;
 
-    // Call API to create customer
-    createUser(userData)
-      .then(() => {
-        toast.success("Customer added successfully!");
-        setIsAddModalOpen(false);
+      // Create user data object for API
+      const userData = {
+        name: newCustomer.fullName,
+        email: newCustomer.email,
+        username: newCustomer.username,
+        phone: newCustomer.phoneNumber,
+        role: "CUST",
+        password: password,
+        password_confirmation: password, // Add password confirmation
+      };
 
-        // Reset form
-        setNewCustomer({
-          fullName: "",
-          username: "",
-          phoneNumber: "",
-          email: "",
-          status: "active",
-        });
+      console.log("Creating new customer with data:", userData);
 
-        // Refresh data
-        setCurrentPage(1);
-        setRefreshTrigger((prev) => prev + 1);
-      })
-      .catch((error) => {
-        console.error("Error creating customer:", error);
-        toast.error(
-          `Failed to add customer: ${
-            error.response?.data?.message || "Unknown error"
-          }`
-        );
-      })
-      .finally(() => {
-        setLoading(false);
+      // Call register API instead of createUser
+      const response = await register(userData);
+
+      console.log("Customer registered successfully:", response);
+
+      // Reset form
+      setNewCustomer({
+        fullName: "",
+        username: "",
+        phoneNumber: "",
+        email: "",
+        password: "",
+        passwordConfirmation: "",
+        status: "active",
       });
+
+      // Show success message with password info if we generated one
+      if (!newCustomer.password) {
+        toast.success(
+          `Customer added successfully! Default password: ${password}`
+        );
+      } else {
+        toast.success("Customer added successfully!");
+      }
+
+      // Close modal
+      setIsAddModalOpen(false);
+
+      // Refresh data
+      setCurrentPage(1);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error creating customer:", error);
+
+      // Show user-friendly error message
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        toast.error(`Failed to add customer: ${error.response.data.message}`);
+      } else if (axios.isAxiosError(error) && error.response?.data?.errors) {
+        // Handle validation errors
+        const errors = Object.values(error.response.data.errors).flat();
+        toast.error(`Failed to add customer: ${errors[0]}`);
+      } else {
+        toast.error("Failed to add customer. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const saveEditedCustomer = () => {
@@ -940,6 +977,41 @@ export function CustomerTable() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="password">
+                Password <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter password (or leave empty for auto-generated)"
+                value={newCustomer.password}
+                onChange={(e) =>
+                  setNewCustomer({
+                    ...newCustomer,
+                    password: e.target.value,
+                  })
+                }
+              />
+              <p className="text-xs text-gray-500">
+                Leave empty to auto-generate a password
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="passwordConfirmation">Confirm Password</Label>
+              <Input
+                id="passwordConfirmation"
+                type="password"
+                placeholder="Confirm password"
+                value={newCustomer.passwordConfirmation}
+                onChange={(e) =>
+                  setNewCustomer({
+                    ...newCustomer,
+                    passwordConfirmation: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select
                 value={newCustomer.status}
@@ -961,10 +1033,23 @@ export function CustomerTable() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddModalOpen(false)}
+              disabled={loading}
+            >
               Cancel
             </Button>
-            <Button onClick={saveNewCustomer}>Add Customer</Button>
+            <Button onClick={saveNewCustomer} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Adding...
+                </>
+              ) : (
+                "Add Customer"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1068,10 +1153,20 @@ export function CustomerTable() {
               <Button
                 variant="outline"
                 onClick={() => setIsEditModalOpen(false)}
+                disabled={loading}
               >
                 Cancel
               </Button>
-              <Button onClick={saveEditedCustomer}>Save Changes</Button>
+              <Button onClick={saveEditedCustomer} disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1092,11 +1187,23 @@ export function CustomerTable() {
               <Button
                 variant="outline"
                 onClick={() => setIsDeleteModalOpen(false)}
+                disabled={loading}
               >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={deleteCustomer}>
-                Delete
+              <Button
+                variant="destructive"
+                onClick={deleteCustomer}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

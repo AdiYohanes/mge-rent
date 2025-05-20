@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { login, LoginRequestData, ErrorResponse } from "@/api";
 import { AxiosError } from "axios";
+import axios from "axios";
 
 // Helper function to set a cookie
 const setCookie = (name: string, value: string, days?: number) => {
@@ -76,10 +77,33 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Login error:", error);
-      const axiosError = error as AxiosError<ErrorResponse>;
-      toast.error(
-        axiosError.response?.data?.message || "Login failed. Please try again."
-      );
+
+      let errorMessage = "Login failed. Please try again.";
+
+      // Check for different error scenarios
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError<ErrorResponse>;
+
+        if (axiosError.response?.status === 401) {
+          errorMessage = "Incorrect username or password. Please try again.";
+        } else if (axiosError.response?.status === 404) {
+          errorMessage = "User not found. Please check your username.";
+        } else if (axiosError.response?.data?.message) {
+          // Use the error message from the server
+          errorMessage = axiosError.response.data.message;
+        } else if (axiosError.message === "Network Error") {
+          errorMessage = "Network error. Please check your connection.";
+        }
+      }
+
+      // Show the error message
+      toast.error(errorMessage);
+
+      // Reset the password field but keep the username
+      setFormData((prev) => ({
+        ...prev,
+        password: "",
+      }));
     } finally {
       setLoading(false);
     }
