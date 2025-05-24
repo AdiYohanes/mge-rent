@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { debugToken, checkTokenHealth } from "@/api/auth/authApi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Cookies from "js-cookie";
 import { useMounted } from "@/hooks/use-mounted";
 
 export default function AuthStatusPage() {
@@ -35,8 +34,8 @@ export default function AuthStatusPage() {
   const clearTokens = () => {
     if (!mounted) return;
 
-    Cookies.remove("token");
-    Cookies.remove("user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     checkStatus();
     alert("Tokens cleared!");
   };

@@ -1,5 +1,4 @@
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
-import Cookies from "js-cookie";
 import { API_BASE_URL } from "./constants";
 
 // Safe environment detection
@@ -22,7 +21,7 @@ apiClient.interceptors.request.use(
   (config) => {
     // Skip token handling on server to prevent hydration issues
     if (!isServer) {
-      const token = Cookies.get("token");
+      const token = localStorage.getItem("token");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
         // Add debug logging to track token usage
@@ -31,7 +30,7 @@ apiClient.interceptors.request.use(
         );
       } else {
         console.warn(
-          "Auth: No token found in cookies for request to",
+          "Auth: No token found in localStorage for request to",
           config.url
         );
       }
@@ -59,9 +58,10 @@ apiClient.interceptors.response.use(
         url: error.config?.url,
         method: error.config?.method,
         responseMessage: error.response?.data
-          ? (error.response.data as any).message || "No message"
+          ? (error.response.data as { message?: string }).message ||
+            "No message"
           : "No data",
-        hasToken: !!Cookies.get("token"),
+        hasToken: !!localStorage.getItem("token"),
       });
 
       // Check if this is a login attempt or already on login page
@@ -74,8 +74,8 @@ apiClient.interceptors.response.use(
       // Don't show alert or redirect for login attempts
       if (!isLoginAttempt && !isOnLoginPage) {
         // Clear authentication data
-        Cookies.remove("token");
-        Cookies.remove("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
 
         // Show message to user
         if (typeof window !== "undefined" && window.alert) {
@@ -146,7 +146,8 @@ export const makeApiRequest = async <T>(
         ...requestConfig.headers,
         Accept: "application/json",
         "X-Requested-With": "XMLHttpRequest",
-        "X-XSRF-TOKEN": !isServer ? Cookies.get("XSRF-TOKEN") || "" : "",
+        // Jika masih perlu XSRF-TOKEN, bisa menggunakan cara lain untuk mendapatkannya
+        // "X-XSRF-TOKEN": !isServer ? Cookies.get("XSRF-TOKEN") || "" : "",
       };
     }
 

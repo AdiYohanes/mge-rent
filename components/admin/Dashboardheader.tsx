@@ -19,7 +19,6 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import Cookies from "js-cookie";
 
 interface UserData {
   id: string;
@@ -45,24 +44,24 @@ export function DashboardHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Get user data from cookies
+  // Get user data from localStorage
   useEffect(() => {
-    const userCookie = Cookies.get("user");
-    if (userCookie) {
+    const userStorage = localStorage.getItem("user");
+    if (userStorage) {
       try {
-        const parsedUser = JSON.parse(userCookie) as UserData;
+        const parsedUser = JSON.parse(userStorage) as UserData;
         setUserData(parsedUser);
       } catch (error) {
-        console.error("Error parsing user data from cookie:", error);
+        console.error("Error parsing user data from localStorage:", error);
       }
     }
   }, []);
 
   // Handle logout
   const handleLogout = () => {
-    // Clear cookies
-    Cookies.remove("user");
-    Cookies.remove("token");
+    // Clear localStorage
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
 
     // Show success toast
     toast.success("Logged out successfully", {

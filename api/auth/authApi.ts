@@ -1,6 +1,5 @@
 import { post } from "../apiUtils";
 import { AUTH_ENDPOINTS } from "../constants";
-import Cookies from "js-cookie";
 
 // Types
 export interface AuthResponse {
@@ -50,7 +49,7 @@ export interface ErrorResponse {
 export const login = async (data: LoginRequestData): Promise<AuthResponse> => {
   const response = await post<AuthResponse>(AUTH_ENDPOINTS.LOGIN, data);
 
-  // Store user data and token in cookies
+  // Store user data and token in localStorage
   if (response && response.token) {
     const userData = response.user;
     const token = response.token;
@@ -60,17 +59,9 @@ export const login = async (data: LoginRequestData): Promise<AuthResponse> => {
       token.substring(0, 10) + "..."
     );
 
-    // Set secure cookies with 7 days expiration
-    Cookies.set("user", JSON.stringify(userData), {
-      expires: 7,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
-    Cookies.set("token", token, {
-      expires: 7,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+    // Set data in localStorage
+    localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("token", token);
   } else {
     console.error("Login response tidak memiliki token:", response);
   }
@@ -94,9 +85,9 @@ export const logout = async (): Promise<void> => {
     // Handle error silently
     console.error("Logout API error");
   } finally {
-    // Always clear cookies
-    Cookies.remove("token");
-    Cookies.remove("user");
+    // Always clear localStorage
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
   }
 };
 
@@ -106,7 +97,7 @@ export const isLoggedIn = (): boolean => {
   if (typeof window === "undefined") {
     return false;
   }
-  return !!Cookies.get("token");
+  return !!localStorage.getItem("token");
 };
 
 // Get current user
@@ -116,7 +107,7 @@ export const getCurrentUser = (): AuthResponse["user"] | null => {
     return null;
   }
 
-  const userJson = Cookies.get("user");
+  const userJson = localStorage.getItem("user");
   if (!userJson) return null;
 
   try {
@@ -130,11 +121,11 @@ export const getCurrentUser = (): AuthResponse["user"] | null => {
 export const debugToken = (): string => {
   // Check if running on server
   if (typeof window === "undefined" || typeof document === "undefined") {
-    return "Running on server (SSR), cookies not accessible";
+    return "Running on server (SSR), localStorage not accessible";
   }
 
-  const token = Cookies.get("token");
-  const userJson = Cookies.get("user");
+  const token = localStorage.getItem("token");
+  const userJson = localStorage.getItem("user");
   let user = null;
 
   try {
@@ -155,7 +146,6 @@ export const checkTokenHealth = (): {
   hasToken: boolean;
   hasUser: boolean;
   tokenLength: number;
-  cookieDetails: Record<string, string>;
   tokenPrefix: string;
   userRole?: string;
   issues: string[];
@@ -166,27 +156,19 @@ export const checkTokenHealth = (): {
       hasToken: false,
       hasUser: false,
       tokenLength: 0,
-      cookieDetails: {},
       tokenPrefix: "",
-      issues: ["Running on server (SSR), cookies not accessible"],
+      issues: ["Running on server (SSR), localStorage not accessible"],
     };
   }
 
-  // Get all cookies for debugging
-  const allCookies: Record<string, string> = {};
-  document.cookie.split(";").forEach((cookie) => {
-    const [name, value] = cookie.trim().split("=");
-    if (name) allCookies[name] = value || "";
-  });
-
-  const token = Cookies.get("token") || "";
-  const userJson = Cookies.get("user") || "";
+  const token = localStorage.getItem("token") || "";
+  const userJson = localStorage.getItem("user") || "";
   const issues: string[] = [];
   let user = null;
 
   // Check token
   if (!token) {
-    issues.push("Token tidak ditemukan dalam cookies");
+    issues.push("Token tidak ditemukan dalam localStorage");
   } else if (token.length < 20) {
     issues.push(`Token terlalu pendek (${token.length} karakter)`);
   }
@@ -200,7 +182,7 @@ export const checkTokenHealth = (): {
   // Check user data
   try {
     if (!userJson) {
-      issues.push("Data user tidak ditemukan dalam cookies");
+      issues.push("Data user tidak ditemukan dalam localStorage");
     } else {
       user = JSON.parse(userJson);
       if (!user.id) issues.push("Data user tidak memiliki ID");
@@ -219,7 +201,6 @@ export const checkTokenHealth = (): {
     hasToken: !!token,
     hasUser: !!user,
     tokenLength: token.length,
-    cookieDetails: allCookies,
     tokenPrefix,
     userRole: user?.role,
     issues,
@@ -235,7 +216,7 @@ export const getAuthHeader = ():
     return {};
   }
 
-  const token = Cookies.get("token");
+  const token = localStorage.getItem("token");
   if (!token) {
     console.warn("Token tidak ditemukan, autentikasi tidak dapat dilakukan");
     return {};

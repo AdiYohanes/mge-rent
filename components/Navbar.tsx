@@ -17,40 +17,16 @@ export default function Navbar() {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const mounted = useMounted();
 
-  // Helper function to get a cookie by name
-  const getCookie = (name: string): string | null => {
-    const nameEQ = name + "=";
-    const ca = document.cookie.split(";");
-    for (let i = 0; i < ca.length; i++) {
-      let c = ca[i];
-      while (c.charAt(0) === " ") c = c.substring(1, c.length);
-      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-    }
-    return null;
-  };
-
   useEffect(() => {
-    // Only access localStorage/cookies after component has mounted on client
+    // Only access localStorage after component has mounted on client
     if (mounted) {
-      const userCookie = getCookie("loggedInUser");
-      if (userCookie) {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
         try {
-          setUser(JSON.parse(userCookie));
+          setUser(JSON.parse(storedUser));
         } catch (e) {
-          console.error("Error parsing user cookie:", e);
-          localStorage.removeItem("user"); // Clear potentially corrupted cookie/LS
-          document.cookie =
-            "loggedInUser=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;"; // Clear cookie
-        }
-      } else {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-          try {
-            setUser(JSON.parse(storedUser));
-          } catch (e) {
-            console.error("Error parsing user from localStorage:", e);
-            localStorage.removeItem("user");
-          }
+          console.error("Error parsing user from localStorage:", e);
+          localStorage.removeItem("user");
         }
       }
     }
@@ -77,9 +53,7 @@ export default function Navbar() {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    // Clear the cookie
-    document.cookie =
-      "loggedInUser=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    localStorage.removeItem("token");
     setUser(null);
     setIsProfileMenuOpen(false);
     router.push("/signin");
