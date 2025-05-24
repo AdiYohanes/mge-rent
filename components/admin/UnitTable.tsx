@@ -49,6 +49,7 @@ import {
   Console,
   getConsoles,
 } from "@/api";
+import { STORAGE_URL } from "@/api/constants";
 
 // Extend UnitPayload interface to include additional properties used in the component
 interface ExtendedUnitPayload extends Omit<UnitPayload, "status"> {
@@ -58,8 +59,14 @@ interface ExtendedUnitPayload extends Omit<UnitPayload, "status"> {
   status: "available" | "booked" | "serviced";
 }
 
-// Define feature options
-const FEATURE_OPTIONS = ["netflix", "disney+", "nintendo_switch"];
+// Add this helper function at the top with other imports
+const formatImageUrl = (imageUrl: string | null): string => {
+  if (!imageUrl) return "/images/ask.png";
+  if (!imageUrl.startsWith("http")) {
+    return `${STORAGE_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
+  }
+  return imageUrl;
+};
 
 // Game List Item Component with Drag and Drop
 const GameItem = ({
@@ -91,15 +98,11 @@ const GameItem = ({
       const dragIndex = item.index;
       const hoverIndex = index;
 
-      // Don't replace items with themselves
       if (dragIndex === hoverIndex) {
         return;
       }
 
-      // Move the game
       moveGame(dragIndex, hoverIndex);
-
-      // Update the index for the dragged item
       item.index = hoverIndex;
     },
   });
@@ -131,12 +134,12 @@ const GameItem = ({
         <div className="flex-shrink-0">
           <div className="relative h-10 w-10 rounded-md overflow-hidden">
             <Image
-              src={game.image || "/placeholder.svg"}
+              src={formatImageUrl(game.image)}
               alt={game.title}
               fill
               className="object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = "/placeholder.svg";
+                (e.target as HTMLImageElement).src = "/images/ask.png";
               }}
             />
           </div>
@@ -238,8 +241,11 @@ export function UnitTable() {
 
         // Fetch consoles
         const consolesResponse = await getConsoles();
-        if (consolesResponse && Array.isArray(consolesResponse.consoles)) {
-          setConsoles(consolesResponse.consoles);
+        if (consolesResponse && Array.isArray(consolesResponse.data)) {
+          setConsoles(consolesResponse.data);
+          console.log("Loaded consoles:", consolesResponse.data);
+        } else {
+          console.error("Unexpected console data format:", consolesResponse);
         }
 
         // Fetch games
@@ -409,18 +415,31 @@ export function UnitTable() {
   const handleEditUnit = (unit: Unit) => {
     setCurrentUnit(unit);
 
-    // Get game objects from IDs
-    const unitGames = unit.game_ids
-      ? (unit.game_ids
-          .map((id) => allGames.find((game) => String(game.id) === String(id)))
-          .filter(Boolean) as Game[])
+    // Get game objects from IDs - pastikan game_ids adalah array
+    const gameIdsArray = Array.isArray(unit.game_ids)
+      ? unit.game_ids
+      : unit.game_ids
+      ? JSON.parse(String(unit.game_ids))
       : [];
+
+    const unitGames = gameIdsArray
+      .map((id: number) =>
+        allGames.find((game) => String(game.id) === String(id))
+      )
+      .filter(Boolean) as Game[];
 
     setSelectedGames(unitGames);
 
     // Get room and console names
     const roomName = getRoomNameById(unit.room_id);
     const consoleName = getConsoleNameById(unit.console_id);
+
+    // Pastikan features adalah array
+    const featuresArray = Array.isArray(unit.features)
+      ? unit.features
+      : unit.features
+      ? JSON.parse(String(unit.features))
+      : [];
 
     // Set unit data for form with existing status and prepopulated values
     setNewUnit({
@@ -429,15 +448,15 @@ export function UnitTable() {
       room: roomName, // Setting room name for dropdown
       console_id: unit.console_id,
       console: consoleName, // Setting console name for dropdown
-      game_ids: unit.game_ids,
+      game_ids: gameIdsArray, // Pastikan ini array
       description: unit.description || "",
       status: unit.status,
-      features: unit.features || [],
+      features: featuresArray, // Pastikan ini array
       // Calculate the rent price based on current data
       rentPrice: calculateRentPrice(
         unit.room_id,
         unit.console_id,
-        unit.features || []
+        featuresArray
       ),
     });
 
@@ -490,19 +509,46 @@ export function UnitTable() {
         newUnit.features || []
       );
 
-      const payload = {
-        name: newUnit.name!,
-        room_id: newUnit.room_id!,
-        console_id: newUnit.console_id!,
-        game_ids: selectedGames.map((game) => Number(game.id)),
+      // Ensure features is an array
+      const featuresArray = Array.isArray(newUnit.features)
+        ? newUnit.features
+        : [];
+
+      // Get room and console
+      const room = rooms.find((r) => r.id === newUnit.room_id);
+      if (!room) {
+        throw new Error("Room tidak ditemukan. Silakan pilih room yang valid.");
+      }
+
+      const consoleItem = consoles.find((c) => c.id === newUnit.console_id);
+      if (!consoleItem) {
+        throw new Error(
+          "Console tidak ditemukan. Silakan pilih console yang valid."
+        );
+      }
+
+      // Ensure game_ids is an array of numbers
+      const gameIdsArray = selectedGames.map((game) => Number(game.id));
+
+      // Create payload with proper array formatting
+      const apiPayload = {
+        name: newUnit.name,
+        room_id: Number(newUnit.room_id),
+        console_id: Number(newUnit.console_id),
+        game_ids: gameIdsArray, // Send as array, not JSON string
         description: newUnit.description || "",
         status: newUnit.status || "available",
-        features: newUnit.features || [],
-        rent_price: unitPrice, // Use rent_price for API
+        features: featuresArray, // Send as array, not JSON string
+        room: room.name,
+        console: consoleItem.model,
+        rent_price: unitPrice,
       };
 
-      console.log("Sending unit data to API:", payload);
-      const result = await addUnit(payload);
+      console.log("Sending unit data to API:", apiPayload);
+      console.log("Game IDs (array):", gameIdsArray);
+      console.log("Features (array):", featuresArray);
+
+      await addUnit(apiPayload);
 
       toast.success("Unit added successfully!");
       resetForm();
@@ -522,50 +568,67 @@ export function UnitTable() {
 
     if (!currentUnit) return;
 
-    // Use current unit data for any missing fields in the edit form
-    const updatedUnit = {
-      name: newUnit.name || currentUnit.name,
-      room_id: newUnit.room_id || currentUnit.room_id,
-      console_id: newUnit.console_id || currentUnit.console_id,
-      description:
-        newUnit.description !== undefined
-          ? newUnit.description
-          : currentUnit.description || "",
-      status: newUnit.status || currentUnit.status,
-      features: newUnit.features || currentUnit.features || [],
-      // Use the selected games or fall back to current unit's game IDs
-      game_ids:
-        selectedGames.length > 0
-          ? selectedGames.map((game) => Number(game.id))
-          : currentUnit.game_ids,
-    };
-
     setLoading(true);
 
     try {
-      // Calculate the unit price based on updated fields
-      const unitPrice = calculateRentPrice(
-        updatedUnit.room_id,
-        updatedUnit.console_id,
-        updatedUnit.features
-      );
-
-      // Prepare the payload with proper data types
-      const payload = {
-        name: updatedUnit.name,
-        room_id: Number(updatedUnit.room_id),
-        console_id: Number(updatedUnit.console_id),
-        game_ids: updatedUnit.game_ids, // This will be stringified in the API
-        description: updatedUnit.description,
-        status: updatedUnit.status,
-        features: updatedUnit.features, // This will be stringified in the API
-        rent_price: unitPrice,
-        // No need to add _method: "PUT" as the API will handle it
+      // Create minimal payload with only the changed fields
+      const apiPayload: Partial<UnitPayload> = {
+        room_id: Number(newUnit.room_id || currentUnit.room_id),
+        console_id: Number(newUnit.console_id || currentUnit.console_id),
       };
 
-      console.log("Updating unit data:", payload);
-      console.log("Unit ID:", currentUnit.id);
-      const result = await updateUnit(currentUnit.id, payload);
+      // Only add other fields if they are changed
+      if (newUnit.name && newUnit.name !== currentUnit.name) {
+        apiPayload.name = newUnit.name;
+      }
+
+      if (
+        newUnit.description !== undefined &&
+        newUnit.description !== currentUnit.description
+      ) {
+        apiPayload.description = newUnit.description;
+      }
+
+      if (newUnit.status && newUnit.status !== currentUnit.status) {
+        apiPayload.status = newUnit.status;
+      }
+
+      // Handle features array properly
+      const currentFeatures = Array.isArray(currentUnit.features)
+        ? currentUnit.features
+        : currentUnit.features
+        ? JSON.parse(String(currentUnit.features))
+        : [];
+
+      const newFeatures = Array.isArray(newUnit.features)
+        ? newUnit.features
+        : newUnit.features
+        ? JSON.parse(String(newUnit.features))
+        : [];
+
+      if (
+        JSON.stringify(currentFeatures.sort()) !==
+        JSON.stringify(newFeatures.sort())
+      ) {
+        apiPayload.features = newFeatures;
+      }
+
+      // Only include game_ids if games were changed
+      if (selectedGames.length > 0) {
+        const currentGameIds = currentUnit.game_ids || [];
+        const newGameIds = selectedGames.map((game) => Number(game.id));
+
+        if (
+          JSON.stringify(currentGameIds.sort()) !==
+          JSON.stringify(newGameIds.sort())
+        ) {
+          apiPayload.game_ids = newGameIds;
+        }
+      }
+
+      console.log("Updating unit data:", apiPayload);
+
+      await updateUnit(currentUnit.id, apiPayload);
 
       toast.success("Unit updated successfully!");
       resetForm();
@@ -599,7 +662,8 @@ export function UnitTable() {
 
   // Handle API errors
   const handleApiError = (error: unknown, defaultMessage: string) => {
-    let errorMessage = error instanceof Error ? error.message : defaultMessage;
+    const errorMessage =
+      error instanceof Error ? error.message : defaultMessage;
 
     // Check for session expiration errors
     if (
@@ -607,7 +671,6 @@ export function UnitTable() {
       error.message.includes("login sudah berakhir")
     ) {
       toast.error("Sesi login sudah berakhir. Silakan login kembali.");
-      // Optionally redirect to login page
       return;
     }
 
@@ -635,11 +698,17 @@ export function UnitTable() {
   // Handle opening game list modal
   const handleOpenGameList = (unit: Unit) => {
     // Find the games by IDs
-    const unitGames = unit.game_ids
-      ? (unit.game_ids
-          .map((id) => allGames.find((game) => String(game.id) === String(id)))
-          .filter(Boolean) as Game[])
+    const gameIdsArray = Array.isArray(unit.game_ids)
+      ? unit.game_ids
+      : unit.game_ids
+      ? JSON.parse(String(unit.game_ids))
       : [];
+
+    const unitGames = gameIdsArray
+      .map((id: number) =>
+        allGames.find((game) => String(game.id) === String(id))
+      )
+      .filter(Boolean) as Game[];
 
     setCurrentUnitGames(unitGames);
     setCurrentUnit(unit);
@@ -1098,7 +1167,7 @@ export function UnitTable() {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="loading" disabled>
                           Loading rooms...
                         </SelectItem>
                       )}
@@ -1130,7 +1199,7 @@ export function UnitTable() {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="loading" disabled>
                           Loading consoles...
                         </SelectItem>
                       )}
@@ -1304,10 +1373,14 @@ export function UnitTable() {
                       >
                         <div className="relative h-3.5 w-3.5 mr-1">
                           <Image
-                            src={game.image || "/images/game-placeholder.png"}
+                            src={formatImageUrl(game.image)}
                             alt={game.title}
                             fill
                             className="object-cover rounded-sm"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "/images/ask.png";
+                            }}
                           />
                         </div>
                         {game.title}
@@ -1375,12 +1448,14 @@ export function UnitTable() {
                             >
                               <div className="relative h-6 w-6 rounded overflow-hidden">
                                 <Image
-                                  src={
-                                    game.image || "/images/game-placeholder.png"
-                                  }
+                                  src={formatImageUrl(game.image)}
                                   alt={game.title}
                                   fill
                                   className="object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src =
+                                      "/images/ask.png";
+                                  }}
                                 />
                               </div>
                               <span>{game.title}</span>
@@ -1461,7 +1536,7 @@ export function UnitTable() {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="loading" disabled>
                           Loading rooms...
                         </SelectItem>
                       )}
@@ -1493,7 +1568,7 @@ export function UnitTable() {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="loading" disabled>
                           Loading consoles...
                         </SelectItem>
                       )}
@@ -1667,10 +1742,14 @@ export function UnitTable() {
                       >
                         <div className="relative h-3.5 w-3.5 mr-1">
                           <Image
-                            src={game.image || "/images/game-placeholder.png"}
+                            src={formatImageUrl(game.image)}
                             alt={game.title}
                             fill
                             className="object-cover rounded-sm"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "/images/ask.png";
+                            }}
                           />
                         </div>
                         {game.title}
@@ -1738,12 +1817,14 @@ export function UnitTable() {
                             >
                               <div className="relative h-6 w-6 rounded overflow-hidden">
                                 <Image
-                                  src={
-                                    game.image || "/images/game-placeholder.png"
-                                  }
+                                  src={formatImageUrl(game.image)}
                                   alt={game.title}
                                   fill
                                   className="object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src =
+                                      "/images/ask.png";
+                                  }}
                                 />
                               </div>
                               <span>{game.title}</span>

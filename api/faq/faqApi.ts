@@ -177,7 +177,7 @@ export const updateFAQ = async (
     console.log(`Updating FAQ with ID: ${id}`, data);
 
     // Add method spoofing for PUT/PATCH if using post
-    const updatedData = { ...data, _method: "PUT" };
+    const updatedData = { ...data, _method: "POST" };
 
     // Use direct axios call to handle 422 errors
     const axios = await import("axios");

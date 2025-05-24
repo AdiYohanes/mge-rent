@@ -1,49 +1,39 @@
-import { get, del, post } from "../apiUtils";
+import { get, del, prepareFileForUpload } from "../apiUtils"; // Removed 'post'
 import { FNB_ENDPOINTS } from "../constants";
 import axios from "axios";
-import { API_BASE_URL } from "../constants";
+// import { API_BASE_URL } from "../constants"; // Removed 'API_BASE_URL'
 import { getAuthHeader } from "../auth/authApi";
 
 // Types
 export interface FoodDrinkItem {
   id: number;
   name: string;
-  category: "Food" | "Drink";
-  price: number;
+  category: "food" | "beverage" | "snack"; // Changed to lowercase
+  price: string;
   image: string | null;
-  status: "Available" | "Sold Out";
+  is_available: boolean; // Changed from status to is_available (boolean)
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 }
 
-export interface FoodDrinkResponseData {
-  items: FoodDrinkItem[];
-  total: number;
+export interface FoodDrinkResponseMeta {
   page: number;
-  limit: number;
-  totalPages: number;
+  perPage: number;
+  total: number;
+  lastPage: number;
+  search: string;
 }
 
 // FoodDrink create/update payload
 export interface FoodDrinkPayload {
   id?: number;
   name: string;
-  category: string;
-  price: number;
+  category: "food" | "beverage" | "snack"; // Changed to lowercase
+  price: string;
   image?: File | null;
-  status?: string;
-  _method?: string; // For Laravel method spoofing
-}
-
-// Define a generic response type to handle different API response formats
-interface UpdateResponse {
-  data?: FoodDrinkItem;
-  item?: FoodDrinkItem;
-  success?: boolean;
-  status?: string;
-  message?: string;
-  [key: string]: unknown;
+  is_available?: boolean; // Changed from status to is_available (boolean)
+  _method?: string;
 }
 
 // Get all food and drink items
@@ -52,7 +42,7 @@ export const getFoodDrinkItems = async (
   limit = 10,
   search = "",
   category = ""
-): Promise<FoodDrinkResponseData> => {
+): Promise<{ data: FoodDrinkItem[]; meta: FoodDrinkResponseMeta }> => {
   try {
     // Build query parameters
     const queryParams = new URLSearchParams();
@@ -68,8 +58,13 @@ export const getFoodDrinkItems = async (
     }
 
     const url = `${FNB_ENDPOINTS.GET_ALL}?${queryParams.toString()}`;
-    const response = await get<FoodDrinkResponseData>(url);
+    const response = await get<{
+      data: FoodDrinkItem[];
+      meta: FoodDrinkResponseMeta;
+    }>(url);
 
+    // Map is_available to status for component compatibility (optional, could also update component)
+    // For now, let's just return the raw API response structure
     return response;
   } catch (error) {
     console.error("Error fetching food and drink items:", error);
@@ -109,7 +104,8 @@ export const addFoodDrinkItem = async (
     });
 
     console.log("Add food/drink item response:", response.data);
-    return response.data;
+    // Assuming the API returns the created item directly or within a 'data' field
+    return response.data.data || response.data;
   } catch (error) {
     console.error("Error creating food/drink item:", error);
     return null;
@@ -119,39 +115,33 @@ export const addFoodDrinkItem = async (
 // Update a food/drink item
 export const updateFoodDrinkItem = async (
   id: string,
-  formData: FormData
+  formData: FormData,
+  imageFile?: File | undefined // Add imageFile parameter
 ): Promise<FoodDrinkItem | null> => {
   try {
     console.log(`Updating food/drink item with ID: ${id}`);
 
-    // Add method spoofing for PUT/PATCH
-    formData.append("_method", "PUT");
+    // Handle new image file if exists
+    if (imageFile) {
+      // Use the imageFile parameter
+      const preparedFile = prepareFileForUpload(imageFile); // Use the imported function
+      formData.append("image", preparedFile);
+    }
 
-    // Use axios directly with proper headers for FormData
+    // Use axios.post for update with FormData (assuming backend expects this with _method spoofing)
     const response = await axios.post(FNB_ENDPOINTS.UPDATE_FNB(id), formData, {
       headers: {
         Accept: "application/json",
         "X-Requested-With": "XMLHttpRequest",
         ...getAuthHeader(),
+        // Content-Type will be automatically set to multipart/form-data by axios for FormData
       },
     });
 
     console.log("Update food/drink item response:", response.data);
 
-    // Handle various response formats
-    if (response.data) {
-      if (response.data.data) {
-        return response.data.data;
-      } else if (response.data.item) {
-        return response.data.item;
-      } else if (response.data.success || response.data.status === "success") {
-        // If response only indicates success, fetch the item again
-        const updatedItem = await getFoodDrinkItem(id);
-        return updatedItem;
-      }
-    }
-
-    return null;
+    // Assuming the API returns the updated item directly or within a 'data' field
+    return response.data.data || response.data;
   } catch (error) {
     console.error(`Error updating food/drink item with id ${id}:`, error);
     return null;

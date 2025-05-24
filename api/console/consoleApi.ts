@@ -2,7 +2,7 @@ import { get } from "../apiUtils";
 import { CONSOLE_ENDPOINTS } from "../constants";
 import axios from "axios";
 import Cookies from "js-cookie";
-import { API_BASE_URL } from "../constants";
+import { API_BASE_URL, STORAGE_URL } from "../constants";
 import { getAuthHeader } from "../auth/authApi";
 
 // Types
@@ -62,7 +62,7 @@ export const uploadConsoleImage = async (
     // Create FormData for image upload
     const formData = new FormData();
     formData.append("image", imageFile);
-    formData.append("_method", "PUT");
+    formData.append("_method", "POST");
 
     // Use axios to upload the image
     const response = await axios.post(
@@ -92,14 +92,22 @@ export const uploadConsoleImage = async (
 };
 
 // Get all consoles
-export const getConsoles = async (): Promise<ConsoleResponseData> => {
+export const getConsoles = async (): Promise<GetConsolesResponse> => {
   try {
-    // Validate authentication
-    if (!Cookies.get("token")) {
-      throw new Error(
-        "Anda harus login untuk melihat daftar console. Silakan login terlebih dahulu."
-      );
+    // Get token - don't throw error immediately if missing
+    const token = Cookies.get("token");
+
+    // Debug token info if available
+    if (token) {
+      const tokenPreview = token.substring(0, 10) + "...";
+      console.log("Using token for getConsoles:", tokenPreview);
+    } else {
+      console.warn("No token found - getConsoles may fail authentication");
     }
+
+    // Get auth header - will handle missing token gracefully
+    const authHeader = getAuthHeader();
+    console.log("Auth header present:", !!authHeader.Authorization);
 
     console.log("Fetching consoles data...");
 
@@ -108,29 +116,38 @@ export const getConsoles = async (): Promise<ConsoleResponseData> => {
       headers: {
         Accept: "application/json",
         "X-Requested-With": "XMLHttpRequest",
-        ...getAuthHeader(),
+        ...authHeader,
       },
     });
 
     console.log("API response for consoles:", response.data);
 
-    if (response && response.data && Array.isArray(response.data.data)) {
+    if (response && response.data) {
       // Process image URLs to use full paths if they're relative
       const processedConsoles = response.data.data.map((console: Console) => {
-        // Check if image is a relative path and fix it
-        if (console.image && !console.image.startsWith("http")) {
-          // If it's a relative path, make it absolute
-          console.image = `${API_BASE_URL}${console.image}`;
+        // Check if image is a relative path and not empty
+        if (
+          console.image &&
+          !console.image.startsWith("http") &&
+          console.image !== ""
+        ) {
+          // If it's a path from storage, use STORAGE_URL
+          if (console.image.includes("storage/images/console")) {
+            console.image = `${STORAGE_URL}/${console.image}`;
+          } else if (!console.image.includes("/")) {
+            // If it's just a filename, use the full path
+            console.image = `${STORAGE_URL}/storage/images/console/${console.image}`;
+          } else {
+            // For other paths
+            console.image = `${STORAGE_URL}/${console.image}`;
+          }
         }
         return console;
       });
 
       return {
-        consoles: processedConsoles,
-        total: response.data.meta?.total || response.data.data.length,
-        page: response.data.meta?.page || 1,
-        limit: response.data.meta?.perPage || response.data.data.length,
-        totalPages: response.data.meta?.lastPage || 1,
+        data: processedConsoles,
+        meta: response.data.meta,
       };
     }
 
@@ -138,18 +155,50 @@ export const getConsoles = async (): Promise<ConsoleResponseData> => {
   } catch (error) {
     console.error("Error fetching consoles:", error);
 
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      Cookies.remove("token");
-      Cookies.remove("user");
-      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    if (axios.isAxiosError(error)) {
+      // Extract response data for better error logging
+      const status = error.response?.status;
+      const responseData = error.response?.data;
+      console.error(`API Error Status: ${status}, Data:`, responseData);
+
+      // Handle expired session
+      if (status === 401) {
+        // Check if we're actually logged in before removing cookies
+        if (Cookies.get("token")) {
+          console.log(
+            "Token exists but API returned 401 - session likely expired"
+          );
+          Cookies.remove("token");
+          Cookies.remove("user");
+
+          // Redirect to login page automatically
+          if (typeof window !== "undefined") {
+            window.location.href = "/signin";
+          }
+
+          throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+        } else {
+          console.log("No token exists - need to login first");
+          throw new Error("Anda perlu login untuk melihat daftar console.");
+        }
+      }
+
+      // Handle other specific error cases
+      if (responseData?.message) {
+        throw new Error(responseData.message);
+      }
     }
 
+    // Default error return empty data
     return {
-      consoles: [],
-      total: 0,
-      page: 1,
-      limit: 10,
-      totalPages: 0,
+      data: [],
+      meta: {
+        page: 1,
+        perPage: 10,
+        total: 0,
+        lastPage: 1,
+        search: "",
+      },
     };
   }
 };
@@ -157,12 +206,62 @@ export const getConsoles = async (): Promise<ConsoleResponseData> => {
 // Get a console by ID
 export const getConsole = async (id: string): Promise<Console | null> => {
   try {
-    const response = await get<{ data: Console }>(
-      CONSOLE_ENDPOINTS.GET_ONE(id)
+    console.log(`[getConsole] Mengambil konsol dengan ID: ${id}`);
+    // Panggil 'get' dan biarkan hasilnya sebagai 'any' untuk pemeriksaan fleksibel
+    const responseFromApiUtil = await get<any>(CONSOLE_ENDPOINTS.GET_ONE(id)); // <--- UBAH INI: gunakan `any` di sini
+
+    console.log(
+      `[getConsole] Respons mentah dari 'apiUtils.get' untuk ID ${id}:`,
+      responseFromApiUtil
     );
-    return response.data;
+
+    // Kritis: Pengecekan respons yang disederhanakan dan lebih kuat
+    if (responseFromApiUtil) {
+      // Skenario 1: Respons adalah objek dengan properti 'data' (misal: { data: {id: 1, ...} })
+      // Ini adalah format standar Laravel Resource untuk satu item.
+      if (
+        responseFromApiUtil.data &&
+        typeof responseFromApiUtil.data === "object" &&
+        responseFromApiUtil.data !== null &&
+        "id" in responseFromApiUtil.data
+      ) {
+        console.log(
+          `[getConsole] Mengembalikan data dari properti 'data':`,
+          responseFromApiUtil.data
+        );
+        return responseFromApiUtil.data as Console; // Pastikan type-casting
+      }
+      // Skenario 2: Respons adalah objek Console secara langsung (misal: {id: 1, model: "PS5", ...})
+      // Ini sesuai dengan JSON respons yang Anda berikan.
+      else if (
+        typeof responseFromApiUtil === "object" &&
+        responseFromApiUtil !== null &&
+        "id" in responseFromApiUtil &&
+        "model" in responseFromApiUtil
+      ) {
+        console.log(
+          `[getConsole] Mengembalikan data sebagai objek Console langsung:`,
+          responseFromApiUtil
+        );
+        return responseFromApiUtil as Console; // Pastikan type-casting
+      }
+    }
+
+    console.warn(
+      `[getConsole] Respons API untuk ID ${id} tidak mengandung data konsol yang valid atau formatnya tidak terduga.`
+    );
+    return null; // Mengembalikan null jika tidak ada format yang cocok
   } catch (error) {
-    console.error(`Error fetching console with id ${id}:`, error);
+    console.error(`[getConsole] Error fetching console with id ${id}:`, error);
+    // Penanganan otentikasi
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      Cookies.remove("token");
+      Cookies.remove("user");
+      if (typeof window !== "undefined") {
+        window.location.href = "/signin";
+      }
+      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    }
     return null;
   }
 };
@@ -173,10 +272,17 @@ export const addConsole = async (
   imageFile?: File
 ): Promise<Console | null> => {
   try {
+    // Validate authentication first
+    const token = Cookies.get("token");
+    if (!token) {
+      throw new Error("Authentication token not found. Please log in again.");
+    }
+
     console.log("Creating console with data:", consoleData);
 
     let response;
     const endpoint = CONSOLE_ENDPOINTS.CREATE_CONSOLE;
+    const authHeader = getAuthHeader();
 
     // If we have an image file, use FormData to send both data and image
     if (imageFile) {
@@ -198,7 +304,7 @@ export const addConsole = async (
           Accept: "application/json",
           // Don't set Content-Type here, it will be set automatically with boundary
           "X-Requested-With": "XMLHttpRequest",
-          ...getAuthHeader(),
+          ...authHeader,
         },
       });
     } else {
@@ -208,36 +314,63 @@ export const addConsole = async (
           Accept: "application/json",
           "Content-Type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
-          ...getAuthHeader(),
+          ...authHeader,
         },
       });
     }
 
     console.log("Add console response:", response.data);
 
-    if (response.data && response.data.data) {
-      return response.data.data;
+    // Check response structure
+    if (response.data) {
+      if (response.data.data) {
+        return response.data.data;
+      } else if (response.data.console) {
+        return response.data.console;
+      } else if (response.status === 200 || response.status === 201) {
+        // If successful but no data returned, fetch the latest consoles
+        const consoles = await getConsoles();
+        return consoles.data[consoles.data.length - 1] || null;
+      }
     }
 
-    return null;
+    throw new Error("Invalid response format from server");
   } catch (error) {
     console.error("Error creating console:", error);
-    return null;
+
+    // Handle specific error cases
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        Cookies.remove("token");
+        Cookies.remove("user");
+        throw new Error("Session expired. Please log in again.");
+      } else if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+    }
+
+    throw error;
   }
 };
 
-// Update a console using POST with support for both data and image
+// Update a console
 export const updateConsole = async (
   id: string,
   consoleData: ConsolePayload,
   imageFile?: File
 ): Promise<Console | null> => {
   try {
-    // Log endpoint and payload for debugging
+    // Validate authentication first
+    const token = Cookies.get("token");
+    if (!token) {
+      throw new Error("Authentication token not found. Please log in again.");
+    }
+
     const endpoint = CONSOLE_ENDPOINTS.UPDATE_CONSOLE(id);
     console.log(`Making POST request to endpoint: ${endpoint}`);
     console.log(`With payload:`, consoleData);
 
+    const authHeader = getAuthHeader();
     let response;
 
     // If we have an image file, use FormData to send both data and image
@@ -251,60 +384,78 @@ export const updateConsole = async (
         }
       });
 
-      // Add the image file
+      // Add the image file and method spoofing
       formData.append("image", imageFile);
+      formData.append("_method", "POST");
 
-      // Using POST with FormData for multipart/form-data
       response = await axios.post(endpoint, formData, {
         headers: {
           Accept: "application/json",
-          // Don't set Content-Type here, it will be set automatically with boundary
           "X-Requested-With": "XMLHttpRequest",
-          ...getAuthHeader(),
+          ...authHeader,
         },
       });
     } else {
-      // Regular JSON update without image
-      response = await axios.post(endpoint, consoleData, {
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-          ...getAuthHeader(),
-        },
-      });
+      // Regular JSON update with method spoofing
+      response = await axios.post(
+        endpoint,
+        { ...consoleData, _method: "POST" },
+        {
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            ...authHeader,
+          },
+        }
+      );
     }
 
     console.log("Update response:", response.data);
 
-    // Handle various response formats
-    if (response.data) {
-      if (response.data.data) {
-        // If the response has a data field (standard format)
-        return response.data.data;
-      } else if (response.data.console) {
-        // If the response directly contains the console
-        return response.data.console;
-      } else if (
-        response.data.success ||
-        response.data.status === "success" ||
-        response.data.message
-      ) {
-        // If the response just indicates success but doesn't return the object
-        // We'll fetch the console again to get the updated data
-        const updatedConsole = await getConsole(id);
+    // Kritis: Pengecekan respons yang lebih spesifik
+    if (response.status >= 200 && response.status < 300) {
+      // 1. Coba ambil data konsol langsung dari respons jika ada di properti 'data' atau 'console'
+      if (response.data && (response.data.data || response.data.console)) {
+        return response.data.data || response.data.console;
+      }
+
+      // 2. Jika API sukses (status 2xx) TAPI tidak mengembalikan data konsol yang diperbarui langsung,
+      // panggil getConsole untuk mengambil data terbaru.
+      const updatedConsole = await getConsole(id);
+      if (updatedConsole) {
         return updatedConsole;
       } else {
-        // If we have a response but can't determine the structure,
-        // assume it was successful (status 200)
-        return { id: parseInt(id) } as Console; // Return minimal console object
+        // Jika bahkan getConsole(id) pun gagal mendapatkan data setelah update berhasil,
+        // ini adalah kondisi yang perlu dianggap sebagai kegagalan untuk frontend.
+        // Lempar error agar catch block di ConsoleTable menangkapnya dan menampilkan toast error.
+        throw new Error(
+          "Update successful, but failed to retrieve updated console data."
+        );
+      }
+    } else {
+      // Jika status HTTP bukan 2xx (misal 400, 500, dll), berarti ada masalah di backend.
+      // Lempar error dengan pesan dari backend jika ada.
+      throw new Error(
+        response.data?.message ||
+          `Failed to update console: HTTP Status ${response.status}`
+      );
+    }
+  } catch (error) {
+    console.error(`Error updating console with id ${id}:`, error);
+
+    // Handle specific error cases
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        Cookies.remove("token");
+        Cookies.remove("user");
+        throw new Error("Session expired. Please log in again.");
+      } else if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
       }
     }
 
-    return null;
-  } catch (error) {
-    console.error(`Error updating console with id ${id}:`, error);
-    return null;
+    throw error;
   }
 };
 
@@ -315,15 +466,30 @@ export const deleteConsole = async (
   try {
     console.log(`Deleting console with ID: ${id}`);
 
+    // Get auth header and log it for debugging (hiding most of token)
+    const authHeader = getAuthHeader();
+    console.log("Auth header present:", !!authHeader.Authorization);
+    if (authHeader.Authorization) {
+      const tokenPreview = authHeader.Authorization.substring(0, 15) + "...";
+      console.log("Using token:", tokenPreview);
+    } else {
+      console.error("No auth token available!");
+      throw new Error("Authentication token not found. Please log in again.");
+    }
+
     // Use axios directly with authentication headers
-    const response = await axios.delete(CONSOLE_ENDPOINTS.DELETE_CONSOLE(id), {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        ...getAuthHeader(),
-      },
-    });
+    const response = await axios.post(
+      CONSOLE_ENDPOINTS.DELETE_CONSOLE(id),
+      { _method: "DELETE" },
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          ...authHeader,
+        },
+      }
+    );
 
     console.log("Delete response:", response.data);
 

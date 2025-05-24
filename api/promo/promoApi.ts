@@ -146,7 +146,7 @@ export const updatePromo = async (
     console.log(`Updating promo with ID: ${id}`, data);
 
     // Add method spoofing for PUT/PATCH if using post
-    const updatedData = { ...data, _method: "PUT" };
+    const updatedData = { ...data, _method: "POST" };
 
     // Use direct axios call to handle 422 errors
     const response = await axios.post(

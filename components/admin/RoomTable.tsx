@@ -38,16 +38,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Room,
-  getRooms,
-  addRoom,
-  updateRoom,
-  deleteRoom,
-  RoomPayload,
-} from "@/api";
+import { Room, getRooms, deleteRoom } from "@/api";
 import axios from "axios";
-import { API_BASE_URL } from "@/api/constants";
+import { STORAGE_URL, API_BASE_URL } from "@/api/constants";
+import { getAuthHeader } from "@/api/auth/authApi";
 
 // Helper function to format image URLs correctly
 const formatImageUrl = (imageUrl: string | null): string => {
@@ -55,7 +49,7 @@ const formatImageUrl = (imageUrl: string | null): string => {
 
   // If it's a relative path, make it absolute
   if (!imageUrl.startsWith("http")) {
-    return `${API_BASE_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
+    return `${STORAGE_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
   }
 
   return imageUrl;
@@ -92,6 +86,7 @@ export function RoomTable() {
   // State for file upload
   const [isDragging, setIsDragging] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   // Set mounted to true once component has mounted
   useEffect(() => {
@@ -169,14 +164,27 @@ export function RoomTable() {
 
   // Handle file selection
   const handleFileChange = (file: File) => {
-    if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-        setNewRoom((prev) => ({ ...prev, image: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Only JPEG, PNG, JPG, and GIF images are allowed");
+      return;
     }
+
+    // Validate file size (2MB = 2 * 1024 * 1024 bytes)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("The image may not be greater than 2MB in size");
+      return;
+    }
+
+    setImageFile(file);
+
+    // Create preview URL for display
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Handle file input change
@@ -296,6 +304,7 @@ export function RoomTable() {
       image: null,
     });
     setPreviewUrl(null);
+    setImageFile(null);
   };
 
   const submitAddRoom = async () => {
@@ -313,30 +322,42 @@ export function RoomTable() {
 
     setLoading(true);
 
-    // Prepare payload
-    const payload: RoomPayload = {
-      name: newRoom.name!,
-      description: newRoom.description!,
-      room_type: newRoom.room_type as "regular" | "vip" | "vvip",
-      price: Number(newRoom.price),
-      max_visitors: Number(newRoom.max_visitors!),
-      is_available: true,
-    };
-
-    // Hanya tambahkan image jika ada
-    if (previewUrl) {
-      payload.image = previewUrl;
-    }
-
     try {
-      console.log("Creating room with payload:", payload);
+      // Create FormData object
+      const formData = new FormData();
 
-      const result = await addRoom(payload);
+      // Add room data
+      formData.append("name", newRoom.name);
+      formData.append("description", newRoom.description);
+      formData.append("room_type", newRoom.room_type as string);
+      formData.append("price", String(newRoom.price));
+      formData.append("max_visitors", String(newRoom.max_visitors));
+      formData.append("is_available", "1");
 
-      // Ubah pengecekan agar menerima true atau objek Room sebagai sukses
-      if (result === true || result !== null) {
+      // Add image file if available
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
+      console.log("Creating room with FormData payload");
+
+      // Make request with axios directly to handle FormData
+      const response = await axios.post(
+        `${API_BASE_URL}/admin/rooms`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Accept: "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            ...getAuthHeader(),
+          },
+        }
+      );
+
+      if (response.status >= 200 && response.status < 300) {
         toast.success("Room added successfully!");
-        setRefreshTrigger((prev) => prev + 1); // Refresh the list
+        setRefreshTrigger((prev) => prev + 1);
       } else {
         throw new Error("Failed to create room");
       }
@@ -349,9 +370,18 @@ export function RoomTable() {
           statusText: error.response?.statusText,
           data: error.response?.data,
         });
-        toast.error(
-          `Add failed: ${error.response?.status} ${error.response?.statusText}`
-        );
+
+        // Handle validation errors
+        if (error.response?.data?.errors) {
+          const errorMessages = Object.values(error.response.data.errors)
+            .flat()
+            .join(", ");
+          toast.error(`Validation error: ${errorMessages}`);
+        } else {
+          toast.error(
+            `Add failed: ${error.response?.status} ${error.response?.statusText}`
+          );
+        }
       } else {
         toast.error(
           `Failed to add room: ${
@@ -383,36 +413,50 @@ export function RoomTable() {
 
     setLoading(true);
 
-    // Prepare payload
-    const payload: RoomPayload = {
-      name: newRoom.name!,
-      description: newRoom.description!,
-      room_type: newRoom.room_type as "regular" | "vip" | "vvip",
-      price: Number(newRoom.price),
-      max_visitors: Number(newRoom.max_visitors!),
-      is_available: currentRoom.is_available,
-    };
-
-    // Hanya tambahkan image jika ada
-    if (previewUrl) {
-      payload.image = previewUrl;
-    }
-
     try {
+      // Create FormData object
+      const formData = new FormData();
+
+      // Add room data
+      formData.append("name", newRoom.name as string);
+      formData.append("description", newRoom.description as string);
+      formData.append("room_type", newRoom.room_type as string);
+      formData.append("price", String(newRoom.price));
+      formData.append("max_visitors", String(newRoom.max_visitors));
+      formData.append("is_available", currentRoom.is_available ? "1" : "0");
+
+      // Add image file if available
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
+      // Add method spoofing for Laravel
+      formData.append("_method", "POST");
+
       console.log(`Updating room ID: ${currentRoom.id}`);
       console.log(`Endpoint: ${API_BASE_URL}/admin/rooms/${currentRoom.id}`);
-      console.log(`Payload:`, payload);
 
-      const result = await updateRoom(currentRoom.id.toString(), payload);
+      // Make request with axios directly to handle FormData
+      const response = await axios.post(
+        `${API_BASE_URL}/admin/rooms/${currentRoom.id}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Accept: "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            ...getAuthHeader(),
+          },
+        }
+      );
 
-      console.log("Update result:", result);
+      console.log("Update response:", response.data);
 
-      // Ubah pengecekan agar menerima true atau objek Room sebagai sukses
-      if (result === true || result !== null) {
+      if (response.status >= 200 && response.status < 300) {
         toast.success("Room updated successfully!");
-        setRefreshTrigger((prev) => prev + 1); // Refresh the list
+        setRefreshTrigger((prev) => prev + 1);
       } else {
-        throw new Error("Failed to update room - received null result");
+        throw new Error("Failed to update room - received unexpected response");
       }
     } catch (error) {
       console.error("Error updating room:", error);
@@ -428,9 +472,18 @@ export function RoomTable() {
             method: error.config?.method,
           },
         });
-        toast.error(
-          `Update failed: ${error.response?.status} ${error.response?.statusText}`
-        );
+
+        // Handle validation errors
+        if (error.response?.data?.errors) {
+          const errorMessages = Object.values(error.response.data.errors)
+            .flat()
+            .join(", ");
+          toast.error(`Validation error: ${errorMessages}`);
+        } else {
+          toast.error(
+            `Update failed: ${error.response?.status} ${error.response?.statusText}`
+          );
+        }
       } else {
         toast.error(
           `Failed to update room: ${

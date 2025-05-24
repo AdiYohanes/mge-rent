@@ -41,14 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  User,
-  GetUsersParams,
-  getUsers,
-  updateUser,
-  deleteUser,
-  register,
-} from "@/api";
+import { User, getUsers, updateUser, deleteUser, register } from "@/api";
 import axios from "axios";
 
 interface Customer {
@@ -70,6 +63,17 @@ interface NewCustomer {
   password: string;
   passwordConfirmation: string;
   status: "active" | "inactive";
+}
+
+// Define the GetUsersParams interface locally since it's not exported from API
+interface GetUsersParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  status?: string;
+  sortBy?: string;
+  sortDirection?: "asc" | "desc";
 }
 
 // Konversi data User dari API menjadi format Customer
@@ -393,6 +397,9 @@ export function CustomerTable() {
       phoneNumber: customer.phoneNumber,
       email: customer.email,
       status: customer.status,
+      // Add empty values for required properties
+      password: "",
+      passwordConfirmation: "",
     });
     setIsEditModalOpen(true);
   };
@@ -508,47 +515,45 @@ export function CustomerTable() {
   };
 
   const saveEditedCustomer = () => {
-    // Validate fields
-    if (
-      !newCustomer.fullName ||
-      !newCustomer.email ||
-      !newCustomer.phoneNumber ||
-      !newCustomer.username
-    ) {
+    if (!selectedCustomer) return;
+
+    // Validate name and phone fields (username and email are disabled)
+    if (!newCustomer.fullName || !newCustomer.phoneNumber) {
       toast.error("Please fill in all required fields!");
       return;
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newCustomer.email)) {
-      toast.error("Please enter a valid email address!");
-      return;
+    // Validate phone only if it's been changed
+    if (newCustomer.phoneNumber !== selectedCustomer.phoneNumber) {
+      const phoneRegex = /^\d{10,15}$/;
+      if (!phoneRegex.test(newCustomer.phoneNumber.replace(/[-\s]/g, ""))) {
+        toast.error("Please enter a valid phone number!");
+        return;
+      }
     }
-
-    // Phone validation - simple numeric check with min length
-    const phoneRegex = /^\d{10,15}$/;
-    if (!phoneRegex.test(newCustomer.phoneNumber.replace(/[-\s]/g, ""))) {
-      toast.error("Please enter a valid phone number!");
-      return;
-    }
-
-    if (!selectedCustomer) return;
 
     // Set loading state
     setLoading(true);
 
-    // Create user data object for API
-    const userData = {
+    // Always include required fields
+    const userData: Record<string, string> = {
       name: newCustomer.fullName,
-      email: newCustomer.email,
+      username: newCustomer.username,
       phone: newCustomer.phoneNumber,
-      // Don't update password here - should be a separate function
+      // We don't include email in the update since it's disabled
     };
+
+    // Include status if it's different from current
+    if (newCustomer.status !== selectedCustomer.status) {
+      userData.status = newCustomer.status;
+    }
+
+    console.log("Updating customer with data:", userData);
 
     // Call API to update customer
     updateUser(selectedCustomer.id.toString(), userData)
-      .then(() => {
+      .then((response) => {
+        console.log("Update response:", response);
         toast.success("Customer updated successfully!");
         setIsEditModalOpen(false);
         setSelectedCustomer(null);
@@ -558,11 +563,28 @@ export function CustomerTable() {
       })
       .catch((error) => {
         console.error("Error updating customer:", error);
-        toast.error(
-          `Failed to update customer: ${
-            error.response?.data?.message || "Unknown error"
-          }`
-        );
+
+        // Handle different types of error responses
+        if (axios.isAxiosError(error)) {
+          const responseData = error.response?.data;
+
+          if (responseData?.errors && typeof responseData.errors === "object") {
+            // Laravel validation errors format
+            const errorMessages = Object.values(responseData.errors)
+              .flat()
+              .join(", ");
+            toast.error(`Validation error: ${errorMessages}`);
+          } else if (responseData?.message) {
+            toast.error(`Error: ${responseData.message}`);
+          } else {
+            toast.error(`Failed to update customer: ${error.message}`);
+          }
+
+          // Log detailed error information for debugging
+          console.log("Full error response:", error.response);
+        } else {
+          toast.error("An unexpected error occurred. Please try again.");
+        }
       })
       .finally(() => {
         setLoading(false);
@@ -977,41 +999,6 @@ export function CustomerTable() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">
-                Password <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter password (or leave empty for auto-generated)"
-                value={newCustomer.password}
-                onChange={(e) =>
-                  setNewCustomer({
-                    ...newCustomer,
-                    password: e.target.value,
-                  })
-                }
-              />
-              <p className="text-xs text-gray-500">
-                Leave empty to auto-generate a password
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="passwordConfirmation">Confirm Password</Label>
-              <Input
-                id="passwordConfirmation"
-                type="password"
-                placeholder="Confirm password"
-                value={newCustomer.passwordConfirmation}
-                onChange={(e) =>
-                  setNewCustomer({
-                    ...newCustomer,
-                    passwordConfirmation: e.target.value,
-                  })
-                }
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select
                 value={newCustomer.status}
@@ -1093,7 +1080,11 @@ export function CustomerTable() {
                       username: e.target.value,
                     })
                   }
+                  disabled={true}
                 />
+                <p className="text-xs text-gray-500">
+                  Username cannot be changed
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-email">
@@ -1110,7 +1101,9 @@ export function CustomerTable() {
                       email: e.target.value,
                     })
                   }
+                  disabled={true}
                 />
+                <p className="text-xs text-gray-500">Email cannot be changed</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-phone">

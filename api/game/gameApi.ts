@@ -12,6 +12,7 @@ export interface Game {
   platform: string;
   genre: string;
   quantity_available: number;
+  description?: string;
   ordering?: number;
   created_at?: string;
   updated_at?: string;
@@ -24,6 +25,7 @@ export interface GamePayload {
   platform: string;
   genre: string;
   quantity_available: number;
+  description?: string;
 }
 
 // Response types
@@ -116,6 +118,9 @@ export const addGame = async (
       "quantity_available",
       (gameData.quantity_available || 1).toString()
     );
+    if (gameData.description) {
+      formData.append("description", gameData.description.trim());
+    }
 
     // Debugging informasi detail
     console.log("Form data fields sebelum image:", {
@@ -123,6 +128,7 @@ export const addGame = async (
       platform: gameData.platform.trim(),
       genre: gameData.genre.trim(),
       quantity_available: (gameData.quantity_available || 1).toString(),
+      description: gameData.description?.trim(),
     });
 
     // Process image if provided
@@ -266,7 +272,7 @@ export const updateGame = async (
     const formData = new FormData();
 
     // Setup for Laravel PUT method
-    formData.append("_method", "PUT");
+    formData.append("_method", "POST");
 
     // Add available fields if provided
     if (gameData.title) formData.append("title", gameData.title.trim());
@@ -279,14 +285,18 @@ export const updateGame = async (
         gameData.quantity_available.toString()
       );
     }
+    if (gameData.description) {
+      formData.append("description", gameData.description.trim());
+    }
 
     // Debugging informasi detail
     console.log("Form data fields untuk update:", {
-      _method: "PUT",
+      _method: "POST",
       title: gameData.title?.trim(),
       platform: gameData.platform?.trim(),
       genre: gameData.genre?.trim(),
       quantity_available: gameData.quantity_available?.toString(),
+      description: gameData.description?.trim(),
     });
 
     // Process image if provided

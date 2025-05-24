@@ -1,4 +1,4 @@
-import { get, post, put, del } from "../apiUtils";
+import { get, post, del } from "../apiUtils";
 import { USER_ENDPOINTS } from "../constants";
 
 // Types
@@ -209,7 +209,10 @@ export const updateUser = async (
   id: string,
   userData: UpdateUserData
 ): Promise<User> => {
-  return await put<User>(USER_ENDPOINTS.UPDATE_USER(id), userData);
+  return await post<User>(USER_ENDPOINTS.UPDATE_USER(id), {
+    ...userData,
+    _method: "POST",
+  });
 };
 
 // Function to delete a user
@@ -222,5 +225,8 @@ export const updateUserStatus = async (
   id: string,
   status: string
 ): Promise<User> => {
-  return await put<User>(USER_ENDPOINTS.UPDATE_USER(id), { status });
+  return await post<User>(USER_ENDPOINTS.UPDATE_USER(id), {
+    status,
+    _method: "POST",
+  });
 };

@@ -1,5 +1,14 @@
 // API Base URL
 export const API_BASE_URL = "http://mge.168.231.84.221.sslip.io/api";
+export const STORAGE_URL = "http://mge.168.231.84.221.sslip.io/storage";
+
+// Image URLs
+export const IMAGE_URLS = {
+  CONSOLE_IMAGES: `${STORAGE_URL}/images/console`,
+  DEFAULT_CONSOLE_IMAGE: "/images/ask.png",
+  FNB_IMAGES: `${STORAGE_URL}/images/fnb`,
+  DEFAULT_FNB_IMAGE: "/images/food/beef.jpg", // Changed to .jpg
+};
 
 // Auth endpoints
 export const AUTH_ENDPOINTS = {

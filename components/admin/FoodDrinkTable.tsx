@@ -48,9 +48,36 @@ import {
   addFoodDrinkItem,
   updateFoodDrinkItem,
   deleteFoodDrinkItem,
-  FoodDrinkItem as FoodDrinkItemType,
+  FoodDrinkItem as FoodDrinkItemTypeAPI, // Renamed to avoid conflict
+  STORAGE_URL, // Import STORAGE_URL
+  IMAGE_URLS, // Import IMAGE_URLS
 } from "@/api";
-import { prepareFileForUpload } from "@/api";
+
+// Utility function to handle image URLs for food and drink items
+const getFoodDrinkImageUrl = (imagePath: string | null): string => {
+  // If no image is provided, use the default image path (served as a static asset)
+  if (!imagePath || imagePath === "") {
+    return IMAGE_URLS.DEFAULT_FNB_IMAGE;
+  }
+
+  // If it's already a full URL, return it
+  if (imagePath.startsWith("http")) {
+    return imagePath;
+  }
+
+  // If it's a path from storage
+  if (imagePath.includes("storage/images/fnb")) {
+    return `${STORAGE_URL}/${imagePath}`;
+  }
+
+  // For paths that only include filename
+  if (!imagePath.includes("/")) {
+    return `${IMAGE_URLS.FNB_IMAGES}/${imagePath}`;
+  }
+
+  // For other paths, assume it's a path relative to storage
+  return `${STORAGE_URL}/${imagePath}`;
+};
 
 // Food Item Component with Drag and Drop functionality
 const FoodDrinkItem = ({
@@ -60,11 +87,11 @@ const FoodDrinkItem = ({
   handleEdit,
   handleDelete,
 }: {
-  item: FoodDrinkItemType;
+  item: FoodDrinkItemTypeAPI; // Use the API type here
   index: number;
   moveItem: (dragIndex: number, hoverIndex: number) => void;
-  handleEdit: (item: FoodDrinkItemType) => void;
-  handleDelete: (item: FoodDrinkItemType) => void;
+  handleEdit: (item: FoodDrinkItemTypeAPI) => void; // Use API type here
+  handleDelete: (item: FoodDrinkItemTypeAPI) => void; // Use API type here
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
@@ -102,8 +129,9 @@ const FoodDrinkItem = ({
   drag(drop(ref));
 
   // Format price to IDR
-  const formatPrice = (price: number) => {
-    return `Rp${price.toLocaleString("id-ID")}`;
+  const formatPrice = (price: string | number) => {
+    const numPrice = typeof price === "string" ? parseFloat(price) : price;
+    return `Rp${numPrice.toLocaleString("id-ID")}`;
   };
 
   return (
@@ -121,10 +149,14 @@ const FoodDrinkItem = ({
       <TableCell>
         <div className="relative h-16 w-16 rounded-sm overflow-hidden">
           <Image
-            src={item.image || "/images/food/1.png"}
+            src={getFoodDrinkImageUrl(item.image)} // Use the utility function
             alt={item.name}
             fill
             className="object-cover"
+            onError={(e) => {
+              // Add error handling for images
+              (e.target as HTMLImageElement).src = IMAGE_URLS.DEFAULT_FNB_IMAGE;
+            }}
           />
         </div>
       </TableCell>
@@ -135,12 +167,13 @@ const FoodDrinkItem = ({
         <Badge
           className={cn(
             "px-2 py-1 rounded-full text-xs font-semibold",
-            item.status === "Available"
+            item.is_available // Use is_available from API type
               ? "bg-green-500 hover:bg-green-600 text-white"
               : "bg-red-500 hover:bg-red-600 text-white"
           )}
         >
-          {item.status}
+          {item.is_available ? "Available" : "Sold Out"}{" "}
+          {/* Map boolean to string */}
         </Badge>
       </TableCell>
       <TableCell>
@@ -168,28 +201,46 @@ const FoodDrinkItem = ({
 };
 
 // Image Dropzone Component
-const ImageDropzone = ({ onImageChange, className = "" }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(null);
+interface ImageDropzoneProps {
+  onImageChange: (imageData: string | null, file: File | null) => void;
+  initialImage?: string | null; // Add initialImage prop
+  className?: string;
+}
 
-  const handleDragEnter = useCallback((e) => {
+const ImageDropzone = ({
+  onImageChange,
+  initialImage = null, // Default to null
+  className = "",
+}: ImageDropzoneProps) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(
+    initialImage ? getFoodDrinkImageUrl(initialImage) : null // Process initialImage
+  ); // State for image preview
+
+  // Update previewImage when initialImage prop changes (e.g., when editing a different item)
+  useEffect(() => {
+    setPreviewImage(initialImage ? getFoodDrinkImageUrl(initialImage) : null); // Process initialImage
+  }, [initialImage]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
   }, []);
 
-  const handleDragLeave = useCallback((e) => {
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
   }, []);
 
-  const handleDragOver = useCallback((e) => {
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
   }, []);
 
-  const validateFile = (file) => {
+  const validateFile = (file: File) => {
     // Check file type
     const validTypes = [
       "image/jpeg",
@@ -223,6 +274,7 @@ const ImageDropzone = ({ onImageChange, className = "" }) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
+        setPreviewImage(result); // Update preview with new image
         onImageChange(result, file);
       };
       reader.readAsDataURL(file);
@@ -231,7 +283,7 @@ const ImageDropzone = ({ onImageChange, className = "" }) => {
   );
 
   const handleDrop = useCallback(
-    (e) => {
+    (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(false);
@@ -245,7 +297,7 @@ const ImageDropzone = ({ onImageChange, className = "" }) => {
   );
 
   const handleChange = useCallback(
-    (e) => {
+    (e: React.ChangeEvent<HTMLInputElement>) => {
       e.preventDefault();
 
       if (e.target.files && e.target.files[0]) {
@@ -255,11 +307,23 @@ const ImageDropzone = ({ onImageChange, className = "" }) => {
     [processFile]
   );
 
+  // Function to clear the selected image
+  const handleClearImage = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation(); // Prevent triggering the file input click
+    setPreviewImage(null);
+    onImageChange(null, null);
+    // Reset the file input value so the same file can be selected again
+    const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  };
+
   return (
     <div className={cn("w-full", className)}>
       <div
         className={cn(
-          "border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center cursor-pointer transition-colors",
+          "border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center cursor-pointer transition-colors relative", // Added relative for positioning clear button
           isDragging
             ? "border-amber-500 bg-amber-50"
             : "border-gray-300 hover:border-amber-400"
@@ -270,13 +334,35 @@ const ImageDropzone = ({ onImageChange, className = "" }) => {
         onDrop={handleDrop}
         onClick={() => document.getElementById("fileInput")?.click()}
       >
-        <Upload className="h-10 w-10 text-gray-400 mb-2" />
-        <p className="text-sm text-center font-medium">
-          Drag & drop image here, or click to select
-        </p>
-        <p className="text-xs text-gray-500 text-center mt-1">
-          Supports: JPG, PNG, GIF, WEBP (max 5MB)
-        </p>
+        {previewImage ? (
+          <>
+            <div className="relative h-32 w-32 rounded-md overflow-hidden">
+              <Image
+                src={previewImage}
+                alt="Preview"
+                fill
+                className="object-cover"
+              />
+            </div>
+            <button
+              type="button"
+              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+              onClick={handleClearImage}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <Upload className="h-10 w-10 text-gray-400 mb-2" />
+            <p className="text-sm text-center font-medium">
+              Drag & drop image here, or click to select
+            </p>
+            <p className="text-xs text-gray-500 text-center mt-1">
+              Supports: JPG, PNG, GIF, WEBP (max 5MB)
+            </p>
+          </>
+        )}
         <input
           id="fileInput"
           type="file"
@@ -297,26 +383,37 @@ interface FoodDrinkTableProps {
 }
 
 export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
-  const [items, setItems] = useState<FoodDrinkItemType[]>([]);
+  const [items, setItems] = useState<FoodDrinkItemTypeAPI[]>([]); // Use API type for items state
   const [currentTab, setCurrentTab] = useState<"all" | "food" | "drink">(
     initialTab
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const [currentItem, setCurrentItem] = useState<FoodDrinkItemType | null>(
+  const [currentItem, setCurrentItem] = useState<FoodDrinkItemTypeAPI | null>( // Use API type
     null
   );
-  const [newItem, setNewItem] = useState<Partial<FoodDrinkItemType>>({
+  // Define a type for the new item state, including the status string and image file
+  interface NewFoodDrinkItemState {
+    id?: number;
+    name: string;
+    category: "food" | "beverage" | "snack";
+    price: string;
+    image: string | null;
+    status: "Available" | "Sold Out"; // Keep status string for UI state
+    imageFile?: File;
+  }
+
+  const [newItem, setNewItem] = useState<Partial<NewFoodDrinkItemState>>({
     name: "",
-    price: 0,
-    image: "",
-    category: "Food",
-    status: "Available",
+    price: "", // Changed to string
+    image: null,
+    category: "food", // Changed to lowercase
+    status: "Available", // Keep status string for UI state
   });
 
   // Add loading state
@@ -328,71 +425,58 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   // Add totalPages state
   const [totalPages, setTotalPages] = useState(1);
 
-  // Fetch data from API when component mounts
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+  // Fetch data from API
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      try {
-        console.log("Fetching food and drink items...");
-        const response = await getFoodDrinkItems(
-          currentPage,
-          itemsPerPage,
-          searchTerm,
-          currentTab !== "all" ? currentTab : ""
-        );
+    try {
+      console.log("Fetching food and drink items...");
+      const response = await getFoodDrinkItems(
+        currentPage,
+        itemsPerPage,
+        searchTerm,
+        currentTab !== "all" ? currentTab : ""
+      );
 
-        console.log("API response:", response);
+      console.log("API response:", response);
 
-        // Handle different possible response formats
-        let itemsArray = [];
-        let total = 0;
-        let pages = 1;
+      let itemsArray: FoodDrinkItemTypeAPI[] = []; // Use API type
+      let total = 0;
+      let pages = 1;
 
-        if (response && Array.isArray(response.items)) {
-          // Standard expected format
-          itemsArray = response.items;
-          total = response.total || response.items.length;
-          pages = response.totalPages || Math.ceil(total / itemsPerPage);
-        } else if (response && Array.isArray(response.data)) {
-          // Alternative format with data property
-          itemsArray = response.data;
-          total = response.total || response.data.length;
-          pages = response.totalPages || Math.ceil(total / itemsPerPage);
-        } else if (Array.isArray(response)) {
-          // Direct array response
-          itemsArray = response;
-          total = response.length;
-          pages = Math.ceil(total / itemsPerPage);
-        } else {
-          throw new Error("Unexpected API response format");
-        }
-
-        setItems(itemsArray);
-        setTotalItems(total);
-        setTotalPages(pages || 1);
-
-        if (itemsArray.length === 0 && total > 0 && currentPage > 1) {
-          // If we're on a page with no items but there are items on earlier pages,
-          // go back to the first page
-          setCurrentPage(1);
-        }
-      } catch (err) {
-        console.error("Error fetching items:", err);
-        setError(
-          `Failed to load items: ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`
-        );
-        toast.error("Failed to load items. Please try again.");
-      } finally {
-        setLoading(false);
+      // Access data from response.data and meta from response.meta
+      if (response && Array.isArray(response.data) && response.meta) {
+        itemsArray = response.data;
+        total = response.meta.total || 0;
+        pages = response.meta.lastPage || 1; // Use lastPage for totalPages
+      } else {
+        throw new Error("Unexpected API response format or empty response.");
       }
-    };
 
+      setItems(itemsArray);
+      setTotalItems(total);
+      setTotalPages(pages || 1);
+
+      if (itemsArray.length === 0 && total > 0 && currentPage > 1) {
+        setCurrentPage(1);
+      }
+    } catch (err) {
+      console.error("Error fetching items:", err);
+      setError(
+        `Failed to load items: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+      toast.error("Failed to load items. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, itemsPerPage, searchTerm, currentTab]); // Dependencies for useCallback
+
+  useEffect(() => {
     fetchData();
-  }, [currentPage, itemsPerPage, searchTerm, currentTab]);
+  }, [fetchData]); // Dependency for useEffect
 
   // Filter data berdasarkan tab dan pencarian
   const filteredData = items.filter((item) => {
@@ -400,8 +484,8 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     const matchesTab =
       currentTab === "all" ||
       (currentTab === "food"
-        ? item.category === "Food"
-        : item.category === "Drink");
+        ? item.category === "food" // Use lowercase
+        : item.category === "beverage"); // Use lowercase
 
     // Filter by search term
     const matchesSearch =
@@ -417,8 +501,9 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   const paginatedData = filteredData.slice(firstIndex, lastIndex);
 
   // Format price ke Rupiah
-  const formatPrice = (price: number) => {
-    return `Rp${price.toLocaleString("id-ID")}`;
+  const formatPrice = (price: string | number) => {
+    const numPrice = typeof price === "string" ? parseFloat(price) : price;
+    return `Rp${numPrice.toLocaleString("id-ID")}`;
   };
 
   // Generate pagination buttons
@@ -474,9 +559,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         className="rounded-full"
         onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
         disabled={currentPage === totalPages}
-      >
-        &gt;
-      </Button>
+      ></Button>
     );
 
     return buttons;
@@ -488,19 +571,21 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     setIsAddDialogOpen(true);
   };
 
-  const handleEditItem = (item: FoodDrinkItemType) => {
+  const handleEditItem = (item: FoodDrinkItemTypeAPI) => {
+    // Use API type
     setCurrentItem(item);
     setNewItem({
       name: item.name,
       price: item.price,
       image: item.image,
       category: item.category,
-      status: item.status,
+      status: item.is_available ? "Available" : "Sold Out", // Map boolean to string for UI state
     });
     setIsEditDialogOpen(true);
   };
 
-  const handleDeleteItem = (item: FoodDrinkItemType) => {
+  const handleDeleteItem = (item: FoodDrinkItemTypeAPI) => {
+    // Use API type
     setCurrentItem(item);
     setIsDeleteDialogOpen(true);
   };
@@ -508,10 +593,11 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   const resetForm = () => {
     setNewItem({
       name: "",
-      price: 0,
+      price: "", // Changed to string
       image: "",
-      category: currentTab === "drink" ? "Drink" : "Food", // Set default based on current tab
-      status: "Available",
+      category: currentTab === "drink" ? "beverage" : "food", // Use lowercase
+      status: "Available", // Keep status string for UI state
+      imageFile: undefined, // Clear image file
     });
   };
 
@@ -520,7 +606,11 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     imageData: string | null,
     file: File | null = null
   ) => {
-    setNewItem({ ...newItem, image: imageData || "" });
+    setNewItem({
+      ...newItem,
+      image: imageData || "",
+      imageFile: file || undefined,
+    });
   };
 
   // Submit functions
@@ -537,13 +627,15 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
       const formData = new FormData();
       formData.append("name", newItem.name);
       formData.append("category", newItem.category);
-      formData.append("price", newItem.price.toString());
-      formData.append("status", newItem.status || "Available");
+      formData.append("price", newItem.price.toString()); // Keep as string for FormData, but ensure backend parses it as number
+      formData.append(
+        "is_available",
+        newItem.status === "Available" ? "1" : "0"
+      ); // Map status string to is_available boolean string
 
       // Handle image if exists
       if (newItem.imageFile) {
-        const preparedFile = prepareFileForUpload(newItem.imageFile);
-        formData.append("image", preparedFile);
+        formData.append("image", newItem.imageFile);
       }
 
       const response = await addFoodDrinkItem(formData);
@@ -561,8 +653,8 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
           currentTab !== "all" ? currentTab : ""
         );
 
-        if (updatedData && Array.isArray(updatedData.items)) {
-          setItems(updatedData.items);
+        if (updatedData && Array.isArray(updatedData.data)) {
+          setItems(updatedData.data);
         }
 
         resetForm();
@@ -593,22 +685,29 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     try {
       setLoading(true);
 
-      // Create FormData for API request
+      // Create FormData for API request with non-image fields
       const formData = new FormData();
       formData.append("name", newItem.name);
       formData.append("category", newItem.category);
       formData.append("price", newItem.price.toString());
-      formData.append("status", newItem.status || "Available");
+      formData.append(
+        "is_available",
+        newItem.status === "Available" ? "1" : "0"
+      );
+      formData.append("_method", "POST"); // Align with RoomTable.tsx for updates
 
-      // Handle image if exists
-      if (newItem.imageFile) {
-        const preparedFile = prepareFileForUpload(newItem.imageFile);
-        formData.append("image", preparedFile);
+      // Handle image removal: if image is set to null, append empty string
+      if (newItem.image === null) {
+        formData.append("image", "");
       }
+
+      // Pass imageFile separately to the API function if a new file is selected
+      const imageFileToUpload = newItem.imageFile || undefined;
 
       const response = await updateFoodDrinkItem(
         currentItem.id.toString(),
-        formData
+        formData,
+        imageFileToUpload
       );
 
       if (response) {
@@ -624,8 +723,8 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
           currentTab !== "all" ? currentTab : ""
         );
 
-        if (updatedData && Array.isArray(updatedData.items)) {
-          setItems(updatedData.items);
+        if (updatedData && Array.isArray(updatedData.data)) {
+          setItems(updatedData.data);
         }
 
         resetForm();
@@ -667,8 +766,8 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
           currentTab !== "all" ? currentTab : ""
         );
 
-        if (updatedData && Array.isArray(updatedData.items)) {
-          setItems(updatedData.items);
+        if (updatedData && Array.isArray(updatedData.data)) {
+          setItems(updatedData.data);
         }
 
         setCurrentItem(null);
@@ -759,14 +858,17 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                       variant="outline"
                       className="bg-green-50 text-green-700 hover:bg-green-50"
                     >
-                      {items.filter((item) => item.category === "Food").length}{" "}
+                      {items.filter((item) => item.category === "food").length}{" "}
                       Food
                     </Badge>
                     <Badge
                       variant="outline"
                       className="bg-blue-50 text-blue-700 hover:bg-blue-50"
                     >
-                      {items.filter((item) => item.category === "Drink").length}{" "}
+                      {
+                        items.filter((item) => item.category === "beverage")
+                          .length
+                      }{" "}
                       Drink
                     </Badge>
                   </div>
@@ -779,7 +881,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     variant="outline"
                     className="bg-green-50 text-green-700 hover:bg-green-50"
                   >
-                    {items.filter((item) => item.category === "Food").length}{" "}
+                    {items.filter((item) => item.category === "food").length}{" "}
                     items
                   </Badge>
                 </>
@@ -791,7 +893,10 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     variant="outline"
                     className="bg-blue-50 text-blue-700 hover:bg-blue-50"
                   >
-                    {items.filter((item) => item.category === "Drink").length}{" "}
+                    {
+                      items.filter((item) => item.category === "beverage")
+                        .length
+                    }{" "}
                     items
                   </Badge>
                 </>
@@ -838,7 +943,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchData()}
+                onClick={fetchData}
                 disabled={loading}
                 className="h-9"
               >
@@ -937,8 +1042,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 px-4 pb-4 bg-white border-t">
             <div className="text-sm text-muted-foreground">
               Showing {filteredData.length > 0 ? firstIndex + 1 : 0} to{" "}
-              {Math.min(lastIndex, filteredData.length)} of{" "}
-              {filteredData.length} entries
+              {Math.min(lastIndex, filteredData.length)} of {totalItems} entries
             </div>
 
             <div className="flex gap-1 self-center sm:self-auto">
@@ -969,6 +1073,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                 </Label>
                 <ImageDropzone
                   onImageChange={handleImageChange}
+                  initialImage={currentItem?.image} // Pass current item image
                   className="mb-1"
                 />
               </div>
@@ -995,10 +1100,10 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                 <Input
                   id="price"
                   placeholder="Price"
-                  type="number"
+                  type="number" // Keep type as number for input validation
                   value={newItem.price || ""}
-                  onChange={(e) =>
-                    setNewItem({ ...newItem, price: Number(e.target.value) })
+                  onChange={
+                    (e) => setNewItem({ ...newItem, price: e.target.value }) // Store as string
                   }
                   className="mt-1"
                 />
@@ -1010,11 +1115,11 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     Category <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={newItem.category || "Food"}
+                    value={newItem.category || "food"}
                     onValueChange={(value) =>
                       setNewItem({
                         ...newItem,
-                        category: value as "Food" | "Drink",
+                        category: value as "food" | "beverage" | "snack", // <--- UBAH: Tipe ke huruf kecil
                       })
                     }
                   >
@@ -1022,13 +1127,9 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {currentTab === "all" || currentTab === "food" ? (
-                        <SelectItem value="Food">Food</SelectItem>
-                      ) : null}
-
-                      {currentTab === "all" || currentTab === "drink" ? (
-                        <SelectItem value="Drink">Drink</SelectItem>
-                      ) : null}
+                      <SelectItem value="food">Food</SelectItem>
+                      <SelectItem value="beverage">Beverage</SelectItem>
+                      <SelectItem value="snack">Snack</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1089,6 +1190,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                 </Label>
                 <ImageDropzone
                   onImageChange={handleImageChange}
+                  initialImage={currentItem?.image} // Pass current item image
                   className="mb-1"
                 />
               </div>
@@ -1115,10 +1217,10 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                 <Input
                   id="edit-price"
                   placeholder="Price"
-                  type="number"
+                  type="number" // Keep type as number for input validation
                   value={newItem.price || ""}
-                  onChange={(e) =>
-                    setNewItem({ ...newItem, price: Number(e.target.value) })
+                  onChange={
+                    (e) => setNewItem({ ...newItem, price: e.target.value }) // Store as string
                   }
                   className="mt-1"
                 />
@@ -1133,11 +1235,11 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     Category <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={newItem.category || "Food"}
+                    value={newItem.category || "food"}
                     onValueChange={(value) =>
                       setNewItem({
                         ...newItem,
-                        category: value as "Food" | "Drink",
+                        category: value as "food" | "beverage" | "snack",
                       })
                     }
                   >
@@ -1145,8 +1247,9 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Food">Food</SelectItem>
-                      <SelectItem value="Drink">Drink</SelectItem>
+                      <SelectItem value="food">Food</SelectItem>
+                      <SelectItem value="beverage">Beverage</SelectItem>
+                      <SelectItem value="snack">Snack</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1209,7 +1312,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                 <div className="flex items-center gap-3 mt-4">
                   <div className="relative h-16 w-16 rounded-md overflow-hidden border">
                     <Image
-                      src={currentItem.image}
+                      src={getFoodDrinkImageUrl(currentItem.image as string)}
                       alt={currentItem.name}
                       fill
                       className="object-cover"
@@ -1218,7 +1321,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                   <div>
                     <h4 className="font-medium">{currentItem.name}</h4>
                     <p className="text-sm text-muted-foreground">
-                      {formatPrice(currentItem.price)}
+                      {formatPrice(currentItem.price as string)}
                     </p>
                   </div>
                 </div>

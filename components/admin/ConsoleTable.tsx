@@ -6,7 +6,6 @@ import {
   Search,
   Pencil,
   Trash2,
-  Upload,
   RefreshCw,
   Loader2,
   AlertCircle,
@@ -44,11 +43,34 @@ import {
   deleteConsole,
   addConsole,
   updateConsole,
+  IMAGE_URLS,
+  STORAGE_URL,
 } from "@/api";
 
 interface ConsoleState extends Partial<Console> {
   imageFile?: File;
 }
+
+// First, let's add a utility function to handle image URLs
+const getImageUrl = (imagePath: string | null): string | null => {
+  if (!imagePath || imagePath === "") return null;
+
+  // If it's already a full URL, return it
+  if (imagePath.startsWith("http")) return imagePath;
+
+  // If it's a path from storage
+  if (imagePath.includes("storage/images/console")) {
+    return `${STORAGE_URL}/${imagePath}`;
+  }
+
+  // For paths that only include filename
+  if (!imagePath.includes("/")) {
+    return `${IMAGE_URLS.CONSOLE_IMAGES}/${imagePath}`;
+  }
+
+  // For other paths
+  return `${STORAGE_URL}/${imagePath}`;
+};
 
 export function ConsoleTable() {
   // State for data and filtering
@@ -74,6 +96,9 @@ export function ConsoleTable() {
     price: "",
     serial_number: "",
   });
+
+  // Available console models
+  const consoleModels = ["PS4", "PS5"];
 
   // State for file upload
   const [isDragging, setIsDragging] = useState(false);
@@ -102,18 +127,19 @@ export function ConsoleTable() {
         const response = await getConsoles();
         console.log("API response:", response);
 
-        if (response && Array.isArray(response.consoles)) {
-          setConsoles(response.consoles);
+        if (response && Array.isArray(response.data)) {
+          setConsoles(response.data);
 
           // Handle metadata if available
-          if (response.total !== undefined) {
-            setTotalItems(response.total);
-            setTotalPages(
-              response.totalPages || Math.ceil(response.total / itemsPerPage)
-            );
+          if (response.meta) {
+            setTotalItems(response.meta.total || 0);
+            setTotalPages(response.meta.lastPage || 1);
+            // Use API pagination if available
+            setCurrentPage(response.meta.page);
+            setItemsPerPage(response.meta.perPage);
           } else {
-            setTotalItems(response.consoles.length);
-            setTotalPages(Math.ceil(response.consoles.length / itemsPerPage));
+            setTotalItems(response.data.length);
+            setTotalPages(Math.ceil(response.data.length / itemsPerPage));
           }
         } else {
           console.error("Invalid API response format:", response);
@@ -185,10 +211,16 @@ export function ConsoleTable() {
     return console.model.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  // Pagination
-  const lastIndex = currentPage * itemsPerPage;
-  const firstIndex = lastIndex - itemsPerPage;
-  const paginatedData = filteredData.slice(firstIndex, lastIndex);
+  // Pagination logic
+  let paginatedData = filteredData;
+
+  // Only do client-side pagination if we're not using server-side pagination
+  // If we have meta data from the API, we're using server-side pagination
+  if (!loading) {
+    const firstIndex = currentPage * itemsPerPage - itemsPerPage;
+    const lastIndex = firstIndex + itemsPerPage;
+    paginatedData = filteredData.slice(firstIndex, lastIndex);
+  }
 
   // Generate pagination buttons
   const generatePaginationButtons = () => {
@@ -267,7 +299,16 @@ export function ConsoleTable() {
       serial_number: consoleItem.serial_number,
       notes: consoleItem.notes || "",
     });
-    setPreviewUrl(consoleItem.image || "");
+
+    // Use getImageUrl for the preview
+    const imageUrl = consoleItem.image ? getImageUrl(consoleItem.image) : null;
+    window.console.log(
+      "Setting preview URL:",
+      imageUrl,
+      "from image:",
+      consoleItem.image
+    );
+    setPreviewUrl(imageUrl);
     setIsEditDialogOpen(true);
   };
 
@@ -303,8 +344,14 @@ export function ConsoleTable() {
 
       console.log("Sending console data to API:", payload);
 
+      // Show loading state
+      toast.loading("Adding console...");
+
       // Call the addConsole API function with both data and image
       const result = await addConsole(payload, newConsole.imageFile);
+
+      // Dismiss loading toast
+      toast.dismiss();
 
       if (!result) {
         toast.error("Failed to add console. Please try again.");
@@ -316,21 +363,25 @@ export function ConsoleTable() {
       resetForm();
       setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
+      // Dismiss loading toast
+      toast.dismiss();
+
       console.error("Error adding console:", err);
 
-      // Check for session expiration
-      if (
-        err instanceof Error &&
-        err.message.includes("login sudah berakhir")
-      ) {
+      if (err instanceof Error) {
+        // Show the specific error message from the API
         toast.error(err.message);
-        // Optionally redirect to login page
+
+        // If it's an auth error, you might want to redirect to login
+        if (
+          err.message.includes("session expired") ||
+          err.message.includes("Please log in")
+        ) {
+          // Redirect to login page if needed
+          // window.location.href = "/login";
+        }
       } else {
-        toast.error(
-          `Failed to add console: ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`
-        );
+        toast.error("An unexpected error occurred. Please try again.");
       }
     }
   };
@@ -357,6 +408,9 @@ export function ConsoleTable() {
 
       console.log("Updating console with ID:", currentConsole.id, payload);
 
+      // Show loading state
+      toast.loading("Updating console...");
+
       // Pass both data and image file (if any) in a single call
       const result = await updateConsole(
         currentConsole.id.toString(),
@@ -364,31 +418,47 @@ export function ConsoleTable() {
         newConsole.imageFile
       );
 
-      if (!result) {
-        toast.error("Failed to update console. Please try again.");
-        return;
-      }
+      // Dismiss loading toast
+      toast.dismiss();
 
-      toast.success("Console updated successfully");
-      setIsEditDialogOpen(false);
-      resetForm();
-      setRefreshTrigger((prev) => prev + 1);
+      // Check for success based on the response structure
+      // The API might return different response formats
+      if (result) {
+        // Check if result has typical API response properties
+        const apiResponse = result as any;
+        if (apiResponse.success === false) {
+          toast.error(apiResponse.message || "Failed to update console");
+          return;
+        }
+
+        toast.success("Console updated successfully");
+        setIsEditDialogOpen(false);
+        resetForm();
+        setRefreshTrigger((prev) => prev + 1);
+      } else {
+        // No result returned
+        toast.error("Failed to update console. Please try again.");
+      }
     } catch (err) {
+      // Dismiss loading toast
+      toast.dismiss();
+
       console.error("Error updating console:", err);
 
-      // Check for session expiration
-      if (
-        err instanceof Error &&
-        err.message.includes("login sudah berakhir")
-      ) {
+      if (err instanceof Error) {
+        // Show the specific error message from the API
         toast.error(err.message);
-        // Optionally redirect to login page
+
+        // If it's an auth error, you might want to redirect to login
+        if (
+          err.message.includes("session expired") ||
+          err.message.includes("Please log in")
+        ) {
+          // Redirect to login page if needed
+          // window.location.href = "/login";
+        }
       } else {
-        toast.error(
-          `Failed to update console: ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`
-        );
+        toast.error("An unexpected error occurred. Please try again.");
       }
     }
   };
@@ -534,21 +604,35 @@ export function ConsoleTable() {
               ) : (
                 paginatedData.map((console, index) => (
                   <TableRow key={console.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">
-                      {firstIndex + index + 1}
-                    </TableCell>
+                    <TableCell className="font-medium">{index + 1}</TableCell>
                     <TableCell>
                       <div className="h-12 w-12 relative overflow-hidden rounded-md bg-gray-100">
-                        {console.image ? (
+                        {console.image && console.image !== "" ? (
                           <Image
-                            src={console.image}
+                            src={
+                              getImageUrl(console.image) ||
+                              IMAGE_URLS.DEFAULT_CONSOLE_IMAGE
+                            }
                             alt={console.model}
                             fill
                             className="object-cover"
+                            onError={(e) => {
+                              window.console.log(
+                                "Image failed to load:",
+                                console.image
+                              );
+                              (e.target as HTMLImageElement).src =
+                                IMAGE_URLS.DEFAULT_CONSOLE_IMAGE;
+                            }}
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center text-gray-400 text-xs">
-                            No image
+                            <Image
+                              src={IMAGE_URLS.DEFAULT_CONSOLE_IMAGE}
+                              alt="No image"
+                              fill
+                              className="object-cover opacity-50"
+                            />
                           </div>
                         )}
                       </div>
@@ -597,9 +681,11 @@ export function ConsoleTable() {
             {loading
               ? "Loading..."
               : `Showing ${
-                  filteredData.length > 0 ? firstIndex + 1 : 0
+                  filteredData.length > 0
+                    ? (currentPage - 1) * itemsPerPage + 1
+                    : 0
                 } to ${Math.min(
-                  lastIndex,
+                  currentPage * itemsPerPage,
                   filteredData.length
                 )} of ${totalItems} entries`}
           </div>
@@ -635,15 +721,34 @@ export function ConsoleTable() {
                 {previewUrl ? (
                   <div className="relative h-32 w-32 mb-2">
                     <Image
-                      src={previewUrl}
+                      src={
+                        previewUrl.startsWith("data:")
+                          ? previewUrl
+                          : getImageUrl(previewUrl) ||
+                            IMAGE_URLS.DEFAULT_CONSOLE_IMAGE
+                      }
                       alt="Preview"
                       fill
                       className="object-contain"
+                      onError={(e) => {
+                        window.console.log(
+                          "Preview image failed to load:",
+                          previewUrl
+                        );
+                        (e.target as HTMLImageElement).src =
+                          IMAGE_URLS.DEFAULT_CONSOLE_IMAGE;
+                      }}
                     />
                   </div>
                 ) : (
-                  <div className="h-32 w-32 mb-2 flex items-center justify-center">
-                    <Upload className="h-8 w-8 text-amber-500" />
+                  <div className="h-32 w-32 mb-2 flex items-center justify-center bg-gray-50">
+                    <Image
+                      src={IMAGE_URLS.DEFAULT_CONSOLE_IMAGE}
+                      alt="Upload placeholder"
+                      width={32}
+                      height={32}
+                      className="opacity-50"
+                    />
                   </div>
                 )}
                 <p className="text-sm text-amber-500 font-medium">
@@ -663,14 +768,23 @@ export function ConsoleTable() {
               <Label htmlFor="model" className="block mb-2">
                 Model <span className="text-red-500">*</span>
               </Label>
-              <Input
-                id="model"
-                placeholder="Model"
+              <Select
                 value={newConsole.model || ""}
-                onChange={(e) =>
-                  setNewConsole({ ...newConsole, model: e.target.value })
+                onValueChange={(value) =>
+                  setNewConsole({ ...newConsole, model: value })
                 }
-              />
+              >
+                <SelectTrigger id="model" className="w-full">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {consoleModels.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="mb-4">
@@ -753,15 +867,34 @@ export function ConsoleTable() {
                 {previewUrl ? (
                   <div className="relative h-32 w-32 mb-2">
                     <Image
-                      src={previewUrl}
+                      src={
+                        previewUrl.startsWith("data:")
+                          ? previewUrl
+                          : getImageUrl(previewUrl) ||
+                            IMAGE_URLS.DEFAULT_CONSOLE_IMAGE
+                      }
                       alt="Preview"
                       fill
                       className="object-contain"
+                      onError={(e) => {
+                        window.console.log(
+                          "Preview image failed to load:",
+                          previewUrl
+                        );
+                        (e.target as HTMLImageElement).src =
+                          IMAGE_URLS.DEFAULT_CONSOLE_IMAGE;
+                      }}
                     />
                   </div>
                 ) : (
-                  <div className="h-32 w-32 mb-2 flex items-center justify-center">
-                    <Upload className="h-8 w-8 text-amber-500" />
+                  <div className="h-32 w-32 mb-2 flex items-center justify-center bg-gray-50">
+                    <Image
+                      src={IMAGE_URLS.DEFAULT_CONSOLE_IMAGE}
+                      alt="Upload placeholder"
+                      width={32}
+                      height={32}
+                      className="opacity-50"
+                    />
                   </div>
                 )}
                 <p className="text-sm text-amber-500 font-medium">
@@ -781,14 +914,23 @@ export function ConsoleTable() {
               <Label htmlFor="edit-model" className="block mb-2">
                 Model <span className="text-red-500">*</span>
               </Label>
-              <Input
-                id="edit-model"
-                placeholder="Model"
+              <Select
                 value={newConsole.model || ""}
-                onChange={(e) =>
-                  setNewConsole({ ...newConsole, model: e.target.value })
+                onValueChange={(value) =>
+                  setNewConsole({ ...newConsole, model: value })
                 }
-              />
+              >
+                <SelectTrigger id="edit-model" className="w-full">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {consoleModels.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="mb-4">

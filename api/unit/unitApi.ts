@@ -193,14 +193,24 @@ export const updateUnit = async (
     const formData = new FormData();
 
     // Add _method=PUT for Laravel method spoofing
-    formData.append("_method", "PUT");
+    formData.append("_method", "POST");
 
     // Add all unit data fields to the FormData
     Object.entries(unitData).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        // For arrays like game_ids and features, convert to JSON string
+        // For arrays like game_ids and features, ensure they are properly formatted
         if (Array.isArray(value)) {
-          formData.append(key, JSON.stringify(value));
+          // For features array, ensure it's properly formatted
+          if (key === "game_ids" || key === "features") {
+            value.forEach((item) => {
+              formData.append(`${key}[]`, String(item));
+            });
+          } else {
+            // Untuk array lain yang mungkin ada (jika backend Anda mengharapkan string JSON),
+            // biarkan tetap di-stringify. Namun, untuk kasus Anda, game_ids dan features
+            // kemungkinan besar adalah satu-satunya array yang perlu penanganan khusus ini.
+            formData.append(key, JSON.stringify(value));
+          }
         } else {
           formData.append(key, String(value));
         }

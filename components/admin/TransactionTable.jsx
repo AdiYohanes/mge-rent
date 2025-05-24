@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
     Search,
     ArrowUpDown,
     ChevronLeft,
-    ChevronRight,
-    Filter,
+    ChevronRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 import {

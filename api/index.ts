@@ -40,6 +40,7 @@ export {
   uploadConsoleImage,
   type Console,
   type ConsolePayload,
+  type GetConsolesResponse,
 } from "./console/consoleApi";
 
 // Room API
