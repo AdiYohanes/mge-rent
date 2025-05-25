@@ -218,7 +218,7 @@ export const togglePromoStatus = async (
 
     const data = {
       is_active: isActive,
-      _method: "PATCH",
+      _method: "POST",
     };
 
     // Use direct axios call

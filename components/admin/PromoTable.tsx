@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Plus, Loader2, RefreshCw, Trash2, Pencil } from "lucide-react";
+import { Search, Plus, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Table,
@@ -35,7 +35,6 @@ import {
   getPromos,
   addPromo,
   updatePromo,
-  togglePromoStatus,
   deletePromo,
   Promo,
   PromoPayload,
@@ -99,11 +98,20 @@ export function PromoTable() {
         promosArray = response.promos;
         total = response.total || response.promos.length;
         pages = response.totalPages || Math.ceil(total / itemsPerPage);
-      } else if (response && Array.isArray(response.data)) {
+      } else if (
+        response &&
+        typeof response === "object" &&
+        "data" in response &&
+        Array.isArray(response.data)
+      ) {
         // Alternative format with data property
-        promosArray = response.data;
-        total = response.total || response.data.length;
-        pages = response.totalPages || Math.ceil(total / itemsPerPage);
+        promosArray = response.data as Promo[];
+        total =
+          "total" in response ? (response.total as number) : promosArray.length;
+        pages =
+          "totalPages" in response
+            ? (response.totalPages as number)
+            : Math.ceil(total / itemsPerPage);
       } else if (Array.isArray(response)) {
         // Direct array response
         promosArray = response;
@@ -135,12 +143,6 @@ export function PromoTable() {
     }
   };
 
-  // Helper function to extract number from percentage string
-  const extractPercentage = (value: string): string => {
-    if (!value || value === "") return "";
-    return value.toString().replace(/%/g, "");
-  };
-
   // Filter promos based on search term (client-side filtering as backup)
   const filteredPromos = promos.filter(
     (promo) =>
@@ -163,10 +165,19 @@ export function PromoTable() {
         )
       );
 
-      // Call API to update status
-      const success = await togglePromoStatus(id.toString(), newStatus);
+      // Create a complete payload with all required fields
+      const promoPayload: PromoPayload = {
+        name: promoToToggle.name,
+        code: promoToToggle.code,
+        type: promoToToggle.type as "percentage" | "fixed",
+        discount_amount: promoToToggle.discount_amount,
+        is_active: newStatus,
+      };
 
-      if (!success) {
+      // Call API to update promo with all required fields
+      const updatedPromo = await updatePromo(id.toString(), promoPayload);
+
+      if (!updatedPromo) {
         // Revert UI if API call failed
         setPromos(
           promos.map((promo) =>
@@ -174,6 +185,10 @@ export function PromoTable() {
           )
         );
         toast.error("Failed to update promo status");
+      } else {
+        toast.success(
+          `Promo ${newStatus ? "activated" : "deactivated"} successfully`
+        );
       }
     } catch (err) {
       console.error("Error toggling promo status:", err);
@@ -275,7 +290,6 @@ export function PromoTable() {
   // Generate pagination buttons
   const renderPaginationButtons = () => {
     const buttons = [];
-    const maxButtons = 7; // Show at most 7 page buttons
 
     // Previous button
     buttons.push(
