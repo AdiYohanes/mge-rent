@@ -91,6 +91,18 @@ export const FAQ_ENDPOINTS = {
   DELETE_FAQ: (id: string) => `${API_BASE_URL}/admin/faqs/${id}`,
 };
 
+// Booking endpoints
+export const BOOKING_ENDPOINTS = {
+  GET_ALL: `${API_BASE_URL}/admin/bookings`,
+  GET_ONE: (id: string) => `${API_BASE_URL}/admin/bookings/${id}`,
+  CREATE_BOOKING: `${API_BASE_URL}/admin/bookings`,
+  UPDATE_BOOKING: (id: string) => `${API_BASE_URL}/admin/bookings/${id}`,
+  DELETE_BOOKING: (id: string) => `${API_BASE_URL}/admin/bookings/${id}`,
+  APPROVE_BOOKING: (id: string) =>
+    `${API_BASE_URL}/admin/bookings/${id}/approve`,
+  REJECT_BOOKING: (id: string) => `${API_BASE_URL}/admin/bookings/${id}/reject`,
+};
+
 // Public endpoints for customer-facing features
 export const PUBLIC_ENDPOINTS = {
   GET_FAQS: `${API_BASE_URL}/customer/faq`,

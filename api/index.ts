@@ -73,7 +73,7 @@ export {
   updateFoodDrinkItem,
   deleteFoodDrinkItem,
   type FoodDrinkItem,
-  type FoodDrinkResponseData,
+  type FoodDrinkResponseMeta,
   type FoodDrinkPayload,
 } from "./fnb/fnbApi";
 
@@ -124,6 +124,21 @@ export {
   type Unit,
   type UnitPayload,
 } from "./unit/unitApi";
+
+// Booking API
+export {
+  getBookings,
+  getBooking,
+  createBooking,
+  updateBooking,
+  deleteBooking,
+  approveBooking,
+  rejectBooking,
+  type Booking,
+  type ApiResponse as BookingApiResponse,
+  type CustomerData,
+  type BookingPayload,
+} from "./booking/bookingApi";
 
 // Import User for the extended interface
 import { User } from "./user/userApi";

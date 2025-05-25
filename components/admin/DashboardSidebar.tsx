@@ -14,7 +14,6 @@ import {
   Coffee,
   CreditCard,
   Settings,
-  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -41,6 +40,26 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { LucideIcon } from "lucide-react";
+
+// Define interface for submenu items
+interface SubMenuItem {
+  name: string;
+  href: string;
+  badge?: number;
+}
+
+// Define interface for menu items
+interface MenuItem {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+  href: string;
+  active: boolean;
+  expandable: boolean;
+  badge?: number;
+  subItems?: SubMenuItem[];
+}
 
 export function DashboardSidebar() {
   const { state } = useSidebar();
@@ -50,7 +69,7 @@ export function DashboardSidebar() {
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
   // Define menu items wrapped in useMemo
-  const menuItems = useMemo(
+  const menuItems = useMemo<MenuItem[]>(
     () => [
       {
         id: "dashboard",
@@ -132,7 +151,7 @@ export function DashboardSidebar() {
   );
 
   // Secondary menu items wrapped in useMemo
-  const secondaryMenuItems = useMemo(
+  const secondaryMenuItems = useMemo<MenuItem[]>(
     () => [
       {
         id: "settings",
@@ -147,6 +166,10 @@ export function DashboardSidebar() {
           {
             name: "Food&drink category",
             href: "/admin/dashboard/settings/food-category",
+          },
+          {
+            name: "Landing Page",
+            href: "/admin/dashboard/settings/landing-page",
           },
         ],
       },
