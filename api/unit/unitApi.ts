@@ -1,7 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL } from "../constants";
 import { getAuthHeader } from "../auth/authApi";
-import Cookies from "js-cookie";
 
 // Type definitions
 export interface Unit {
@@ -59,14 +58,22 @@ export const getUnits = async (
   search = ""
 ): Promise<ApiResponse<Unit[]>> => {
   try {
-    // Validate authentication
-    if (!Cookies.get("token")) {
+    // Validasi autentikasi menggunakan localStorage
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+      console.warn("Token tidak ditemukan, autentikasi diperlukan");
       throw new Error(
         "Anda harus login untuk melihat daftar unit. Silakan login terlebih dahulu."
       );
     }
 
-    console.log("Mengambil daftar unit");
+    // Debug token info
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("token");
+      if (token) {
+        const tokenPreview = token.substring(0, 10) + "...";
+        console.log("Menggunakan token untuk getUnits:", tokenPreview);
+      }
+    }
 
     // Build query parameters
     const queryParams = new URLSearchParams({
@@ -90,12 +97,6 @@ export const getUnits = async (
       }
     );
 
-    console.log(
-      "Berhasil mengambil daftar unit:",
-      response.data.data?.length || 0,
-      "unit"
-    );
-
     return {
       data: response.data.data || [],
       meta: response.data.meta,
@@ -103,13 +104,25 @@ export const getUnits = async (
   } catch (error) {
     console.error("Error mengambil daftar unit:", error);
 
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      Cookies.remove("token");
-      Cookies.remove("user");
-      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        // Hapus token dan user dari localStorage
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+        }
+        throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+      }
+
+      // Handle specific error responses
+      if (error.response?.data?.message) {
+        throw new Error(`Error: ${error.response.data.message}`);
+      }
     }
 
-    throw formatApiError(error, "Gagal mengambil daftar unit");
+    throw error instanceof Error
+      ? error
+      : new Error("Gagal mengambil daftar unit. Silakan coba lagi nanti.");
   }
 };
 
@@ -120,9 +133,8 @@ export const addUnit = async (
   unitData: UnitPayload
 ): Promise<ApiResponse<Unit>> => {
   try {
-    // Validate authentication
-    const token = Cookies.get("token");
-    if (!token) {
+    // Validasi autentikasi menggunakan localStorage
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
       throw new Error(
         "Anda harus login untuk menambahkan unit. Silakan login terlebih dahulu."
       );
@@ -152,8 +164,11 @@ export const addUnit = async (
 
       // Handle 401 Unauthorized error
       if (error.response?.status === 401) {
-        Cookies.remove("token");
-        Cookies.remove("user");
+        // Hapus token dan user dari localStorage, bukan cookies
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+        }
         throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
       }
 
@@ -178,8 +193,8 @@ export const updateUnit = async (
   unitData: Partial<UnitPayload>
 ): Promise<ApiResponse<Unit>> => {
   try {
-    // Validate authentication
-    if (!Cookies.get("token")) {
+    // Validasi autentikasi menggunakan localStorage
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
       throw new Error(
         "Anda harus login untuk mengubah unit. Silakan login terlebih dahulu."
       );
@@ -256,8 +271,11 @@ export const updateUnit = async (
       }
 
       if (error.response?.status === 401) {
-        Cookies.remove("token");
-        Cookies.remove("user");
+        // Hapus token dan user dari localStorage, bukan cookies
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+        }
         throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
       }
     }
@@ -273,8 +291,8 @@ export const deleteUnit = async (
   id: string | number
 ): Promise<ApiResponse<unknown>> => {
   try {
-    // Validate authentication
-    if (!Cookies.get("token")) {
+    // Validasi autentikasi menggunakan localStorage
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
       throw new Error(
         "Anda harus login untuk menghapus unit. Silakan login terlebih dahulu."
       );
@@ -299,8 +317,11 @@ export const deleteUnit = async (
     console.error("Error menghapus unit:", error);
 
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      Cookies.remove("token");
-      Cookies.remove("user");
+      // Hapus token dan user dari localStorage, bukan cookies
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
       throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
     }
 

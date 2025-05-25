@@ -49,6 +49,10 @@ export const getFoodDrinkItems = async (
     queryParams.append("page", page.toString());
     queryParams.append("limit", limit.toString());
 
+    console.log(
+      `API call with page=${page}, limit=${limit}, search=${search}, category=${category}`
+    );
+
     if (search) {
       queryParams.append("search", search);
     }
@@ -58,6 +62,8 @@ export const getFoodDrinkItems = async (
     }
 
     const url = `${FNB_ENDPOINTS.GET_ALL}?${queryParams.toString()}`;
+    console.log("API URL:", url);
+
     const response = await get<{
       data: FoodDrinkItem[];
       meta: FoodDrinkResponseMeta;

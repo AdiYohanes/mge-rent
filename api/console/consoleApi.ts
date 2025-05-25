@@ -1,7 +1,6 @@
 import { get } from "../apiUtils";
 import { CONSOLE_ENDPOINTS } from "../constants";
 import axios from "axios";
-import Cookies from "js-cookie";
 import { API_BASE_URL, STORAGE_URL } from "../constants";
 import { getAuthHeader } from "../auth/authApi";
 
@@ -95,7 +94,7 @@ export const uploadConsoleImage = async (
 export const getConsoles = async (): Promise<GetConsolesResponse> => {
   try {
     // Get token - don't throw error immediately if missing
-    const token = Cookies.get("token");
+    const token = localStorage.getItem("token");
 
     // Debug token info if available
     if (token) {
@@ -163,13 +162,13 @@ export const getConsoles = async (): Promise<GetConsolesResponse> => {
 
       // Handle expired session
       if (status === 401) {
-        // Check if we're actually logged in before removing cookies
-        if (Cookies.get("token")) {
+        // Check if we're actually logged in before removing localStorage
+        if (localStorage.getItem("token")) {
           console.log(
             "Token exists but API returned 401 - session likely expired"
           );
-          Cookies.remove("token");
-          Cookies.remove("user");
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
 
           // Redirect to login page automatically
           if (typeof window !== "undefined") {
@@ -255,8 +254,8 @@ export const getConsole = async (id: string): Promise<Console | null> => {
     console.error(`[getConsole] Error fetching console with id ${id}:`, error);
     // Penanganan otentikasi
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      Cookies.remove("token");
-      Cookies.remove("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       if (typeof window !== "undefined") {
         window.location.href = "/signin";
       }
@@ -273,7 +272,7 @@ export const addConsole = async (
 ): Promise<Console | null> => {
   try {
     // Validate authentication first
-    const token = Cookies.get("token");
+    const token = localStorage.getItem("token");
     if (!token) {
       throw new Error("Authentication token not found. Please log in again.");
     }
@@ -341,8 +340,8 @@ export const addConsole = async (
     // Handle specific error cases
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401) {
-        Cookies.remove("token");
-        Cookies.remove("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         throw new Error("Session expired. Please log in again.");
       } else if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
@@ -361,7 +360,7 @@ export const updateConsole = async (
 ): Promise<Console | null> => {
   try {
     // Validate authentication first
-    const token = Cookies.get("token");
+    const token = localStorage.getItem("token");
     if (!token) {
       throw new Error("Authentication token not found. Please log in again.");
     }
@@ -447,8 +446,8 @@ export const updateConsole = async (
     // Handle specific error cases
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401) {
-        Cookies.remove("token");
-        Cookies.remove("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         throw new Error("Session expired. Please log in again.");
       } else if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
@@ -504,8 +503,8 @@ export const deleteConsole = async (
 
     // Check for authentication error
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      Cookies.remove("token");
-      Cookies.remove("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
     }
 

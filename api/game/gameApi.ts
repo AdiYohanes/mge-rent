@@ -1,7 +1,6 @@
 import { prepareFileForUpload } from "../apiUtils";
 import axios from "axios";
 import { API_BASE_URL } from "../constants";
-import Cookies from "js-cookie";
 import { getAuthHeader } from "../auth/authApi";
 
 // Type definitions
@@ -47,25 +46,40 @@ const ACCEPTED_IMAGE_TYPES = [
 /**
  * Get all games with optional pagination
  */
-export const getGames = async () => {
+export const getGames = async (page = 1, perPage = 10, search = "") => {
   try {
     // Validasi autentikasi
-    if (!Cookies.get("token")) {
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
       throw new Error(
         "Anda harus login untuk melihat daftar game. Silakan login terlebih dahulu."
       );
     }
 
-    console.log("Mengambil daftar game");
+    console.log(
+      `Mengambil daftar game (halaman ${page}, ${perPage} per halaman, search: "${search}")`
+    );
+
+    // Build query parameters
+    const queryParams = new URLSearchParams({
+      page: String(page),
+      perPage: String(perPage),
+    });
+
+    if (search) {
+      queryParams.set("search", search);
+    }
 
     // Gunakan axios dengan header autentikasi dari helper function
-    const response = await axios.get(`${API_BASE_URL}/admin/games`, {
-      headers: {
-        Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        ...getAuthHeader(),
-      },
-    });
+    const response = await axios.get(
+      `${API_BASE_URL}/admin/games?${queryParams.toString()}`,
+      {
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          ...getAuthHeader(),
+        },
+      }
+    );
 
     console.log(
       "Berhasil mengambil daftar game:",
@@ -80,8 +94,8 @@ export const getGames = async () => {
     console.error("Error mengambil daftar game:", error);
 
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      Cookies.remove("token");
-      Cookies.remove("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
     }
 
@@ -97,7 +111,7 @@ export const addGame = async (
 ): Promise<ApiResponse<Game>> => {
   try {
     // Validasi autentikasi
-    const token = Cookies.get("token");
+    const token = localStorage.getItem("token");
     if (!token) {
       throw new Error(
         "Anda harus login untuk menambahkan game. Silakan login terlebih dahulu."
@@ -116,7 +130,10 @@ export const addGame = async (
     formData.append("genre", gameData.genre.trim());
     formData.append(
       "quantity_available",
-      (gameData.quantity_available || 1).toString()
+      (gameData.quantity_available !== undefined
+        ? gameData.quantity_available
+        : 1
+      ).toString()
     );
     if (gameData.description) {
       formData.append("description", gameData.description.trim());
@@ -127,7 +144,10 @@ export const addGame = async (
       title: gameData.title.trim(),
       platform: gameData.platform.trim(),
       genre: gameData.genre.trim(),
-      quantity_available: (gameData.quantity_available || 1).toString(),
+      quantity_available: (gameData.quantity_available !== undefined
+        ? gameData.quantity_available
+        : 1
+      ).toString(),
       description: gameData.description?.trim(),
     });
 
@@ -232,8 +252,8 @@ export const addGame = async (
       // Handle 401 Unauthorized error
       if (error.response?.status === 401) {
         // Hapus token karena sudah tidak valid
-        Cookies.remove("token");
-        Cookies.remove("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
       }
 
@@ -259,7 +279,7 @@ export const updateGame = async (
 ): Promise<ApiResponse<Game>> => {
   try {
     // Validasi autentikasi
-    if (!Cookies.get("token")) {
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
       throw new Error(
         "Anda harus login untuk mengubah game. Silakan login terlebih dahulu."
       );
@@ -279,7 +299,7 @@ export const updateGame = async (
     if (gameData.platform)
       formData.append("platform", gameData.platform.trim());
     if (gameData.genre) formData.append("genre", gameData.genre.trim());
-    if (gameData.quantity_available) {
+    if (gameData.quantity_available !== undefined) {
       formData.append(
         "quantity_available",
         gameData.quantity_available.toString()
@@ -407,8 +427,8 @@ export const updateGame = async (
       }
 
       if (error.response?.status === 401) {
-        Cookies.remove("token");
-        Cookies.remove("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
       }
     }
@@ -423,7 +443,7 @@ export const updateGame = async (
 export const deleteGame = async (id: string): Promise<ApiResponse<unknown>> => {
   try {
     // Validasi autentikasi
-    if (!Cookies.get("token")) {
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
       throw new Error(
         "Anda harus login untuk menghapus game. Silakan login terlebih dahulu."
       );
@@ -456,8 +476,8 @@ export const deleteGame = async (id: string): Promise<ApiResponse<unknown>> => {
     console.error("Error menghapus game:", error);
 
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      Cookies.remove("token");
-      Cookies.remove("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
     }
 

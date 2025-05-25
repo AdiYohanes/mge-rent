@@ -213,6 +213,9 @@ export const getAuthHeader = ():
   | Record<string, never> => {
   // Check if running on server
   if (typeof window === "undefined") {
+    console.warn(
+      "getAuthHeader dipanggil di server side, mengembalikan header kosong"
+    );
     return {};
   }
 
@@ -221,5 +224,11 @@ export const getAuthHeader = ():
     console.warn("Token tidak ditemukan, autentikasi tidak dapat dilakukan");
     return {};
   }
+
+  // Log partial token for debugging
+  const tokenPreview =
+    token.substring(0, 5) + "..." + token.substring(token.length - 5);
+  console.log(`Auth header created with token: ${tokenPreview}`);
+
   return { Authorization: `Bearer ${token}` };
 };

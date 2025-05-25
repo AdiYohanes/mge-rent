@@ -105,10 +105,15 @@ export function RoomTable() {
       setError(null);
 
       try {
-        console.log("Fetching rooms data...");
+        // Check if we have a token before making the API call
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setError("Silakan login terlebih dahulu untuk melihat daftar kamar.");
+          setLoading(false);
+          return;
+        }
 
         const response = await getRooms();
-        console.log("API response:", response);
 
         if (response && Array.isArray(response.data)) {
           setRooms(response.data);
@@ -122,7 +127,6 @@ export function RoomTable() {
             setTotalPages(Math.ceil(response.data.length / itemsPerPage));
           }
         } else {
-          console.error("Invalid API response format:", response);
           throw new Error("API returned an invalid data format");
         }
       } catch (err) {
@@ -133,15 +137,20 @@ export function RoomTable() {
           err instanceof Error &&
           err.message.includes("login sudah berakhir")
         ) {
-          toast.error(err.message);
-          // Optionally redirect to login page
+          setError("Sesi login Anda telah berakhir. Silakan login kembali.");
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+        } else if (
+          err instanceof Error &&
+          err.message.includes("login terlebih dahulu")
+        ) {
+          setError("Silakan login terlebih dahulu untuk melihat daftar kamar.");
         } else {
           setError(
-            `Failed to load rooms: ${
+            `Gagal memuat daftar kamar: ${
               err instanceof Error ? err.message : "Unknown error"
             }`
           );
-          toast.error("Failed to load rooms. Please try again.");
         }
       } finally {
         setLoading(false);

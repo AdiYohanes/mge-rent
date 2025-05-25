@@ -150,6 +150,21 @@ const GameItem = ({
   );
 };
 
+// Helper function to normalize features to ensure it's always an array
+const normalizeFeatures = (features: unknown): string[] => {
+  if (!features) return [];
+  if (Array.isArray(features)) return features;
+  if (typeof features === "string") {
+    try {
+      const parsed = JSON.parse(features);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [features]; // If not valid JSON, treat as a single feature
+    }
+  }
+  return [];
+};
+
 export function UnitTable() {
   const mounted = useMounted();
 
@@ -205,6 +220,14 @@ export function UnitTable() {
       setError(null);
 
       try {
+        // Check if we have a token before making the API call
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setError("Silakan login terlebih dahulu untuk melihat daftar unit.");
+          setLoading(false);
+          return;
+        }
+
         const response = await getUnits(currentPage, itemsPerPage, searchTerm);
 
         if (response && Array.isArray(response.data)) {
@@ -215,10 +238,28 @@ export function UnitTable() {
           throw new Error("Invalid API response format for units");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load units");
-        toast.error(
-          "Failed to load units. " + (err instanceof Error ? err.message : "")
-        );
+        console.error("Error fetching units:", err);
+
+        // Check for session expiration
+        if (
+          err instanceof Error &&
+          err.message.includes("login sudah berakhir")
+        ) {
+          setError("Sesi login Anda telah berakhir. Silakan login kembali.");
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+        } else if (
+          err instanceof Error &&
+          err.message.includes("login terlebih dahulu")
+        ) {
+          setError("Silakan login terlebih dahulu untuk melihat daftar unit.");
+        } else {
+          setError(
+            `Gagal memuat daftar unit: ${
+              err instanceof Error ? err.message : "Unknown error"
+            }`
+          );
+        }
       } finally {
         setLoading(false);
       }
@@ -233,29 +274,44 @@ export function UnitTable() {
 
     const fetchRelatedData = async () => {
       try {
+        // Check if we have a token before making the API calls
+        const token = localStorage.getItem("token");
+        if (!token) {
+          console.warn("Token not found. Related data fetching skipped.");
+          return;
+        }
+
         // Fetch rooms
-        const roomsResponse = await getRooms();
-        if (roomsResponse && Array.isArray(roomsResponse.data)) {
-          setRooms(roomsResponse.data);
+        try {
+          const roomsResponse = await getRooms();
+          if (roomsResponse && Array.isArray(roomsResponse.data)) {
+            setRooms(roomsResponse.data);
+          }
+        } catch (roomErr) {
+          console.error("Error fetching rooms:", roomErr);
         }
 
         // Fetch consoles
-        const consolesResponse = await getConsoles();
-        if (consolesResponse && Array.isArray(consolesResponse.data)) {
-          setConsoles(consolesResponse.data);
-          console.log("Loaded consoles:", consolesResponse.data);
-        } else {
-          console.error("Unexpected console data format:", consolesResponse);
+        try {
+          const consolesResponse = await getConsoles();
+          if (consolesResponse && Array.isArray(consolesResponse.data)) {
+            setConsoles(consolesResponse.data);
+          }
+        } catch (consoleErr) {
+          console.error("Error fetching consoles:", consoleErr);
         }
 
         // Fetch games
-        const gamesResponse = await getGames();
-        if (gamesResponse && Array.isArray(gamesResponse.games)) {
-          setAllGames(gamesResponse.games);
+        try {
+          const gamesResponse = await getGames();
+          if (gamesResponse && Array.isArray(gamesResponse.games)) {
+            setAllGames(gamesResponse.games);
+          }
+        } catch (gameErr) {
+          console.error("Error fetching games:", gameErr);
         }
       } catch (err) {
         console.error("Error fetching related data:", err);
-        toast.error("Failed to load some reference data");
       }
     };
 
@@ -282,7 +338,7 @@ export function UnitTable() {
   const calculateRentPrice = (
     roomId: number,
     consoleId: number,
-    features: string[]
+    features: unknown
   ): number => {
     // Get room price from API data
     const room = rooms.find((r) => String(r.id) === String(roomId));
@@ -298,8 +354,10 @@ export function UnitTable() {
 
     // Calculate feature price
     let featurePrice = 0;
-    if (features && features.length > 0) {
-      const feature = features[0]; // We now only support one feature at a time
+    const normalizedFeatures = normalizeFeatures(features);
+
+    if (normalizedFeatures.length > 0) {
+      const feature = normalizedFeatures[0]; // We now only support one feature at a time
 
       if (feature === "netflix") {
         featurePrice = 2000;
@@ -435,11 +493,7 @@ export function UnitTable() {
     const consoleName = getConsoleNameById(unit.console_id);
 
     // Pastikan features adalah array
-    const featuresArray = Array.isArray(unit.features)
-      ? unit.features
-      : unit.features
-      ? JSON.parse(String(unit.features))
-      : [];
+    const featuresArray = normalizeFeatures(unit.features);
 
     // Set unit data for form with existing status and prepopulated values
     setNewUnit({
@@ -993,8 +1047,8 @@ export function UnitTable() {
                         {getConsoleNameById(unit.console_id)}
                       </TableCell>
                       <TableCell>
-                        {unit.features && unit.features.length > 0
-                          ? unit.features.join(", ")
+                        {normalizeFeatures(unit.features).length > 0
+                          ? normalizeFeatures(unit.features).join(", ")
                           : "-"}
                       </TableCell>
                       <TableCell>
@@ -1004,7 +1058,7 @@ export function UnitTable() {
                               calculateRentPrice(
                                 unit.room_id,
                                 unit.console_id,
-                                unit.features || []
+                                normalizeFeatures(unit.features)
                               )
                             )}
                       </TableCell>
@@ -1213,8 +1267,9 @@ export function UnitTable() {
                   </Label>
                   <Select
                     value={
-                      newUnit.features && newUnit.features.length > 0
-                        ? newUnit.features[0]
+                      newUnit.features &&
+                      normalizeFeatures(newUnit.features).length > 0
+                        ? normalizeFeatures(newUnit.features)[0]
                         : "none"
                     }
                     onValueChange={(value) => {
@@ -1311,13 +1366,20 @@ export function UnitTable() {
 
                       <div>Features: </div>
                       <div className="text-right">
-                        {newUnit.features && newUnit.features.length > 0
+                        {newUnit.features &&
+                        normalizeFeatures(newUnit.features).length > 0
                           ? formatPrice(
-                              newUnit.features.includes("netflix")
+                              normalizeFeatures(newUnit.features).includes(
+                                "netflix"
+                              )
                                 ? 2000
-                                : newUnit.features.includes("disney+")
+                                : normalizeFeatures(newUnit.features).includes(
+                                    "disney+"
+                                  )
                                 ? 2500
-                                : newUnit.features.includes("nintendo_switch")
+                                : normalizeFeatures(newUnit.features).includes(
+                                    "nintendo_switch"
+                                  )
                                 ? 3000
                                 : 0
                             )
@@ -1582,8 +1644,9 @@ export function UnitTable() {
                   </Label>
                   <Select
                     value={
-                      newUnit.features && newUnit.features.length > 0
-                        ? newUnit.features[0]
+                      newUnit.features &&
+                      normalizeFeatures(newUnit.features).length > 0
+                        ? normalizeFeatures(newUnit.features)[0]
                         : "none"
                     }
                     onValueChange={(value) => {
@@ -1680,13 +1743,20 @@ export function UnitTable() {
 
                       <div>Features: </div>
                       <div className="text-right">
-                        {newUnit.features && newUnit.features.length > 0
+                        {newUnit.features &&
+                        normalizeFeatures(newUnit.features).length > 0
                           ? formatPrice(
-                              newUnit.features.includes("netflix")
+                              normalizeFeatures(newUnit.features).includes(
+                                "netflix"
+                              )
                                 ? 2000
-                                : newUnit.features.includes("disney+")
+                                : normalizeFeatures(newUnit.features).includes(
+                                    "disney+"
+                                  )
                                 ? 2500
-                                : newUnit.features.includes("nintendo_switch")
+                                : normalizeFeatures(newUnit.features).includes(
+                                    "nintendo_switch"
+                                  )
                                 ? 3000
                                 : 0
                             )

@@ -98,7 +98,7 @@ export function ConsoleTable() {
   });
 
   // Available console models
-  const consoleModels = ["PS4", "PS5"];
+  const consoleModels = ["PS4", "PS5", "Nintendo"];
 
   // State for file upload
   const [isDragging, setIsDragging] = useState(false);

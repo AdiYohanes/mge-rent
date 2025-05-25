@@ -51,6 +51,8 @@ import {
   FoodDrinkItem as FoodDrinkItemTypeAPI, // Renamed to avoid conflict
   STORAGE_URL, // Import STORAGE_URL
   IMAGE_URLS, // Import IMAGE_URLS
+  getFnbCategories, // Import the categories API function
+  FnbCategory, // Import FnbCategory type
 } from "@/api";
 
 // Utility function to handle image URLs for food and drink items
@@ -86,12 +88,14 @@ const FoodDrinkItem = ({
   moveItem,
   handleEdit,
   handleDelete,
+  getCategoryName, // Add this as a prop
 }: {
   item: FoodDrinkItemTypeAPI; // Use the API type here
   index: number;
   moveItem: (dragIndex: number, hoverIndex: number) => void;
   handleEdit: (item: FoodDrinkItemTypeAPI) => void; // Use API type here
   handleDelete: (item: FoodDrinkItemTypeAPI) => void; // Use API type here
+  getCategoryName: (category: string | object | undefined) => string; // Add this prop type
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
@@ -137,7 +141,7 @@ const FoodDrinkItem = ({
   return (
     <TableRow
       ref={ref}
-      key={item.id}
+      key={item.id ? item.id.toString() : index}
       style={{ opacity: isDragging ? 0.5 : 1 }}
       className="hover:bg-gray-50 cursor-move"
     >
@@ -150,7 +154,7 @@ const FoodDrinkItem = ({
         <div className="relative h-16 w-16 rounded-sm overflow-hidden">
           <Image
             src={getFoodDrinkImageUrl(item.image)} // Use the utility function
-            alt={item.name}
+            alt={item.name || "Food/Drink Item"}
             fill
             className="object-cover"
             onError={(e) => {
@@ -160,9 +164,11 @@ const FoodDrinkItem = ({
           />
         </div>
       </TableCell>
-      <TableCell className="font-medium">{item.name}</TableCell>
-      <TableCell>{item.category}</TableCell>
-      <TableCell>{formatPrice(item.price)}</TableCell>
+      <TableCell className="font-medium">
+        {item.name || "Unnamed Item"}
+      </TableCell>
+      <TableCell>{getCategoryName(item.category)}</TableCell>
+      <TableCell>{formatPrice(item.price || 0)}</TableCell>
       <TableCell>
         <Badge
           className={cn(
@@ -172,8 +178,7 @@ const FoodDrinkItem = ({
               : "bg-red-500 hover:bg-red-600 text-white"
           )}
         >
-          {item.is_available ? "Available" : "Sold Out"}{" "}
-          {/* Map boolean to string */}
+          {item.is_available ? "Available" : "Sold Out"}
         </Badge>
       </TableCell>
       <TableCell>
@@ -390,9 +395,13 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  // Add state for categories
+  const [categories, setCategories] = useState<FnbCategory[]>([]);
 
   const [currentItem, setCurrentItem] = useState<FoodDrinkItemTypeAPI | null>( // Use API type
     null
@@ -401,7 +410,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   interface NewFoodDrinkItemState {
     id?: number;
     name: string;
-    category: "food" | "beverage" | "snack";
+    category: string; // Change from enum to string to support dynamic categories
     price: string;
     image: string | null;
     status: "Available" | "Sold Out"; // Keep status string for UI state
@@ -420,10 +429,126 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   const [loading, setLoading] = useState(false);
   // Add error state
   const [error, setError] = useState<string | null>(null);
-  // Add totalItems state
-  const [totalItems, setTotalItems] = useState(0);
-  // Add totalPages state
-  const [totalPages, setTotalPages] = useState(1);
+
+  // Add function to load categories
+  const loadCategories = useCallback(async () => {
+    try {
+      const response = await getFnbCategories();
+      if (response && Array.isArray(response.data)) {
+        setCategories(response.data);
+        console.log("Categories loaded:", response.data);
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      toast.error("Failed to load categories. Using default values.");
+    }
+  }, []);
+
+  // Load categories when component mounts
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  // Helper function to get category object by ID or type
+  const getCategoryByValue = useCallback(
+    (value: string): FnbCategory | undefined => {
+      // First try to find by ID
+      if (/^\d+$/.test(value)) {
+        return categories.find(
+          (cat: FnbCategory) => cat.id.toString() === value
+        );
+      }
+
+      // Then try to find by type
+      return categories.find(
+        (cat: FnbCategory) =>
+          cat.type.toLowerCase() === value.toLowerCase() ||
+          cat.category.toLowerCase() === value.toLowerCase()
+      );
+    },
+    [categories]
+  );
+
+  // Helper function to determine the correct category value
+  const determineCategoryValue = useCallback(
+    (categoryData: string | object | unknown): string => {
+      // If it's a string, use directly
+      if (typeof categoryData === "string") {
+        return categoryData;
+      }
+
+      // If it's an object, try to extract appropriate values
+      if (typeof categoryData === "object" && categoryData) {
+        // If it has an id property
+        if (categoryData && "id" in categoryData) {
+          return String((categoryData as { id: string | number }).id);
+        }
+
+        // If it has a type property
+        if (categoryData && "type" in categoryData) {
+          return String((categoryData as { type: string }).type);
+        }
+
+        // If it has a name or category property
+        if (categoryData && "name" in categoryData) {
+          return String((categoryData as { name: string }).name);
+        }
+        if (categoryData && "category" in categoryData) {
+          return String((categoryData as { category: string }).category);
+        }
+      }
+
+      // Default to "food" if we can't determine
+      return "food";
+    },
+    []
+  );
+
+  // Helper function for refreshing data with current pagination settings
+  const refreshData = async () => {
+    try {
+      console.log(
+        `Refreshing data with: page=${currentPage}, itemsPerPage=${itemsPerPage}, search="${searchTerm}", tab=${currentTab}`
+      );
+
+      const response = await getFoodDrinkItems(
+        currentPage,
+        itemsPerPage,
+        searchTerm,
+        currentTab !== "all" ? currentTab : ""
+      );
+
+      if (response && Array.isArray(response.data) && response.meta) {
+        setItems(response.data);
+        setTotalItems(response.meta.total || 0);
+        setTotalPages(response.meta.lastPage || 1);
+
+        console.log(
+          `Refresh successful: ${response.data.length} items loaded, total=${response.meta.total}, pages=${response.meta.lastPage}`
+        );
+
+        // Check if we're on an empty page that's not the first page
+        if (
+          response.data.length === 0 &&
+          currentPage > 1 &&
+          response.meta.total > 0
+        ) {
+          console.log(
+            `Current page ${currentPage} is empty but there are items. Resetting to page 1.`
+          );
+          setCurrentPage(1);
+        }
+      } else {
+        console.warn(
+          "Unexpected API response format during refresh:",
+          response
+        );
+      }
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast.error("Failed to refresh data. Please try again.");
+    }
+  };
 
   // Fetch data from API
   const fetchData = useCallback(async () => {
@@ -431,7 +556,10 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     setError(null);
 
     try {
-      console.log("Fetching food and drink items...");
+      console.log(
+        `Fetching food and drink items for page ${currentPage}, items per page: ${itemsPerPage}`
+      );
+
       const response = await getFoodDrinkItems(
         currentPage,
         itemsPerPage,
@@ -441,25 +569,30 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
 
       console.log("API response:", response);
 
-      let itemsArray: FoodDrinkItemTypeAPI[] = []; // Use API type
+      let itemsArray: FoodDrinkItemTypeAPI[] = [];
       let total = 0;
       let pages = 1;
 
-      // Access data from response.data and meta from response.meta
+      // Process API response
       if (response && Array.isArray(response.data) && response.meta) {
         itemsArray = response.data;
         total = response.meta.total || 0;
-        pages = response.meta.lastPage || 1; // Use lastPage for totalPages
+        pages = response.meta.lastPage || 1;
+
+        console.log(
+          `Received ${itemsArray.length} items, total: ${total}, pages: ${pages}`
+        );
+
+        setItems(itemsArray);
+        setTotalItems(total);
+        setTotalPages(pages);
+
+        // If we're on a page that no longer exists (e.g., after deleting the last item on the page)
+        if (itemsArray.length === 0 && total > 0 && currentPage > 1) {
+          setCurrentPage(1);
+        }
       } else {
-        throw new Error("Unexpected API response format or empty response.");
-      }
-
-      setItems(itemsArray);
-      setTotalItems(total);
-      setTotalPages(pages || 1);
-
-      if (itemsArray.length === 0 && total > 0 && currentPage > 1) {
-        setCurrentPage(1);
+        throw new Error("Unexpected API response format");
       }
     } catch (err) {
       console.error("Error fetching items:", err);
@@ -472,97 +605,27 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, searchTerm, currentTab]); // Dependencies for useCallback
+  }, [currentPage, itemsPerPage, searchTerm, currentTab]);
 
+  // Load data when dependencies change
   useEffect(() => {
     fetchData();
-  }, [fetchData]); // Dependency for useEffect
+  }, [fetchData]);
 
-  // Filter data berdasarkan tab dan pencarian
-  const filteredData = items.filter((item) => {
-    // Filter by tab
-    const matchesTab =
-      currentTab === "all" ||
-      (currentTab === "food"
-        ? item.category === "food" // Use lowercase
-        : item.category === "beverage"); // Use lowercase
+  // Add a separate effect for itemsPerPage changes
+  useEffect(() => {
+    console.log(`Items per page changed to: ${itemsPerPage}`);
+    // No need to call fetchData directly as it's already in the dependency array of fetchData useCallback
+  }, [itemsPerPage]);
 
-    // Filter by search term
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase());
-
-    return matchesTab && matchesSearch;
-  });
-
-  // Pagination
-  const lastIndex = currentPage * itemsPerPage;
-  const firstIndex = lastIndex - itemsPerPage;
-  const paginatedData = filteredData.slice(firstIndex, lastIndex);
+  // All data is now displayed directly
+  const filteredData = items;
+  const paginatedData = filteredData;
 
   // Format price ke Rupiah
   const formatPrice = (price: string | number) => {
     const numPrice = typeof price === "string" ? parseFloat(price) : price;
     return `Rp${numPrice.toLocaleString("id-ID")}`;
-  };
-
-  // Generate pagination buttons
-  const generatePaginationButtons = () => {
-    const buttons = [];
-    const maxButtons = 7; // Show 7 pagination buttons as in design
-    let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
-    const endPage = Math.min(totalPages, startPage + maxButtons - 1);
-
-    if (endPage - startPage + 1 < maxButtons) {
-      startPage = Math.max(1, endPage - maxButtons + 1);
-    }
-
-    // Previous button
-    buttons.push(
-      <Button
-        key="prev"
-        variant="outline"
-        size="icon"
-        className="rounded-full"
-        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-        disabled={currentPage === 1}
-      >
-        &lt;
-      </Button>
-    );
-
-    // Page buttons
-    for (let i = startPage; i <= endPage; i++) {
-      buttons.push(
-        <Button
-          key={i}
-          variant={i === currentPage ? "default" : "outline"}
-          size="icon"
-          className={
-            i === currentPage
-              ? "rounded-full bg-amber-500 hover:bg-amber-600"
-              : "rounded-full"
-          }
-          onClick={() => setCurrentPage(i)}
-        >
-          {i}
-        </Button>
-      );
-    }
-
-    // Next button
-    buttons.push(
-      <Button
-        key="next"
-        variant="outline"
-        size="icon"
-        className="rounded-full"
-        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-        disabled={currentPage === totalPages}
-      ></Button>
-    );
-
-    return buttons;
   };
 
   // Handler for CRUD operations
@@ -572,15 +635,20 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   };
 
   const handleEditItem = (item: FoodDrinkItemTypeAPI) => {
-    // Use API type
+    console.log("Editing item:", item);
     setCurrentItem(item);
+
+    const categoryValue = determineCategoryValue(item.category);
+    console.log("Determined category value:", categoryValue);
+
     setNewItem({
       name: item.name,
       price: item.price,
       image: item.image,
-      category: item.category,
+      category: categoryValue,
       status: item.is_available ? "Available" : "Sold Out", // Map boolean to string for UI state
     });
+
     setIsEditDialogOpen(true);
   };
 
@@ -613,6 +681,64 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     });
   };
 
+  // Helper function to map category to category ID
+  const getCategoryId = useCallback(
+    (category: string | object | unknown): string => {
+      // Use getCategoryByValue to get the category object if needed
+      if (typeof category === "string") {
+        // If it's already a numeric ID, return as is
+        if (/^\d+$/.test(category)) {
+          return category;
+        }
+
+        // Try to find the category by type or name
+        const foundCategory = getCategoryByValue(category);
+        if (foundCategory) {
+          return foundCategory.id.toString();
+        }
+      }
+
+      // If it's an object, extract id if available
+      if (typeof category === "object" && category) {
+        // If it has an id property, use that directly
+        if ("id" in category) {
+          return String((category as { id: string | number }).id);
+        }
+
+        // If it has category and type properties, try to find matching category
+        if ("category" in category && "type" in category) {
+          const catName = String((category as { category: string }).category);
+          const catType = String((category as { type: string }).type);
+
+          const foundCategory = categories.find(
+            (c: FnbCategory) =>
+              c.category.toLowerCase() === catName.toLowerCase() &&
+              c.type.toLowerCase() === catType.toLowerCase()
+          );
+
+          if (foundCategory) {
+            return foundCategory.id.toString();
+          }
+        }
+      }
+
+      // If we still couldn't determine, return a default ID if categories exist
+      if (categories.length > 0) {
+        // Try to find a food category as default
+        const foodCategory = categories.find(
+          (c: FnbCategory) => c.type === "food"
+        );
+        if (foodCategory) return foodCategory.id.toString();
+
+        // Otherwise return the first category
+        return categories[0].id.toString();
+      }
+
+      return "1"; // Default to "1" as fallback
+    },
+    [categories, getCategoryByValue]
+  );
+
   // Submit functions
   const submitAddItem = async () => {
     if (!newItem.name || !newItem.price || !newItem.category) {
@@ -626,12 +752,27 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
       // Create FormData for API request
       const formData = new FormData();
       formData.append("name", newItem.name);
-      formData.append("category", newItem.category);
-      formData.append("price", newItem.price.toString()); // Keep as string for FormData, but ensure backend parses it as number
+
+      // Add both category and fnb_category_id
+      const categoryId = getCategoryId(newItem.category);
+      formData.append("fnb_category_id", categoryId);
+
+      // Try to find the category object
+      const categoryObj = categories.find(
+        (c: FnbCategory) => c.id.toString() === categoryId
+      );
+      if (categoryObj) {
+        formData.append("category", categoryObj.type); // Use the type (food, beverage, snack)
+      } else {
+        // Fallback to the original value
+        formData.append("category", newItem.category);
+      }
+
+      formData.append("price", newItem.price.toString());
       formData.append(
         "is_available",
         newItem.status === "Available" ? "1" : "0"
-      ); // Map status string to is_available boolean string
+      );
 
       // Handle image if exists
       if (newItem.imageFile) {
@@ -646,16 +787,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         });
 
         // Refresh data
-        const updatedData = await getFoodDrinkItems(
-          currentPage,
-          itemsPerPage,
-          searchTerm,
-          currentTab !== "all" ? currentTab : ""
-        );
-
-        if (updatedData && Array.isArray(updatedData.data)) {
-          setItems(updatedData.data);
-        }
+        await refreshData();
 
         resetForm();
         setIsAddDialogOpen(false);
@@ -684,11 +816,27 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
 
     try {
       setLoading(true);
+      console.log("Submitting edit with category:", newItem.category);
 
       // Create FormData for API request with non-image fields
       const formData = new FormData();
       formData.append("name", newItem.name);
-      formData.append("category", newItem.category);
+
+      // Add both category and fnb_category_id
+      const categoryId = getCategoryId(newItem.category);
+      formData.append("fnb_category_id", categoryId);
+
+      // Try to find the category object
+      const categoryObj = categories.find(
+        (c: FnbCategory) => c.id.toString() === categoryId
+      );
+      if (categoryObj) {
+        formData.append("category", categoryObj.type); // Use the type (food, beverage, snack)
+      } else {
+        // Fallback to the original value
+        formData.append("category", newItem.category);
+      }
+
       formData.append("price", newItem.price.toString());
       formData.append(
         "is_available",
@@ -716,16 +864,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         });
 
         // Refresh data
-        const updatedData = await getFoodDrinkItems(
-          currentPage,
-          itemsPerPage,
-          searchTerm,
-          currentTab !== "all" ? currentTab : ""
-        );
-
-        if (updatedData && Array.isArray(updatedData.data)) {
-          setItems(updatedData.data);
-        }
+        await refreshData();
 
         resetForm();
         setCurrentItem(null);
@@ -759,16 +898,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         });
 
         // Refresh data
-        const updatedData = await getFoodDrinkItems(
-          currentPage,
-          itemsPerPage,
-          searchTerm,
-          currentTab !== "all" ? currentTab : ""
-        );
-
-        if (updatedData && Array.isArray(updatedData.data)) {
-          setItems(updatedData.data);
-        }
+        await refreshData();
 
         setCurrentItem(null);
         setIsDeleteDialogOpen(false);
@@ -806,6 +936,113 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     setItems(newItems);
   };
 
+  // Generate pagination buttons
+  const generatePaginationButtons = () => {
+    const buttons = [];
+    const maxButtons = 5; // Show 5 pagination buttons in design
+    let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+    const endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    if (endPage - startPage + 1 < maxButtons) {
+      startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+
+    // Previous button
+    buttons.push(
+      <Button
+        key="prev"
+        variant="outline"
+        size="icon"
+        className="rounded-full"
+        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+        disabled={currentPage === 1 || loading}
+      >
+        &lt;
+      </Button>
+    );
+
+    // Page buttons
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
+          size="icon"
+          className={
+            i === currentPage
+              ? "rounded-full bg-amber-500 hover:bg-amber-600"
+              : "rounded-full"
+          }
+          onClick={() => setCurrentPage(i)}
+          disabled={loading}
+        >
+          {i}
+        </Button>
+      );
+    }
+
+    // Next button
+    buttons.push(
+      <Button
+        key="next"
+        variant="outline"
+        size="icon"
+        className="rounded-full"
+        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+        disabled={currentPage === totalPages || loading}
+      >
+        &gt;
+      </Button>
+    );
+
+    return buttons;
+  };
+
+  // Improved function for better category name display
+  const getCategoryName = useCallback(
+    (category: string | object | undefined) => {
+      if (!category) return "Unknown";
+
+      // If it's a string and looks like an ID, try to find the category
+      if (typeof category === "string" && /^\d+$/.test(category)) {
+        const foundCategory = categories.find(
+          (c: FnbCategory) => c.id.toString() === category
+        );
+        if (foundCategory) {
+          return foundCategory.category;
+        }
+      }
+
+      // Handle the case when category is an object
+      if (typeof category === "object") {
+        // Try to extract name property if it exists
+        if (category && "name" in category) {
+          return category.name as string;
+        }
+
+        // Try to extract category property if it exists
+        if (category && "category" in category) {
+          return (category as { category: string }).category;
+        }
+
+        // Try to extract id property if it exists
+        if (category && "id" in category) {
+          const id = String(category.id);
+          const foundCategory = categories.find(
+            (c: FnbCategory) => c.id.toString() === id
+          );
+          if (foundCategory) {
+            return foundCategory.category;
+          }
+        }
+      }
+
+      // If we get here, just return the string representation
+      return String(category);
+    },
+    [categories]
+  );
+
   return (
     <DndProvider backend={HTML5Backend}>
       <Card className="border-none shadow-none">
@@ -816,7 +1053,6 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
               value={currentTab}
               onValueChange={(value) => {
                 setCurrentTab(value as "all" | "food" | "drink");
-                setCurrentPage(1); // Reset ke halaman pertama saat ganti tab
               }}
               className="w-full sm:w-auto"
             >
@@ -913,22 +1149,31 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
-                    setCurrentPage(1); // Reset ke halaman pertama saat pencarian
+                    setCurrentPage(1); // Reset to first page when searching
                   }}
                   disabled={loading}
                 />
               </div>
               <div className="flex items-center space-x-2">
-                <Label>Show</Label>
+                <Label htmlFor="entries-select" className="text-sm font-medium">
+                  Show
+                </Label>
                 <Select
                   value={String(itemsPerPage)}
                   onValueChange={(value) => {
-                    setItemsPerPage(Number(value));
-                    setCurrentPage(1);
+                    const newValue = Number(value);
+                    console.log(
+                      `Changing entries per page from ${itemsPerPage} to ${newValue}`
+                    );
+                    setItemsPerPage(newValue);
+                    setCurrentPage(1); // Reset to first page when changing items per page
                   }}
                   disabled={loading}
                 >
-                  <SelectTrigger className="w-[80px]">
+                  <SelectTrigger
+                    id="entries-select"
+                    className="w-[80px] border-amber-300 focus:ring-amber-500"
+                  >
                     <SelectValue placeholder={itemsPerPage} />
                   </SelectTrigger>
                   <SelectContent>
@@ -938,7 +1183,9 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     <SelectItem value="50">50</SelectItem>
                   </SelectContent>
                 </Select>
-                <Label>entries</Label>
+                <Label htmlFor="entries-select" className="text-sm font-medium">
+                  entries
+                </Label>
               </div>
               <Button
                 variant="outline"
@@ -1031,6 +1278,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                       moveItem={moveItem}
                       handleEdit={handleEditItem}
                       handleDelete={handleDeleteItem}
+                      getCategoryName={getCategoryName}
                     />
                   ))
                 )}
@@ -1038,16 +1286,33 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
             </Table>
           </div>
 
-          {/* Pagination */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 px-4 pb-4 bg-white border-t">
+          {/* Pagination Footer */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 px-4 py-3 bg-[#f9f9f7] border-t border-gray-200 rounded-b-md">
             <div className="text-sm text-muted-foreground">
-              Showing {filteredData.length > 0 ? firstIndex + 1 : 0} to{" "}
-              {Math.min(lastIndex, filteredData.length)} of {totalItems} entries
+              {totalItems > 0 ? (
+                <span>
+                  Showing{" "}
+                  <span className="font-medium">
+                    {items.length > 0
+                      ? (currentPage - 1) * itemsPerPage + 1
+                      : 0}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-medium">
+                    {Math.min(currentPage * itemsPerPage, totalItems)}
+                  </span>{" "}
+                  of <span className="font-medium">{totalItems}</span> entries
+                </span>
+              ) : (
+                <span>No entries to display</span>
+              )}
             </div>
 
-            <div className="flex gap-1 self-center sm:self-auto">
-              {generatePaginationButtons()}
-            </div>
+            {totalPages > 1 && (
+              <div className="flex gap-1 self-center sm:self-auto">
+                {generatePaginationButtons()}
+              </div>
+            )}
           </div>
         </CardContent>
 
@@ -1115,11 +1380,11 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     Category <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={newItem.category || "food"}
+                    value={newItem.category || ""}
                     onValueChange={(value) =>
                       setNewItem({
                         ...newItem,
-                        category: value as "food" | "beverage" | "snack", // <--- UBAH: Tipe ke huruf kecil
+                        category: value,
                       })
                     }
                   >
@@ -1127,9 +1392,22 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="food">Food</SelectItem>
-                      <SelectItem value="beverage">Beverage</SelectItem>
-                      <SelectItem value="snack">Snack</SelectItem>
+                      {categories.length > 0 ? (
+                        categories.map((category) => (
+                          <SelectItem
+                            key={category.id}
+                            value={category.id.toString()}
+                          >
+                            {category.category} ({category.type})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="food">Food</SelectItem>
+                          <SelectItem value="beverage">Beverage</SelectItem>
+                          <SelectItem value="snack">Snack</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1235,21 +1513,35 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     Category <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={newItem.category || "food"}
-                    onValueChange={(value) =>
+                    value={newItem.category || ""}
+                    onValueChange={(value) => {
+                      console.log("Category changed to:", value);
                       setNewItem({
                         ...newItem,
-                        category: value as "food" | "beverage" | "snack",
-                      })
-                    }
+                        category: value,
+                      });
+                    }}
                   >
                     <SelectTrigger id="edit-category" className="mt-1">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="food">Food</SelectItem>
-                      <SelectItem value="beverage">Beverage</SelectItem>
-                      <SelectItem value="snack">Snack</SelectItem>
+                      {categories.length > 0 ? (
+                        categories.map((category) => (
+                          <SelectItem
+                            key={category.id}
+                            value={category.id.toString()}
+                          >
+                            {category.category} ({category.type})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="food">Food</SelectItem>
+                          <SelectItem value="beverage">Beverage</SelectItem>
+                          <SelectItem value="snack">Snack</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

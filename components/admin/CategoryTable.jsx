@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from 'react';
-import { Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Plus, Pencil, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
     Table,
@@ -24,30 +24,100 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-// Sample categories data
-const initialCategories = [
-    {
-        id: 1,
-        name: "Snack",
-        type: "Food"
-    },
-    {
-        id: 2,
-        name: "Coffee",
-        type: "Drink"
-    },
-    {
-        id: 3,
-        name: "Ricebowl",
-        type: "Food"
+// API functions for category CRUD operations
+const fetchCategories = async (page = 1, perPage = 10, search = "") => {
+    try {
+        // Simple GET request without query parameters as per backend requirements
+        const response = await fetch(`/api/admin/fnb-category`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch categories: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching categories:", error);
+        throw error;
     }
-];
+};
+
+const createCategory = async (categoryData) => {
+    try {
+        const response = await fetch('/api/admin/fnb-category', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(categoryData),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to create category: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error creating category:", error);
+        throw error;
+    }
+};
+
+const updateCategory = async (id, categoryData) => {
+    try {
+        const response = await fetch(`/api/admin/fnb-category/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                ...categoryData,
+                _method: 'PUT' // Using _method to indicate PUT operation
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to update category: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error updating category:", error);
+        throw error;
+    }
+};
+
+const deleteCategory = async (id) => {
+    try {
+        const response = await fetch(`/api/admin/fnb-category/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                _method: 'DELETE' // Using _method to indicate DELETE operation
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to delete category: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error deleting category:", error);
+        throw error;
+    }
+};
 
 export function CategoryTable() {
-    const [categories, setCategories] = useState(initialCategories);
+    const [categories, setCategories] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     // Add Category dialog state
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -56,82 +126,191 @@ export function CategoryTable() {
     const [currentCategory, setCurrentCategory] = useState(null);
 
     const [newCategory, setNewCategory] = useState({
-        name: "",
-        type: "Food"
+        category: "", // Updated from 'name' to 'category' to match API
+        type: "food"   // Default to lowercase to match API
     });
 
-    // Filter categories based on search term
-    const filteredCategories = categories.filter(category =>
-        category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        category.type.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Fetch categories from API
+    const loadCategories = useCallback(async () => {
+        setLoading(true);
+        setError(null);
 
-    // Pagination logic
-    const lastIndex = currentPage * itemsPerPage;
-    const firstIndex = lastIndex - itemsPerPage;
-    const currentCategories = filteredCategories.slice(firstIndex, lastIndex);
-    const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);
+        try {
+            const response = await fetchCategories();
+            console.log("API Response:", response);
 
-    // Handle adding new category
-    const handleAddCategory = () => {
-        if (!newCategory.name || !newCategory.type) {
-            return; // Don't add incomplete categories
+            if (response && response.data) {
+                setCategories(response.data);
+
+                // Set pagination data from meta if available
+                if (response.meta) {
+                    setTotalItems(response.meta.total || response.data.length);
+                    setTotalPages(response.meta.lastPage || 1);
+                } else {
+                    // If no meta data, use the length of the data array
+                    setTotalItems(response.data.length);
+                    setTotalPages(1);
+                }
+            } else if (Array.isArray(response)) {
+                // Handle case where API returns array directly
+                setCategories(response);
+                setTotalItems(response.length);
+                setTotalPages(1);
+            }
+        } catch (err) {
+            setError(err.message || "Failed to load categories");
+            toast.error("Failed to load categories", {
+                description: err.message || "Please try again later",
+            });
+        } finally {
+            setLoading(false);
         }
+    }, []);
 
-        const newId = categories.length > 0 ? Math.max(...categories.map(c => c.id)) + 1 : 1;
-        setCategories([...categories, { ...newCategory, id: newId }]);
-        setNewCategory({ name: "", type: "Food" });
-        setIsAddCategoryOpen(false);
+    // Load categories on initial render
+    useEffect(() => {
+        loadCategories();
+    }, [loadCategories]);
 
-        // Show success toast
-        toast.success("Category added successfully", {
-            description: `New ${newCategory.type} category "${newCategory.name}" has been added.`,
-            duration: 3000
-        });
+    // Manual refresh function that can be called from buttons
+    const refreshData = () => {
+        loadCategories();
     };
 
-    // Handle editing category
-    const handleEditCategory = () => {
-        if (!currentCategory || !newCategory.name || !newCategory.type) {
+    // Client-side search function
+    const getFilteredCategories = useCallback(() => {
+        if (!categories || categories.length === 0) return [];
+        if (!searchTerm) return categories;
+
+        return categories.filter(category =>
+            category.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            category.type.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [categories, searchTerm]);
+
+    // For now, pagination is client-side since API doesn't support pagination parameters
+    const getPagedCategories = useCallback(() => {
+        const filteredCategories = getFilteredCategories();
+        if (filteredCategories.length === 0) return [];
+
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, filteredCategories.length);
+
+        // Update total pages based on filtered results
+        const calculatedTotalPages = Math.ceil(filteredCategories.length / itemsPerPage);
+        if (calculatedTotalPages !== totalPages) {
+            setTotalPages(calculatedTotalPages);
+        }
+
+        // Update total items count based on filtered results
+        if (filteredCategories.length !== totalItems) {
+            setTotalItems(filteredCategories.length);
+        }
+
+        return filteredCategories.slice(startIndex, endIndex);
+    }, [categories, searchTerm, currentPage, itemsPerPage, totalItems, totalPages]);
+
+    // Handle adding new category
+    const handleAddCategory = async () => {
+        if (!newCategory.category || !newCategory.type) {
+            toast.error("Please fill in all required fields");
             return;
         }
 
-        const updatedCategories = categories.map(category =>
-            category.id === currentCategory.id ? { ...category, name: newCategory.name, type: newCategory.type } : category
-        );
+        setLoading(true);
 
-        setCategories(updatedCategories);
-        setCurrentCategory(null);
-        setNewCategory({ name: "", type: "Food" });
-        setIsEditCategoryOpen(false);
+        try {
+            await createCategory(newCategory);
 
-        // Show success toast
-        toast.success("Category updated successfully", {
-            description: `Category has been updated to "${newCategory.name}" (${newCategory.type}).`,
-            duration: 3000
-        });
+            // Refresh category list after adding
+            await loadCategories();
+
+            // Reset form and close dialog
+            setNewCategory({ category: "", type: "food" });
+            setIsAddCategoryOpen(false);
+
+            // Show success toast
+            toast.success("Category added successfully", {
+                description: `New ${formatType(newCategory.type)} category "${newCategory.category}" has been added.`,
+            });
+        } catch (err) {
+            toast.error("Failed to add category", {
+                description: err.message || "Please try again",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle editing category
+    const handleEditCategory = async () => {
+        if (!currentCategory || !newCategory.category || !newCategory.type) {
+            toast.error("Please fill in all required fields");
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            await updateCategory(currentCategory.id, newCategory);
+
+            // Refresh category list after updating
+            await loadCategories();
+
+            // Reset form and close dialog
+            setCurrentCategory(null);
+            setNewCategory({ category: "", type: "food" });
+            setIsEditCategoryOpen(false);
+
+            // Show success toast
+            toast.success("Category updated successfully", {
+                description: `Category has been updated to "${newCategory.category}" (${formatType(newCategory.type)}).`,
+            });
+        } catch (err) {
+            toast.error("Failed to update category", {
+                description: err.message || "Please try again",
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Handle deleting category
-    const handleDeleteCategory = () => {
+    const handleDeleteCategory = async () => {
         if (!currentCategory) return;
 
-        const updatedCategories = categories.filter(category => category.id !== currentCategory.id);
-        setCategories(updatedCategories);
-        setCurrentCategory(null);
-        setIsDeleteCategoryOpen(false);
+        setLoading(true);
 
-        // Show success toast
-        toast.success("Category deleted successfully", {
-            description: `"${currentCategory.name}" has been removed from categories.`,
-            duration: 3000
-        });
+        try {
+            await deleteCategory(currentCategory.id);
+
+            // Refresh category list after deleting
+            await loadCategories();
+
+            // Reset state and close dialog
+            setCurrentCategory(null);
+            setIsDeleteCategoryOpen(false);
+
+            // Show success toast
+            toast.success("Category deleted successfully", {
+                description: `"${currentCategory.category}" has been removed from categories.`,
+            });
+        } catch (err) {
+            toast.error("Failed to delete category", {
+                description: err.message || "Please try again",
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Open edit dialog
     const openEditDialog = (category) => {
         setCurrentCategory(category);
-        setNewCategory({ name: category.name, type: category.type });
+        setNewCategory({
+            category: category.category,
+            type: category.type
+        });
         setIsEditCategoryOpen(true);
     };
 
@@ -144,7 +323,9 @@ export function CategoryTable() {
     // Generate pagination buttons
     const renderPaginationButtons = () => {
         const buttons = [];
-        const maxButtons = 7; // Show at most 7 page buttons
+
+        // Don't render pagination if there are no pages or only one page
+        if (totalPages <= 1) return buttons;
 
         // Previous button
         buttons.push(
@@ -153,32 +334,77 @@ export function CategoryTable() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
+                disabled={currentPage === 1 || loading}
                 className="h-8 w-8 p-0 rounded-full"
             >
                 &lt;
             </Button>
         );
 
-        // Page number buttons
-        for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-                buttons.push(
-                    <Button
-                        key={i}
-                        variant={currentPage === i ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(i)}
-                        className={`h-8 w-8 p-0 rounded-full ${currentPage === i ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
-                    >
-                        {i}
-                    </Button>
-                );
-            } else if (i === currentPage - 3 || i === currentPage + 3) {
-                buttons.push(
-                    <span key={i} className="mx-1">...</span>
-                );
+        // Page number buttons with ellipsis for large page counts
+        const maxButtons = 5; // Show at most 5 page buttons
+        let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        const endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+        // Adjust startPage if we're near the end
+        if (endPage - startPage + 1 < maxButtons) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        // First page and ellipsis if needed
+        if (startPage > 1) {
+            buttons.push(
+                <Button
+                    key={1}
+                    variant={currentPage === 1 ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={loading}
+                    className={`h-8 w-8 p-0 rounded-full ${currentPage === 1 ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+                >
+                    1
+                </Button>
+            );
+
+            if (startPage > 2) {
+                buttons.push(<span key="ellipsis1" className="mx-1">...</span>);
             }
+        }
+
+        // Page buttons
+        for (let i = startPage; i <= endPage; i++) {
+            buttons.push(
+                <Button
+                    key={i}
+                    variant={currentPage === i ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(i)}
+                    disabled={loading}
+                    className={`h-8 w-8 p-0 rounded-full ${currentPage === i ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+                >
+                    {i}
+                </Button>
+            );
+        }
+
+        // Last page and ellipsis if needed
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                buttons.push(<span key="ellipsis2" className="mx-1">...</span>);
+            }
+
+            buttons.push(
+                <Button
+                    key={totalPages}
+                    variant={currentPage === totalPages ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={loading}
+                    className={`h-8 w-8 p-0 rounded-full ${currentPage === totalPages ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+                >
+                    {totalPages}
+                </Button>
+            );
         }
 
         // Next button
@@ -188,7 +414,7 @@ export function CategoryTable() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
+                disabled={currentPage === totalPages || loading}
                 className="h-8 w-8 p-0 rounded-full"
             >
                 &gt;
@@ -197,6 +423,26 @@ export function CategoryTable() {
 
         return buttons;
     };
+
+    // Format type for display (capitalize first letter)
+    const formatType = (type) => {
+        if (!type) return "";
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    };
+
+    // Handle changes to items per page
+    useEffect(() => {
+        if (categories.length > 0) {
+            const filteredCategories = getFilteredCategories();
+            const newTotalPages = Math.ceil(filteredCategories.length / itemsPerPage);
+            setTotalPages(newTotalPages);
+
+            // Reset to page 1 if current page would be out of bounds
+            if (currentPage > newTotalPages) {
+                setCurrentPage(1);
+            }
+        }
+    }, [itemsPerPage, categories, getFilteredCategories, currentPage]);
 
     return (
         <Card className="shadow-sm border-gray-200">
@@ -213,6 +459,7 @@ export function CategoryTable() {
                                     setItemsPerPage(Number(value));
                                     setCurrentPage(1);
                                 }}
+                                disabled={loading}
                             >
                                 <SelectTrigger className="h-8 w-[70px]">
                                     <SelectValue placeholder={itemsPerPage} />
@@ -234,15 +481,35 @@ export function CategoryTable() {
                                 className="pl-8 h-8 w-full sm:w-[200px]"
                                 value={searchTerm}
                                 onChange={(e) => {
-                                    setSearchTerm(e.target.value);
+                                    const value = e.target.value;
+                                    setSearchTerm(value);
+                                    // Always reset to page 1 when search changes
                                     setCurrentPage(1);
+                                    console.log(`Searching for: "${value}"`);
                                 }}
+                                disabled={loading}
                             />
                         </div>
 
                         <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={refreshData}
+                            disabled={loading}
+                            className="h-8"
+                        >
+                            {loading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <RefreshCw className="h-4 w-4" />
+                            )}
+                            <span className="ml-1">Refresh</span>
+                        </Button>
+
+                        <Button
                             className="bg-amber-500 hover:bg-amber-600 h-9"
                             onClick={() => setIsAddCategoryOpen(true)}
+                            disabled={loading}
                         >
                             <Plus className="h-4 w-4 mr-1" /> Add Category
                         </Button>
@@ -262,12 +529,32 @@ export function CategoryTable() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {currentCategories.length > 0 ? (
-                                currentCategories.map((category, index) => (
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-24 text-center">
+                                        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                                        <span>Loading categories...</span>
+                                    </TableCell>
+                                </TableRow>
+                            ) : error ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-24 text-center text-red-500">
+                                        <p className="mb-2">{error}</p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={refreshData}
+                                        >
+                                            Try Again
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ) : getPagedCategories().length > 0 ? (
+                                getPagedCategories().map((category, index) => (
                                     <TableRow key={category.id}>
-                                        <TableCell>{firstIndex + index + 1}</TableCell>
-                                        <TableCell className="font-medium">{category.name}</TableCell>
-                                        <TableCell>{category.type}</TableCell>
+                                        <TableCell>{(currentPage - 1) * itemsPerPage + index + 1}</TableCell>
+                                        <TableCell className="font-medium">{category.category}</TableCell>
+                                        <TableCell>{formatType(category.type)}</TableCell>
                                         <TableCell>
                                             <div className="flex justify-center gap-2">
                                                 <Button
@@ -275,6 +562,7 @@ export function CategoryTable() {
                                                     size="icon"
                                                     className="h-8 w-8 text-amber-500 border-amber-500"
                                                     onClick={() => openEditDialog(category)}
+                                                    disabled={loading}
                                                 >
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
@@ -283,6 +571,7 @@ export function CategoryTable() {
                                                     size="icon"
                                                     className="h-8 w-8 text-red-500 border-red-500"
                                                     onClick={() => openDeleteDialog(category)}
+                                                    disabled={loading}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -303,12 +592,22 @@ export function CategoryTable() {
 
                 <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t">
                     <div className="text-sm text-gray-500 mb-4 sm:mb-0">
-                        Showing {filteredCategories.length > 0 ? firstIndex + 1 : 0} to {Math.min(lastIndex, filteredCategories.length)} of {filteredCategories.length} entries
+                        {searchTerm ? (
+                            <span>
+                                Found {totalItems} {totalItems === 1 ? 'entry' : 'entries'} matching "{searchTerm}"
+                            </span>
+                        ) : (
+                            <span>
+                                Showing {totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} entries
+                            </span>
+                        )}
                     </div>
 
-                    <div className="flex gap-1">
-                        {renderPaginationButtons()}
-                    </div>
+                    {totalPages > 1 && (
+                        <div className="flex gap-1">
+                            {renderPaginationButtons()}
+                        </div>
+                    )}
                 </div>
             </CardContent>
 
@@ -326,8 +625,8 @@ export function CategoryTable() {
                             </Label>
                             <Input
                                 id="category-name"
-                                value={newCategory.name}
-                                onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                                value={newCategory.category}
+                                onChange={(e) => setNewCategory({ ...newCategory, category: e.target.value })}
                                 placeholder="Category name"
                             />
                         </div>
@@ -344,8 +643,9 @@ export function CategoryTable() {
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Food">Food</SelectItem>
-                                    <SelectItem value="Drink">Drink</SelectItem>
+                                    <SelectItem value="food">Food</SelectItem>
+                                    <SelectItem value="beverage">Drink</SelectItem>
+                                    <SelectItem value="snack">Snack</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -356,8 +656,16 @@ export function CategoryTable() {
                             type="submit"
                             className="bg-amber-500 hover:bg-amber-600 w-full"
                             onClick={handleAddCategory}
+                            disabled={loading || !newCategory.category || !newCategory.type}
                         >
-                            Add Category
+                            {loading ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Adding...
+                                </>
+                            ) : (
+                                "Add Category"
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -377,8 +685,8 @@ export function CategoryTable() {
                             </Label>
                             <Input
                                 id="edit-category-name"
-                                value={newCategory.name}
-                                onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                                value={newCategory.category}
+                                onChange={(e) => setNewCategory({ ...newCategory, category: e.target.value })}
                             />
                         </div>
 
@@ -394,8 +702,9 @@ export function CategoryTable() {
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Food">Food</SelectItem>
-                                    <SelectItem value="Drink">Drink</SelectItem>
+                                    <SelectItem value="food">Food</SelectItem>
+                                    <SelectItem value="beverage">Drink</SelectItem>
+                                    <SelectItem value="snack">Snack</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -406,8 +715,16 @@ export function CategoryTable() {
                             type="submit"
                             className="bg-amber-500 hover:bg-amber-600 w-full"
                             onClick={handleEditCategory}
+                            disabled={loading || !newCategory.category || !newCategory.type}
                         >
-                            Save Changes
+                            {loading ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Saving...
+                                </>
+                            ) : (
+                                "Save Changes"
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -424,7 +741,7 @@ export function CategoryTable() {
                         <p>Are you sure you want to delete this category? This action cannot be undone.</p>
                         {currentCategory && (
                             <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                                <p className="font-medium">{currentCategory.name} ({currentCategory.type})</p>
+                                <p className="font-medium">{currentCategory.category} ({formatType(currentCategory.type)})</p>
                             </div>
                         )}
                     </div>
@@ -435,6 +752,7 @@ export function CategoryTable() {
                             variant="outline"
                             onClick={() => setIsDeleteCategoryOpen(false)}
                             className="w-full md:w-auto"
+                            disabled={loading}
                         >
                             Cancel
                         </Button>
@@ -442,8 +760,16 @@ export function CategoryTable() {
                             type="submit"
                             className="bg-red-500 hover:bg-red-600 w-full md:w-auto"
                             onClick={handleDeleteCategory}
+                            disabled={loading}
                         >
-                            Delete
+                            {loading ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                "Delete"
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

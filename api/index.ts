@@ -77,6 +77,19 @@ export {
   type FoodDrinkPayload,
 } from "./fnb/fnbApi";
 
+// Food & Drink Category API
+export {
+  getFnbCategories,
+  getFnbCategory,
+  createFnbCategory,
+  updateFnbCategory,
+  deleteFnbCategory,
+  type FnbCategory,
+  type FnbCategoryResponse,
+  type FnbCategoryResponseMeta,
+  type FnbCategoryPayload,
+} from "./fnb/fnbCategoryApi";
+
 // Promo API
 export {
   getPromos,

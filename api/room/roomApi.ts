@@ -1,7 +1,6 @@
 import { get, del, post } from "../apiUtils";
 import { ROOM_ENDPOINTS } from "../constants";
 import axios from "axios";
-import Cookies from "js-cookie";
 import { API_BASE_URL } from "../constants";
 import { getAuthHeader } from "../auth/authApi";
 
@@ -63,11 +62,21 @@ interface ApiResponse {
 // Get all rooms
 export const getRooms = async (): Promise<ApiResponse<Room[]>> => {
   try {
-    // Validate authentication
-    if (!Cookies.get("token")) {
+    // Validasi autentikasi menggunakan localStorage
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+      console.warn("Token tidak ditemukan, autentikasi diperlukan");
       throw new Error(
         "Anda harus login untuk melihat daftar room. Silakan login terlebih dahulu."
       );
+    }
+
+    // Debug token info
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("token");
+      if (token) {
+        const tokenPreview = token.substring(0, 10) + "...";
+        console.log("Menggunakan token untuk getRooms:", tokenPreview);
+      }
     }
 
     // Use axios with authentication header
@@ -86,13 +95,25 @@ export const getRooms = async (): Promise<ApiResponse<Room[]>> => {
   } catch (error) {
     console.error("Error fetching rooms:", error);
 
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      Cookies.remove("token");
-      Cookies.remove("user");
-      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        // Hapus token dan user dari localStorage, bukan cookies
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+        }
+        throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+      }
+
+      // Handle specific error responses
+      if (error.response?.data?.message) {
+        throw new Error(`Error: ${error.response.data.message}`);
+      }
     }
 
-    throw error instanceof Error ? error : new Error("Failed to fetch rooms.");
+    throw error instanceof Error
+      ? error
+      : new Error("Gagal mengambil data kamar. Silakan coba lagi nanti.");
   }
 };
 

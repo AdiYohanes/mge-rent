@@ -64,6 +64,15 @@ export const FNB_ENDPOINTS = {
   DELETE_FNB: (id: string) => `${API_BASE_URL}/admin/fnb/${id}`,
 };
 
+// Food and Drink Category endpoints
+export const FNB_CATEGORY_ENDPOINTS = {
+  GET_ALL: `${API_BASE_URL}/admin/fnb-category`,
+  GET_ONE: (id: string) => `${API_BASE_URL}/admin/fnb-category/${id}`,
+  CREATE_CATEGORY: `${API_BASE_URL}/admin/fnb-category`,
+  UPDATE_CATEGORY: (id: string) => `${API_BASE_URL}/admin/fnb-category/${id}`,
+  DELETE_CATEGORY: (id: string) => `${API_BASE_URL}/admin/fnb-category/${id}`,
+};
+
 // Promo endpoints
 export const PROMO_ENDPOINTS = {
   GET_ALL: `${API_BASE_URL}/admin/promos`,

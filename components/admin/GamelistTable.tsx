@@ -155,11 +155,21 @@ export function GameListTable() {
       setError(null);
 
       try {
-        const response = await getGames();
+        // Use pagination parameters when fetching games
+        const response = await getGames(currentPage, itemsPerPage, searchTerm);
+
         if (response && Array.isArray(response.games)) {
           setGames(response.games);
           setTotalItems(response.meta?.total || response.games.length);
           setTotalPages(response.meta?.lastPage || 1);
+
+          console.log("Games fetched:", {
+            currentPage,
+            itemsPerPage,
+            totalItems: response.meta?.total || response.games.length,
+            totalPages: response.meta?.lastPage || 1,
+            gamesCount: response.games.length,
+          });
         } else {
           throw new Error("Invalid API response format for games");
         }
@@ -174,23 +184,16 @@ export function GameListTable() {
     };
 
     fetchGames();
-  }, [mounted, refreshTrigger]);
+  }, [mounted, refreshTrigger, currentPage, itemsPerPage, searchTerm]);
 
-  // Filter data based on search
-  const filteredData = games.filter((game) => {
-    if (!searchTerm) return true;
-
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (game.title && game.title.toLowerCase().includes(searchLower)) ||
-      (game.description && game.description.toLowerCase().includes(searchLower))
-    );
+  // Debug logs
+  console.log("Pagination Info:", {
+    currentPage,
+    itemsPerPage,
+    totalItems,
+    totalPages,
+    gamesCount: games.length,
   });
-
-  // Pagination
-  const lastIndex = currentPage * itemsPerPage;
-  const firstIndex = lastIndex - itemsPerPage;
-  const paginatedData = filteredData.slice(0, itemsPerPage);
 
   // Generate pagination buttons
   const generatePaginationButtons = () => {
@@ -333,18 +336,32 @@ export function GameListTable() {
     setUploadingImage(true);
 
     try {
+      // Log untuk debugging
+      console.log("Editing game with current data:", currentGame);
+      console.log("New game data:", newGame);
+      console.log(
+        "Image file status:",
+        imageFile ? "New image selected" : "No new image"
+      );
+
       const apiPayload = {
         title: newGame.title || currentGame.title,
         platform: newGame.platform || currentGame.platform,
         genre: newGame.genre || currentGame.genre,
         quantity_available:
-          newGame.quantity_available || currentGame.quantity_available,
+          newGame.quantity_available !== undefined
+            ? newGame.quantity_available
+            : currentGame.quantity_available,
         description: newGame.description || currentGame.description || "",
         image: imageFile,
         _method: "POST", // Method spoofing for Laravel
       };
 
-      console.log("Updating game with payload:", apiPayload); // Debug log
+      console.log("Updating game with payload:", {
+        ...apiPayload,
+        image: imageFile ? `Image: ${imageFile.name}` : "No new image",
+      });
+
       await updateGame(currentGame.id.toString(), apiPayload);
 
       toast.success("Game updated successfully!");
@@ -567,7 +584,7 @@ export function GameListTable() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : paginatedData.length === 0 ? (
+                ) : games.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center h-24">
                       <div className="flex flex-col items-center justify-center text-muted-foreground">
@@ -579,10 +596,10 @@ export function GameListTable() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedData.map((game, index) => (
+                  games.map((game, index) => (
                     <TableRow key={game.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">
-                        {firstIndex + index + 1}
+                        {(currentPage - 1) * itemsPerPage + index + 1}
                       </TableCell>
                       <TableCell>
                         <div className="relative h-12 w-12 rounded-md overflow-hidden border">
@@ -642,8 +659,13 @@ export function GameListTable() {
           {/* Pagination */}
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
-              Showing {filteredData.length > 0 ? firstIndex + 1 : 0} to{" "}
-              {Math.min(lastIndex, filteredData.length)} of {totalItems} entries
+              Showing{" "}
+              {games.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to{" "}
+              {Math.min(
+                (currentPage - 1) * itemsPerPage + games.length,
+                totalItems
+              )}{" "}
+              of {totalItems} entries
             </div>
             <div className="flex gap-1">{generatePaginationButtons()}</div>
           </div>
