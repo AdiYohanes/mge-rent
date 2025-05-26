@@ -1,10 +1,7 @@
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
 import { API_BASE_URL } from "./constants";
 import Cookies from "js-cookie";
-
-// Cookie names
-const TOKEN_COOKIE = "auth_token";
-const USER_COOKIE = "auth_user";
+import { TOKEN_COOKIE, clearAuthCookies } from "@/utils/cookieUtils";
 
 // Safe environment detection
 const isServer =
@@ -16,8 +13,10 @@ const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
+    Accept: "application/json",
+    "X-Requested-With": "XMLHttpRequest",
   },
-  // Don't send credentials by default - let each request decide
+  // Disable credentials for cross-domain requests to avoid certificate issues
   withCredentials: false,
 });
 
@@ -78,9 +77,8 @@ apiClient.interceptors.response.use(
 
       // Don't show alert or redirect for login attempts
       if (!isLoginAttempt && !isOnLoginPage) {
-        // Clear authentication data
-        Cookies.remove(TOKEN_COOKIE, { path: "/" });
-        Cookies.remove(USER_COOKIE, { path: "/" });
+        // Clear authentication data using the utility function
+        clearAuthCookies();
 
         // Show message to user
         if (typeof window !== "undefined" && window.alert) {
@@ -105,15 +103,26 @@ export const apiRequest = async <T>(
   config?: AxiosRequestConfig
 ): Promise<T> => {
   try {
+    // Use config as is, without forcing withCredentials
+    const requestConfig = {
+      ...config,
+    };
+
     const response: AxiosResponse<T> = await apiClient({
       method,
       url,
       data,
-      ...config,
+      ...requestConfig,
     });
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
+    if (axios.isAxiosError(error) && error.response) {
+      console.error("API Request Error:", {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        headers: error.response.headers,
+      });
       throw error;
     }
     throw new Error("An unexpected error occurred");
@@ -136,6 +145,8 @@ export const makeApiRequest = async <T>(
       ...config,
       headers: {
         ...config?.headers,
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
       },
     };
 
@@ -144,15 +155,6 @@ export const makeApiRequest = async <T>(
       requestConfig.headers = {
         ...requestConfig.headers,
         "Content-Type": "application/json",
-      };
-    } else {
-      // FormData case - add necessary headers for Laravel
-      requestConfig.headers = {
-        ...requestConfig.headers,
-        Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        // Jika masih perlu XSRF-TOKEN, bisa menggunakan cara lain untuk mendapatkannya
-        // "X-XSRF-TOKEN": !isServer ? Cookies.get("XSRF-TOKEN") || "" : "",
       };
     }
 
