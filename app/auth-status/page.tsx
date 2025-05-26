@@ -5,6 +5,11 @@ import { debugToken, checkTokenHealth } from "@/api/auth/authApi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
+import Cookies from "js-cookie";
+
+// Cookie names
+const TOKEN_COOKIE = "auth_token";
+const USER_COOKIE = "auth_user";
 
 export default function AuthStatusPage() {
   const [tokenInfo, setTokenInfo] = useState("Loading...");
@@ -17,7 +22,17 @@ export default function AuthStatusPage() {
 
     try {
       setTokenInfo(debugToken());
-      setHealthCheck(checkTokenHealth());
+      const health = checkTokenHealth();
+
+      // Add all cookies to health check for debugging
+      const cookieDetails: Record<string, string> = {};
+      document.cookie.split(";").forEach((cookie) => {
+        const [name, value] = cookie.trim().split("=");
+        if (name) cookieDetails[name] = value || "";
+      });
+
+      health.cookieDetails = cookieDetails;
+      setHealthCheck(health);
     } catch (e) {
       setTokenInfo(
         `Error checking token: ${
@@ -34,8 +49,8 @@ export default function AuthStatusPage() {
   const clearTokens = () => {
     if (!mounted) return;
 
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    Cookies.remove(TOKEN_COOKIE, { path: "/" });
+    Cookies.remove(USER_COOKIE, { path: "/" });
     checkStatus();
     alert("Tokens cleared!");
   };

@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getUserFromCookie, updateUserCookie } from "@/utils/cookieUtils";
+
+// Cookie names
+const USER_COOKIE = "auth_user";
 
 interface UserData {
   fullName?: string;
@@ -23,9 +27,8 @@ export default function Profile() {
   const router = useRouter();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      const userData = JSON.parse(storedUser);
+    const userData = getUserFromCookie();
+    if (userData) {
       setUser(userData);
       if (userData.fullName) setFullName(userData.fullName);
       if (userData.email) setEmail(userData.email);
@@ -47,7 +50,8 @@ export default function Profile() {
       phoneNumber,
     };
 
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    // Update user cookie
+    updateUserCookie(updatedUser);
     setUser(updatedUser);
     alert("Personal information saved successfully!");
   };

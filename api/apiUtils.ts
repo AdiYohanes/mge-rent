@@ -1,5 +1,10 @@
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
 import { API_BASE_URL } from "./constants";
+import Cookies from "js-cookie";
+
+// Cookie names
+const TOKEN_COOKIE = "auth_token";
+const USER_COOKIE = "auth_user";
 
 // Safe environment detection
 const isServer =
@@ -21,7 +26,7 @@ apiClient.interceptors.request.use(
   (config) => {
     // Skip token handling on server to prevent hydration issues
     if (!isServer) {
-      const token = localStorage.getItem("token");
+      const token = Cookies.get(TOKEN_COOKIE);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
         // Add debug logging to track token usage
@@ -30,7 +35,7 @@ apiClient.interceptors.request.use(
         );
       } else {
         console.warn(
-          "Auth: No token found in localStorage for request to",
+          "Auth: No token found in cookies for request to",
           config.url
         );
       }
@@ -61,7 +66,7 @@ apiClient.interceptors.response.use(
           ? (error.response.data as { message?: string }).message ||
             "No message"
           : "No data",
-        hasToken: !!localStorage.getItem("token"),
+        hasToken: !!Cookies.get(TOKEN_COOKIE),
       });
 
       // Check if this is a login attempt or already on login page
@@ -74,8 +79,8 @@ apiClient.interceptors.response.use(
       // Don't show alert or redirect for login attempts
       if (!isLoginAttempt && !isOnLoginPage) {
         // Clear authentication data
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        Cookies.remove(TOKEN_COOKIE, { path: "/" });
+        Cookies.remove(USER_COOKIE, { path: "/" });
 
         // Show message to user
         if (typeof window !== "undefined" && window.alert) {

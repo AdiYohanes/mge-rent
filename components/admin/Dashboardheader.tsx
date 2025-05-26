@@ -19,6 +19,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { getUserFromCookie, clearAuthCookies } from "@/utils/cookieUtils";
 
 interface UserData {
   id: string;
@@ -44,24 +45,18 @@ export function DashboardHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Get user data from localStorage
+  // Get user data from cookies
   useEffect(() => {
-    const userStorage = localStorage.getItem("user");
-    if (userStorage) {
-      try {
-        const parsedUser = JSON.parse(userStorage) as UserData;
-        setUserData(parsedUser);
-      } catch (error) {
-        console.error("Error parsing user data from localStorage:", error);
-      }
+    const user = getUserFromCookie();
+    if (user) {
+      setUserData(user as UserData);
     }
   }, []);
 
   // Handle logout
   const handleLogout = () => {
-    // Clear localStorage
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    // Clear cookies
+    clearAuthCookies();
 
     // Show success toast
     toast.success("Logged out successfully", {

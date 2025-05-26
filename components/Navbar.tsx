@@ -8,6 +8,7 @@ import { RiCloseFill } from "react-icons/ri";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMounted } from "@/hooks/use-mounted";
+import { getUserFromCookie, clearAuthCookies } from "@/utils/cookieUtils";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -18,16 +19,11 @@ export default function Navbar() {
   const mounted = useMounted();
 
   useEffect(() => {
-    // Only access localStorage after component has mounted on client
+    // Only access cookies after component has mounted on client
     if (mounted) {
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch (e) {
-          console.error("Error parsing user from localStorage:", e);
-          localStorage.removeItem("user");
-        }
+      const userData = getUserFromCookie();
+      if (userData) {
+        setUser(userData);
       }
     }
   }, [mounted]);
@@ -52,8 +48,7 @@ export default function Navbar() {
   }, [mounted]);
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    clearAuthCookies();
     setUser(null);
     setIsProfileMenuOpen(false);
     router.push("/signin");

@@ -1,5 +1,11 @@
 import { post } from "../apiUtils";
 import { AUTH_ENDPOINTS } from "../constants";
+import {
+  setAuthCookies,
+  clearAuthCookies,
+  getTokenFromCookie,
+  getUserFromCookie,
+} from "@/utils/cookieUtils";
 
 // Types
 export interface AuthResponse {
@@ -49,7 +55,7 @@ export interface ErrorResponse {
 export const login = async (data: LoginRequestData): Promise<AuthResponse> => {
   const response = await post<AuthResponse>(AUTH_ENDPOINTS.LOGIN, data);
 
-  // Store user data and token in localStorage
+  // Store user data and token in cookies
   if (response && response.token) {
     const userData = response.user;
     const token = response.token;
@@ -59,9 +65,8 @@ export const login = async (data: LoginRequestData): Promise<AuthResponse> => {
       token.substring(0, 10) + "..."
     );
 
-    // Set data in localStorage
-    localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("token", token);
+    // Set auth cookies
+    setAuthCookies(token, userData);
   } else {
     console.error("Login response tidak memiliki token:", response);
   }
@@ -85,9 +90,8 @@ export const logout = async (): Promise<void> => {
     // Handle error silently
     console.error("Logout API error");
   } finally {
-    // Always clear localStorage
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    // Always clear cookies
+    clearAuthCookies();
   }
 };
 
@@ -97,7 +101,7 @@ export const isLoggedIn = (): boolean => {
   if (typeof window === "undefined") {
     return false;
   }
-  return !!localStorage.getItem("token");
+  return !!getTokenFromCookie();
 };
 
 // Get current user
@@ -107,34 +111,18 @@ export const getCurrentUser = (): AuthResponse["user"] | null => {
     return null;
   }
 
-  const userJson = localStorage.getItem("user");
-  if (!userJson) return null;
-
-  try {
-    return JSON.parse(userJson);
-  } catch {
-    return null;
-  }
+  return getUserFromCookie();
 };
 
 // Debug helper untuk memeriksa status token
 export const debugToken = (): string => {
   // Check if running on server
   if (typeof window === "undefined" || typeof document === "undefined") {
-    return "Running on server (SSR), localStorage not accessible";
+    return "Running on server (SSR), cookies not accessible";
   }
 
-  const token = localStorage.getItem("token");
-  const userJson = localStorage.getItem("user");
-  let user = null;
-
-  try {
-    if (userJson) {
-      user = JSON.parse(userJson);
-    }
-  } catch (e) {
-    // Ignore parsing errors
-  }
+  const token = getTokenFromCookie();
+  const user = getUserFromCookie();
 
   return `Token: ${
     token ? `${token.substring(0, 15)}...` : "TIDAK ADA"
@@ -157,18 +145,17 @@ export const checkTokenHealth = (): {
       hasUser: false,
       tokenLength: 0,
       tokenPrefix: "",
-      issues: ["Running on server (SSR), localStorage not accessible"],
+      issues: ["Running on server (SSR), cookies not accessible"],
     };
   }
 
-  const token = localStorage.getItem("token") || "";
-  const userJson = localStorage.getItem("user") || "";
+  const token = getTokenFromCookie() || "";
+  const user = getUserFromCookie();
   const issues: string[] = [];
-  let user = null;
 
   // Check token
   if (!token) {
-    issues.push("Token tidak ditemukan dalam localStorage");
+    issues.push("Token tidak ditemukan dalam cookies");
   } else if (token.length < 20) {
     issues.push(`Token terlalu pendek (${token.length} karakter)`);
   }
@@ -180,21 +167,12 @@ export const checkTokenHealth = (): {
   }
 
   // Check user data
-  try {
-    if (!userJson) {
-      issues.push("Data user tidak ditemukan dalam localStorage");
-    } else {
-      user = JSON.parse(userJson);
-      if (!user.id) issues.push("Data user tidak memiliki ID");
-      if (!user.username) issues.push("Data user tidak memiliki username");
-      if (!user.role) issues.push("Data user tidak memiliki role");
-    }
-  } catch (e) {
-    issues.push(
-      `Error parsing user data: ${
-        e instanceof Error ? e.message : "Unknown error"
-      }`
-    );
+  if (!user) {
+    issues.push("Data user tidak ditemukan dalam cookies");
+  } else {
+    if (!user.id) issues.push("Data user tidak memiliki ID");
+    if (!user.username) issues.push("Data user tidak memiliki username");
+    if (!user.role) issues.push("Data user tidak memiliki role");
   }
 
   return {
@@ -219,7 +197,7 @@ export const getAuthHeader = ():
     return {};
   }
 
-  const token = localStorage.getItem("token");
+  const token = getTokenFromCookie();
   if (!token) {
     console.warn("Token tidak ditemukan, autentikasi tidak dapat dilakukan");
     return {};
