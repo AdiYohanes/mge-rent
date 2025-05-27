@@ -3,6 +3,7 @@ import { ROOM_ENDPOINTS } from "../constants";
 import axios from "axios";
 import { API_BASE_URL } from "../constants";
 import { getAuthHeader } from "../auth/authApi";
+import { getTokenFromCookie, clearAuthCookies } from "@/utils/cookieUtils";
 
 // Types
 export interface Room {
@@ -50,20 +51,27 @@ export interface RoomPayload {
   is_available?: boolean;
 }
 
-// Define a generic response type to handle different API response formats
+// Define a response type to handle different API response formats
 interface ApiResponse {
   data?: Room | Room[];
   success?: boolean;
   status?: string;
   message?: string;
+  meta?: {
+    page: number;
+    perPage: number;
+    total: number;
+    lastPage: number;
+    search: string;
+  };
   [key: string]: unknown;
 }
 
 // Get all rooms
-export const getRooms = async (): Promise<ApiResponse<Room[]>> => {
+export const getRooms = async (): Promise<ApiResponse> => {
   try {
-    // Validasi autentikasi menggunakan localStorage
-    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+    // Validasi autentikasi menggunakan cookies
+    if (typeof window !== "undefined" && !getTokenFromCookie()) {
       console.warn("Token tidak ditemukan, autentikasi diperlukan");
       throw new Error(
         "Anda harus login untuk melihat daftar room. Silakan login terlebih dahulu."
@@ -72,7 +80,7 @@ export const getRooms = async (): Promise<ApiResponse<Room[]>> => {
 
     // Debug token info
     if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
+      const token = getTokenFromCookie();
       if (token) {
         const tokenPreview = token.substring(0, 10) + "...";
         console.log("Menggunakan token untuk getRooms:", tokenPreview);
@@ -97,10 +105,9 @@ export const getRooms = async (): Promise<ApiResponse<Room[]>> => {
 
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401) {
-        // Hapus token dan user dari localStorage, bukan cookies
+        // Hapus token dan user dari cookies
         if (typeof window !== "undefined") {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          clearAuthCookies();
         }
         throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
       }
@@ -124,6 +131,11 @@ export const getRoom = async (id: string): Promise<Room | null> => {
     return response.data;
   } catch (error) {
     console.error(`Error fetching room with id ${id}:`, error);
+    // Handle authentication error
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      clearAuthCookies();
+      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    }
     return null;
   }
 };
@@ -133,6 +145,12 @@ export const addRoom = async (
   roomData: RoomPayload
 ): Promise<Room | true | null> => {
   try {
+    // Validate authentication
+    const token = getTokenFromCookie();
+    if (!token) {
+      throw new Error("Authentication token not found. Please log in again.");
+    }
+
     console.log(`Creating new room with data:`, roomData);
 
     const response = await post<ApiResponse>(
@@ -155,6 +173,11 @@ export const addRoom = async (
     return null;
   } catch (error) {
     console.error("Error creating room:", error);
+    // Handle authentication error
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      clearAuthCookies();
+      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    }
     return null;
   }
 };
@@ -165,6 +188,12 @@ export const updateRoom = async (
   roomData: RoomPayload
 ): Promise<Room | true | null> => {
   try {
+    // Validate authentication
+    const token = getTokenFromCookie();
+    if (!token) {
+      throw new Error("Authentication token not found. Please log in again.");
+    }
+
     console.log(`Updating room with ID ${id} using POST method:`, roomData);
 
     const endpoint = ROOM_ENDPOINTS.UPDATE_ROOM(id);
@@ -190,6 +219,11 @@ export const updateRoom = async (
     return null;
   } catch (error) {
     console.error(`Error updating room with id ${id}:`, error);
+    // Handle authentication error
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      clearAuthCookies();
+      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    }
     return null;
   }
 };
@@ -197,11 +231,22 @@ export const updateRoom = async (
 // Delete a room
 export const deleteRoom = async (id: string): Promise<boolean> => {
   try {
+    // Validate authentication
+    const token = getTokenFromCookie();
+    if (!token) {
+      throw new Error("Authentication token not found. Please log in again.");
+    }
+
     console.log(`Deleting room with ID: ${id}`);
     await del(ROOM_ENDPOINTS.DELETE_ROOM(id));
     return true;
   } catch (error) {
     console.error(`Error deleting room with id ${id}:`, error);
+    // Handle authentication error
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      clearAuthCookies();
+      throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    }
     return false;
   }
 };

@@ -126,7 +126,7 @@ export const createBooking = async (
 
 // Update a booking
 export const updateBooking = async (
-  id: string,
+  id: string, 
   bookingData: Partial<BookingPayload>
 ): Promise<Booking> => {
   try {
@@ -136,7 +136,7 @@ export const updateBooking = async (
       payload.customer_data = JSON.stringify(payload.customer_data);
     }
 
-    const response = await put<{ data: Booking }>(
+    const response = await post<{ data: Booking }>(
       BOOKING_ENDPOINTS.UPDATE_BOOKING(id),
       payload
     );

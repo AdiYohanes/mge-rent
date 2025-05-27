@@ -46,7 +46,7 @@ export interface FoodBooking extends BaseBooking {
 
 // Common table props
 export interface BookingTableBaseProps {
-  filterStatus: BookingStatus | BookingStatus[] | null;
+  filterStatus?: BookingStatus | BookingStatus[] | null;
 }
 
 // Utility functions

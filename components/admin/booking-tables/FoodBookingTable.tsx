@@ -186,9 +186,7 @@ const FoodBookingTable: React.FC<BookingTableBaseProps> = ({
           <div>
             <CardTitle>Food & Drink Orders</CardTitle>
             <CardDescription>
-              {filterStatus
-                ? `Showing ${filterStatus} food orders`
-                : `Manage and view all food & drink orders`}
+              Manage and view all food & drink orders
             </CardDescription>
           </div>
           <div className="flex items-center gap-3">

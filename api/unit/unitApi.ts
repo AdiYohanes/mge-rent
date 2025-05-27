@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_BASE_URL } from "../constants";
 import { getAuthHeader } from "../auth/authApi";
+import { getTokenFromCookie, clearAuthCookies } from "@/utils/cookieUtils";
 
 // Type definitions
 export interface Unit {
@@ -58,8 +59,8 @@ export const getUnits = async (
   search = ""
 ): Promise<ApiResponse<Unit[]>> => {
   try {
-    // Validasi autentikasi menggunakan localStorage
-    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+    // Validasi autentikasi menggunakan cookies
+    if (typeof window !== "undefined" && !getTokenFromCookie()) {
       console.warn("Token tidak ditemukan, autentikasi diperlukan");
       throw new Error(
         "Anda harus login untuk melihat daftar unit. Silakan login terlebih dahulu."
@@ -68,7 +69,7 @@ export const getUnits = async (
 
     // Debug token info
     if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
+      const token = getTokenFromCookie();
       if (token) {
         const tokenPreview = token.substring(0, 10) + "...";
         console.log("Menggunakan token untuk getUnits:", tokenPreview);
@@ -106,10 +107,9 @@ export const getUnits = async (
 
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401) {
-        // Hapus token dan user dari localStorage
+        // Hapus token dan user dari cookies
         if (typeof window !== "undefined") {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          clearAuthCookies();
         }
         throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
       }
@@ -133,8 +133,8 @@ export const addUnit = async (
   unitData: UnitPayload
 ): Promise<ApiResponse<Unit>> => {
   try {
-    // Validasi autentikasi menggunakan localStorage
-    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+    // Validasi autentikasi menggunakan cookies
+    if (typeof window !== "undefined" && !getTokenFromCookie()) {
       throw new Error(
         "Anda harus login untuk menambahkan unit. Silakan login terlebih dahulu."
       );
@@ -164,10 +164,9 @@ export const addUnit = async (
 
       // Handle 401 Unauthorized error
       if (error.response?.status === 401) {
-        // Hapus token dan user dari localStorage, bukan cookies
+        // Hapus token dan user dari cookies
         if (typeof window !== "undefined") {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          clearAuthCookies();
         }
         throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
       }
@@ -193,8 +192,8 @@ export const updateUnit = async (
   unitData: Partial<UnitPayload>
 ): Promise<ApiResponse<Unit>> => {
   try {
-    // Validasi autentikasi menggunakan localStorage
-    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+    // Validasi autentikasi menggunakan cookies
+    if (typeof window !== "undefined" && !getTokenFromCookie()) {
       throw new Error(
         "Anda harus login untuk mengubah unit. Silakan login terlebih dahulu."
       );
@@ -248,35 +247,21 @@ export const updateUnit = async (
       }
     );
 
-    console.log("Respons update unit:", response.data);
+    console.log("Respons API updateUnit:", response.data);
     return response.data;
   } catch (error) {
-    console.error("Error mengupdate unit:", error);
+    console.error("Error API updateUnit:", error);
 
     if (axios.isAxiosError(error)) {
-      console.error("Status:", error.response?.status);
-      console.error("Response data:", error.response?.data);
-      console.error("Request URL:", error.config?.url);
-      console.error("Request method:", error.config?.method);
-      console.error("Request headers:", error.config?.headers);
-
-      // If it's a 405 Method Not Allowed, provide more detailed information
-      if (error.response?.status === 405) {
-        console.error(
-          "405 Method Not Allowed - The server does not allow the method used for this endpoint."
-        );
-        console.error(
-          "Make sure the endpoint supports POST with _method spoofing or adjust the API call."
-        );
+      // Handle 401 Unauthorized error
+      if (error.response?.status === 401) {
+        clearAuthCookies();
+        throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
       }
 
-      if (error.response?.status === 401) {
-        // Hapus token dan user dari localStorage, bukan cookies
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-        }
-        throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+      // Debug tambahan untuk error 422
+      if (error.response?.status === 422) {
+        console.error("Validation error detail:", error.response?.data);
       }
     }
 
@@ -285,14 +270,14 @@ export const updateUnit = async (
 };
 
 /**
- * Delete a unit by ID
+ * Delete a unit
  */
 export const deleteUnit = async (
   id: string | number
 ): Promise<ApiResponse<unknown>> => {
   try {
-    // Validasi autentikasi menggunakan localStorage
-    if (typeof window !== "undefined" && !localStorage.getItem("token")) {
+    // Validasi autentikasi menggunakan cookies
+    if (typeof window !== "undefined" && !getTokenFromCookie()) {
       throw new Error(
         "Anda harus login untuk menghapus unit. Silakan login terlebih dahulu."
       );
@@ -300,28 +285,27 @@ export const deleteUnit = async (
 
     if (!id) throw new Error("ID unit diperlukan untuk penghapusan");
 
-    console.log("Menghapus unit dengan ID:", id);
+    // Use axios with DELETE method (Laravel requires method spoofing for non-GET/POST)
+    const response = await axios.post(
+      `${API_BASE_URL}/admin/units/${id}`,
+      { _method: "DELETE" },
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          ...getAuthHeader(),
+        },
+      }
+    );
 
-    // Use axios with authentication header
-    const response = await axios.delete(`${API_BASE_URL}/admin/units/${id}`, {
-      headers: {
-        Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        ...getAuthHeader(),
-      },
-    });
-
-    console.log("Respons hapus unit:", response.data);
+    console.log("Respons API deleteUnit:", response.data);
     return response.data;
   } catch (error) {
-    console.error("Error menghapus unit:", error);
+    console.error("Error API deleteUnit:", error);
 
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      // Hapus token dan user dari localStorage, bukan cookies
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-      }
+      clearAuthCookies();
       throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
     }
 
@@ -345,18 +329,23 @@ function formatApiError(error: unknown, defaultMessage: string): Error {
         }
       }
 
-      // Handle empty validation response or non-standard format
-      if (Object.keys(error.response.data || {}).length === 0) {
-        return new Error(
-          "Validasi gagal: Server tidak memberikan detail error."
-        );
-      }
-
       if (error.response.data?.message) {
         return new Error(error.response.data.message);
       }
 
       return new Error("Validasi gagal. Periksa semua field.");
+    }
+
+    // Handle foreign key constraint violations
+    if (
+      error.response.status === 500 &&
+      error.response.data?.message &&
+      typeof error.response.data.message === "string" &&
+      error.response.data.message.includes("foreign key constraint")
+    ) {
+      return new Error(
+        "Unit ini tidak dapat dihapus karena masih terhubung dengan data lain."
+      );
     }
 
     // Handle other API errors with messages

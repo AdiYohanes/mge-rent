@@ -340,9 +340,7 @@ const EventBookingTable: React.FC<BookingTableBaseProps> = ({
           <div>
             <CardTitle>Event Bookings</CardTitle>
             <CardDescription>
-              {filterStatus
-                ? `Showing ${filterStatus} event bookings`
-                : `Manage and view all event bookings`}
+              Manage and view all event bookings
             </CardDescription>
           </div>
           <div className="flex items-center gap-3">

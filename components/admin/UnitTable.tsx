@@ -35,6 +35,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { toast } from "sonner";
 import { useMounted } from "@/hooks/use-mounted";
 import axios from "axios";
+import { getTokenFromCookie, clearAuthCookies } from "@/utils/cookieUtils";
 import {
   Unit,
   UnitPayload,
@@ -221,7 +222,7 @@ export function UnitTable() {
 
       try {
         // Check if we have a token before making the API call
-        const token = localStorage.getItem("token");
+        const token = getTokenFromCookie();
         if (!token) {
           setError("Silakan login terlebih dahulu untuk melihat daftar unit.");
           setLoading(false);
@@ -246,8 +247,7 @@ export function UnitTable() {
           err.message.includes("login sudah berakhir")
         ) {
           setError("Sesi login Anda telah berakhir. Silakan login kembali.");
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          clearAuthCookies();
         } else if (
           err instanceof Error &&
           err.message.includes("login terlebih dahulu")
@@ -275,7 +275,7 @@ export function UnitTable() {
     const fetchRelatedData = async () => {
       try {
         // Check if we have a token before making the API calls
-        const token = localStorage.getItem("token");
+        const token = getTokenFromCookie();
         if (!token) {
           console.warn("Token not found. Related data fetching skipped.");
           return;
@@ -725,6 +725,7 @@ export function UnitTable() {
       error.message.includes("login sudah berakhir")
     ) {
       toast.error("Sesi login sudah berakhir. Silakan login kembali.");
+      clearAuthCookies();
       return;
     }
 
@@ -848,31 +849,7 @@ export function UnitTable() {
     });
   };
 
-  // Handle features selection
-  const handleFeatureToggle = (feature: string) => {
-    setNewUnit((prev) => {
-      const features = [...(prev.features || [])];
-
-      // Toggle the feature
-      let newFeatures: string[];
-      if (features.includes(feature)) {
-        newFeatures = features.filter((f) => f !== feature);
-      } else {
-        newFeatures = [...features, feature];
-      }
-
-      // Recalculate rent price with updated features
-      const roomId = prev.room_id || 0;
-      const consoleId = prev.console_id || 0;
-      const rentPrice = calculateRentPrice(roomId, consoleId, newFeatures);
-
-      return {
-        ...prev,
-        features: newFeatures,
-        rentPrice: rentPrice,
-      };
-    });
-  };
+  // Removed unused handleFeatureToggle function
 
   // Render a simple skeleton UI while not mounted to prevent hydration mismatch
   if (!mounted) {
@@ -892,21 +869,7 @@ export function UnitTable() {
     );
   }
 
-  // Type safety for price calculations
-  const calculatePrice = (
-    roomPrice: number | string,
-    consolePrice: number | string
-  ): number => {
-    const roomValue =
-      typeof roomPrice === "string"
-        ? parseInt(roomPrice, 10) || 0
-        : roomPrice || 0;
-    const consoleValue =
-      typeof consolePrice === "string"
-        ? parseInt(consolePrice, 10) || 0
-        : consolePrice || 0;
-    return roomValue + consoleValue;
-  };
+  // Removed unused calculatePrice function
 
   return (
     <DndProvider backend={HTML5Backend}>

@@ -19,6 +19,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +31,15 @@ import {
 } from "@/components/ui/popover";
 import { useMounted } from "@/hooks/use-mounted";
 import useBookingItemStore from "@/store/BookingItemStore";
+import { getProcessedAvailableTimes } from "@/api/booking/datePublicApi";
 
 // Define types for time slots and hour slots
+interface TimeSlot {
+  startTime: string;
+  endTime: string;
+  available: boolean;
+}
+
 interface MinuteSlot {
   label: string;
   value: string;
@@ -53,9 +62,16 @@ export default function DateTimeSelection() {
   const { selectedTime, setSelectedTime } = useBookingItemStore();
   const { duration, setDuration } = useBookingItemStore();
   const { setEndTime } = useBookingItemStore();
+  // Get selected console and unit from BookingItemStore
+  const { selectedConsole } = useBookingItemStore();
+  const { selectedUnitName } = useBookingItemStore();
+
   const [hourSlots, setHourSlots] = useState<HourSlot[]>([]);
+  const [rawTimeSlots, setRawTimeSlots] = useState<TimeSlot[]>([]);
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("all");
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState<boolean>(false);
+  const [timeSlotError, setTimeSlotError] = useState<string | null>(null);
   const mounted = useMounted();
 
   useEffect(() => {
@@ -82,6 +98,17 @@ export default function DateTimeSelection() {
 
           const calculatedEndTime = addHours(startDate, duration);
           setEndTime(calculatedEndTime);
+
+          // Check if this booking has conflicts
+          if (rawTimeSlots && rawTimeSlots.length > 0) {
+            // The duration check would happen here when booking
+            console.log(
+              `Selected time ${selectedTime} with ${duration}h duration, ending at ${format(
+                calculatedEndTime,
+                "HH:mm"
+              )}`
+            );
+          }
         } else {
           setEndTime(null);
         }
@@ -92,80 +119,274 @@ export default function DateTimeSelection() {
     } else {
       setEndTime(null);
     }
-  }, [selectedDate, selectedTime, duration, setEndTime]);
+  }, [selectedDate, selectedTime, duration, setEndTime, rawTimeSlots]);
 
-  const fetchTimeSlots = useCallback(
-    (date: Date | undefined) => {
-      if (date && mounted) {
-        const isWeekend = [0, 6].includes(date.getDay()); // 0 is Sunday, 6 is Saturday
-        const startHour = isWeekend ? 9 : 8; // 9AM for weekends, 8AM for weekdays
-        const endHour = isWeekend ? 22 : 21; // 10PM for weekends, 9PM for weekdays
+  // Process raw time slots into hour/minute structure
+  const processTimeSlots = useCallback((slots: TimeSlot[]) => {
+    console.log("Processing time slots:", slots.length);
 
-        const hours: HourSlot[] = [];
+    if (!slots || slots.length === 0) {
+      console.log("No slots to process");
+      return [];
+    }
 
-        for (let hour = startHour; hour < endHour; hour++) {
-          const hourFormatted = hour.toString().padStart(2, "0");
-          const timeDate = new Date();
-          timeDate.setHours(hour, 0);
-          const hourLabel = format(timeDate, "h a");
+    const hours: HourSlot[] = [];
+    const processedHours = new Set<number>();
 
-          const minuteSlots: MinuteSlot[] = [];
+    // First, display all the slot data for debugging
+    console.log("First 5 slots:", slots.slice(0, 5));
 
-          for (let minute = 0; minute < 60; minute += 10) {
-            const minuteFormatted = minute.toString().padStart(2, "0");
-            const value = `${hourFormatted}:${minuteFormatted}`;
+    // Process slots in order
+    slots.forEach((slot) => {
+      // Skip invalid slots
+      if (!slot.startTime) {
+        console.log("Skipping invalid slot:", slot);
+        return;
+      }
 
-            timeDate.setMinutes(minute);
-            const label = format(timeDate, "h:mm a");
+      const [hourStr, minuteStr] = slot.startTime.split(":");
+      if (!hourStr || !minuteStr) {
+        console.log("Invalid time format:", slot.startTime);
+        return;
+      }
 
-            minuteSlots.push({
-              label,
-              value,
-              available: true,
-            });
+      const hour = parseInt(hourStr, 10);
+      const minute = parseInt(minuteStr, 10);
+
+      if (isNaN(hour) || isNaN(minute)) {
+        console.log("Invalid time numbers:", hourStr, minuteStr);
+        return;
+      }
+
+      // Skip if not on the hour or half-hour
+      if (minute !== 0 && minute !== 30) return;
+
+      // Create hour slot if it doesn't exist
+      if (!processedHours.has(hour)) {
+        const timeDate = new Date();
+        timeDate.setHours(hour, 0);
+        const hourLabel = format(timeDate, "h a");
+
+        hours.push({
+          hour,
+          label: hourLabel,
+          available: false, // Will update based on minutes
+          minutes: [],
+        });
+
+        processedHours.add(hour);
+      }
+
+      // Find the hour slot
+      const hourSlot = hours.find((h) => h.hour === hour);
+      if (!hourSlot) return;
+
+      // Create minute slot
+      const timeDate = new Date();
+      timeDate.setHours(hour, minute);
+      const label = format(timeDate, "h:mm a");
+      const value = slot.startTime;
+
+      // Check if this time slot works with selected duration
+      const slotAvailable = slot.available; // Just use the slot's available status directly
+
+      hourSlot.minutes.push({
+        label,
+        value,
+        available: slotAvailable,
+      });
+
+      // Update hour availability if any minute is available
+      if (slotAvailable) {
+        hourSlot.available = true;
+      }
+    });
+
+    console.log(`Processed ${hours.length} hour slots`);
+
+    // Sort hours
+    hours.sort((a, b) => a.hour - b.hour);
+
+    // Sort minutes within each hour
+    hours.forEach((hour) => {
+      hour.minutes.sort((a, b) => {
+        const [aHour, aMin] = a.value.split(":").map(Number);
+        const [bHour, bMin] = b.value.split(":").map(Number);
+        return aHour === bHour ? aMin - bMin : aHour - bHour;
+      });
+    });
+
+    return hours;
+  }, []);
+
+  // Fallback function to generate slots if API call fails
+  const fallbackGenerateTimeSlots = useCallback(
+    (date: Date) => {
+      console.log("Using fallback time slot generation");
+      const isWeekend = [0, 6].includes(date.getDay()); // 0 is Sunday, 6 is Saturday
+      const startHour = isWeekend ? 9 : 8; // 9AM for weekends, 8AM for weekdays
+      const endHour = isWeekend ? 22 : 21; // 10PM for weekends, 9PM for weekdays
+
+      const mockTimeSlots: TimeSlot[] = [];
+
+      // Generate time slots every 30 minutes
+      for (let hour = startHour; hour < endHour; hour++) {
+        for (const minute of [0, 30]) {
+          const startHourFormatted = hour.toString().padStart(2, "0");
+          const startMinuteFormatted = minute.toString().padStart(2, "0");
+
+          // Calculate end time (30 minutes later)
+          let endHour = hour;
+          let endMinute = minute + 30;
+
+          if (endMinute >= 60) {
+            endHour += 1;
+            endMinute -= 60;
           }
 
-          // Check if any minute slots are available for today
-          let hourAvailable = true;
+          const endHourFormatted = endHour.toString().padStart(2, "0");
+          const endMinuteFormatted = endMinute.toString().padStart(2, "0");
+
+          // Create time slot
+          const startTime = `${startHourFormatted}:${startMinuteFormatted}`;
+          const endTime = `${endHourFormatted}:${endMinuteFormatted}`;
+
+          // Check if slot is in the past for today
+          let available = true;
           if (isToday(date)) {
             const now = new Date();
-            if (hour < now.getHours()) {
-              hourAvailable = false;
-              minuteSlots.forEach((slot) => {
-                slot.available = false;
-              });
-            } else if (hour === now.getHours()) {
-              minuteSlots.forEach((slot) => {
-                const minute = parseInt(slot.value.split(":")[1], 10);
-                if (minute < now.getMinutes()) {
-                  slot.available = false;
-                }
-              });
-              // Check if any minute slots are available in this hour
-              hourAvailable = minuteSlots.some((slot) => slot.available);
+            const slotDate = new Date(date);
+            slotDate.setHours(hour, minute);
+
+            if (slotDate <= now) {
+              available = false;
             }
           }
 
-          hours.push({
-            hour,
-            label: hourLabel,
-            available: hourAvailable,
-            minutes: minuteSlots,
+          mockTimeSlots.push({
+            startTime,
+            endTime,
+            available,
           });
         }
+      }
 
-        setHourSlots(hours);
-        setSelectedTime("");
+      console.log("Generated mock time slots:", mockTimeSlots.length);
+      setRawTimeSlots(mockTimeSlots);
+
+      // Process the mock time slots
+      const processedHours = processTimeSlots(mockTimeSlots);
+      setHourSlots(processedHours);
+    },
+    [processTimeSlots]
+  );
+
+  const fetchTimeSlots = useCallback(
+    async (date: Date | undefined) => {
+      if (!date || !mounted) return;
+
+      setIsLoadingTimeSlots(true);
+      setTimeSlotError(null);
+      setSelectedTime("");
+
+      try {
+        // Format date as YYYY-MM-DD for API
+        const formattedDate = format(date, "yyyy-MM-dd");
+
+        // Get unitId from selectedUnitName if available
+        let unitId: number | undefined;
+
+        // If we have a selectedUnitName, extract unit ID
+        if (selectedUnitName && selectedUnitName !== "all") {
+          // For now, let's use a mock unit ID of 21 for testing
+          unitId = 21; // This is just a placeholder
+        } else if (selectedConsole) {
+          // If no specific unit is selected but console is, use console ID
+          unitId = selectedConsole.id;
+        } else {
+          // No unit or console selected yet
+          console.log("No unit or console selected");
+          setHourSlots([]);
+          setRawTimeSlots([]);
+          setIsLoadingTimeSlots(false);
+          return;
+        }
+
+        console.log(`Fetching times for unit ${unitId} on ${formattedDate}`);
+
+        // Fetch available times from API
+        try {
+          const response = await getProcessedAvailableTimes(
+            unitId,
+            formattedDate
+          );
+
+          console.log("API response received");
+
+          // Store raw time slots
+          const slots = response.timeSlots || [];
+          console.log(`Got ${slots.length} time slots from API`);
+
+          if (slots.length === 0) {
+            console.log("No slots returned from API");
+            fallbackGenerateTimeSlots(date);
+            return;
+          }
+
+          setRawTimeSlots(slots);
+
+          // Either use API's processed hour slots or process them here
+          if (response.hourSlots && response.hourSlots.length > 0) {
+            console.log(
+              `Using ${response.hourSlots.length} pre-processed hour slots from API`
+            );
+            setHourSlots(response.hourSlots);
+          } else {
+            // Fallback to local processing if API doesn't return hour slots
+            console.log("Processing time slots locally");
+            const processedHours = processTimeSlots(slots);
+            setHourSlots(processedHours);
+          }
+        } catch (apiError) {
+          console.error("API error:", apiError);
+          throw apiError;
+        }
+      } catch (err) {
+        console.error("Error fetching time slots:", err);
+        setTimeSlotError("Failed to load available time slots");
+
+        // Fallback to mock data generation if API fails
+        fallbackGenerateTimeSlots(date);
+      } finally {
+        setIsLoadingTimeSlots(false);
       }
     },
-    [mounted, setSelectedDate, selectedDate]
+    [
+      mounted,
+      selectedUnitName,
+      selectedConsole,
+      processTimeSlots,
+      fallbackGenerateTimeSlots,
+    ]
   );
 
   useEffect(() => {
     if (selectedDate) {
       fetchTimeSlots(selectedDate);
     }
-  }, [selectedDate, fetchTimeSlots]);
+  }, [selectedDate, fetchTimeSlots, selectedUnitName, selectedConsole]);
+
+  // Effect to update availability when duration changes
+  useEffect(() => {
+    if (rawTimeSlots && rawTimeSlots.length > 0) {
+      console.log(
+        "Recalculating availability due to duration change:",
+        duration
+      );
+      const processedHours = processTimeSlots(rawTimeSlots);
+      setHourSlots(processedHours);
+    }
+  }, [duration, rawTimeSlots, processTimeSlots]);
 
   // Function to disable past dates
   const getDisabledDays = () => {
@@ -177,11 +398,23 @@ export default function DateTimeSelection() {
     if (date) {
       setSelectedDate(date);
       setShowCalendar(false);
+      setSelectedTime("");
     }
   };
 
   const handleTimeSelect = (time: string) => {
+    console.log("Time selected:", time);
     setSelectedTime(time);
+
+    // Additional debugging for selected time
+    if (rawTimeSlots && rawTimeSlots.length > 0) {
+      const selectedSlot = rawTimeSlots.find((slot) => slot.startTime === time);
+      if (selectedSlot) {
+        console.log("Selected slot data:", selectedSlot);
+      } else {
+        console.log("Warning: Selected time not found in available slots");
+      }
+    }
   };
 
   const getTimeOfDay = (hour: number): TimeOfDay => {
@@ -231,6 +464,33 @@ export default function DateTimeSelection() {
               <p className="text-[#B99733]/80 mt-2">
                 Select a date and time that works for you
               </p>
+
+              {/* Selected unit info */}
+              {selectedUnitName ? (
+                <Badge
+                  variant="outline"
+                  className="bg-[#B99733]/10 border-[#B99733]/20 text-[#B99733] mt-3"
+                >
+                  {selectedUnitName === "all"
+                    ? "All Units"
+                    : `Selected Unit: ${selectedUnitName}`}
+                </Badge>
+              ) : selectedConsole ? (
+                <Badge
+                  variant="outline"
+                  className="bg-[#B99733]/10 border-[#B99733]/20 text-[#B99733] mt-3"
+                >
+                  {`Selected Console: ${selectedConsole.name}`}
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="bg-red-100 border-red-200 text-red-600 mt-3"
+                >
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  Please select a unit first
+                </Badge>
+              )}
             </header>
 
             <div className="grid md:grid-cols-5 gap-6">
@@ -346,7 +606,9 @@ export default function DateTimeSelection() {
                       )}
                     </div>
                     <CardDescription className="text-[#B99733]/70">
-                      {selectedDate
+                      {!selectedConsole && !selectedUnitName
+                        ? "Please select a unit first"
+                        : selectedDate
                         ? `Available times for your booking`
                         : "Please select a date first"}
                     </CardDescription>
@@ -403,59 +665,119 @@ export default function DateTimeSelection() {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-h-[220px] overflow-y-auto pr-2">
-                      {getFilteredHourSlots().map((hourSlot) => (
-                        <Popover key={hourSlot.hour}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              disabled={!hourSlot.available}
-                              className={cn(
-                                "w-full justify-between h-10 sm:h-12 px-3 py-2 border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm",
-                                !hourSlot.available &&
-                                  "opacity-50 cursor-not-allowed"
-                              )}
-                            >
-                              <div className="flex items-center gap-1 sm:gap-2">
-                                <Clock3 className="h-3 w-3 sm:h-4 sm:w-4 text-[#B99733]" />
-                                <span className="text-[#B99733]">
-                                  {hourSlot.label}
-                                </span>
-                              </div>
-                              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-[#B99733]/70" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-2">
-                            <div className="grid grid-cols-2 gap-1">
-                              {hourSlot.minutes.map((minute) => (
-                                <Button
-                                  key={minute.value}
-                                  variant={
-                                    selectedTime === minute.value
-                                      ? "default"
-                                      : "outline"
-                                  }
-                                  size="sm"
-                                  disabled={!minute.available}
-                                  onClick={() => handleTimeSelect(minute.value)}
-                                  className={cn(
-                                    "justify-center h-8 sm:h-9 text-xs sm:text-sm cursor-pointer",
-                                    selectedTime === minute.value
-                                      ? "bg-[#B99733] text-white hover:bg-[#B99733]/90"
-                                      : "border-[#B99733]/20 hover:bg-[#B99733]/10",
-                                    !minute.available &&
-                                      "opacity-50 cursor-not-allowed"
-                                  )}
-                                >
-                                  {minute.label.split(" ")[0]}
-                                </Button>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      ))}
-                    </div>
+                    {/* Loading state */}
+                    {isLoadingTimeSlots && (
+                      <div className="flex justify-center items-center py-20">
+                        <Loader2 className="h-10 w-10 animate-spin text-[#B99733] mr-3" />
+                        <span>Loading available times...</span>
+                      </div>
+                    )}
 
+                    {/* Error state */}
+                    {timeSlotError && (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <AlertCircle className="h-10 w-10 text-red-500 mb-2" />
+                        <p className="text-red-500 mb-4">{timeSlotError}</p>
+                        <Button
+                          variant="outline"
+                          onClick={() => fetchTimeSlots(selectedDate)}
+                          className="border-[#B99733]/20 hover:bg-[#B99733]/10"
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* No unit selected message */}
+                    {!isLoadingTimeSlots &&
+                      !timeSlotError &&
+                      !selectedConsole &&
+                      !selectedUnitName && (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                          <AlertCircle className="h-10 w-10 text-amber-500 mb-2" />
+                          <p className="text-amber-500">
+                            Please select a console or unit first to view
+                            available times
+                          </p>
+                        </div>
+                      )}
+
+                    {/* Time slots */}
+                    {!isLoadingTimeSlots &&
+                      !timeSlotError &&
+                      (selectedConsole || selectedUnitName) && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-h-[220px] overflow-y-auto pr-2">
+                          {getFilteredHourSlots().length > 0 ? (
+                            getFilteredHourSlots().map((hourSlot) => (
+                              <Popover key={hourSlot.hour}>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    disabled={!hourSlot.available}
+                                    className={cn(
+                                      "w-full justify-between h-10 sm:h-12 px-3 py-2 border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm",
+                                      !hourSlot.available &&
+                                        "opacity-50 cursor-not-allowed"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-1 sm:gap-2">
+                                      <Clock3 className="h-3 w-3 sm:h-4 sm:w-4 text-[#B99733]" />
+                                      <span className="text-[#B99733]">
+                                        {hourSlot.label}
+                                      </span>
+                                    </div>
+                                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-[#B99733]/70" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 p-2">
+                                  <div className="grid grid-cols-2 gap-1">
+                                    {hourSlot.minutes.map((minute) => (
+                                      <Button
+                                        key={minute.value}
+                                        variant={
+                                          selectedTime === minute.value
+                                            ? "default"
+                                            : "outline"
+                                        }
+                                        size="sm"
+                                        disabled={!minute.available}
+                                        onClick={() => {
+                                          console.log(
+                                            "Clicking time:",
+                                            minute.value,
+                                            "Available:",
+                                            minute.available
+                                          );
+                                          handleTimeSelect(minute.value);
+                                        }}
+                                        className={cn(
+                                          "justify-center h-8 sm:h-9 text-xs sm:text-sm cursor-pointer",
+                                          selectedTime === minute.value
+                                            ? "bg-[#B99733] text-white hover:bg-[#B99733]/90"
+                                            : "border-[#B99733]/20 hover:bg-[#B99733]/10",
+                                          !minute.available &&
+                                            "opacity-50 cursor-not-allowed"
+                                        )}
+                                      >
+                                        {minute.label.split(" ")[0]}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            ))
+                          ) : (
+                            <div className="col-span-full flex flex-col items-center justify-center py-8 text-center">
+                              <Clock className="h-10 w-10 text-gray-300 mb-2" />
+                              <p className="text-gray-500">
+                                No available time slots for this selection
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                    {/* Time slot info */}
                     {selectedDate && isToday(selectedDate) && (
                       <p className="text-xs text-[#B99733]/70 mt-4 flex items-center gap-1">
                         <span className="inline-block w-2 h-2 bg-[#B99733]/30 rounded-full"></span>

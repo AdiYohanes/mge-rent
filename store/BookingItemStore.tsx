@@ -3,7 +3,8 @@ import { create } from "zustand";
 // Define the Console type
 export interface Console {
   id: number;
-  name: string;
+  model: string; // The raw model identifier (PS4, PS5) used for API calls
+  name: string; // Display name (PlayStation 4, PlayStation 5)
   image: string;
   description: string;
   price: string; // e.g., "18k"

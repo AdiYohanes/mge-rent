@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   Search,
   Pencil,
@@ -395,7 +395,6 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
-  const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -469,86 +468,53 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     [categories]
   );
 
-  // Helper function to determine the correct category value
-  const determineCategoryValue = useCallback(
-    (categoryData: string | object | unknown): string => {
-      // If it's a string, use directly
-      if (typeof categoryData === "string") {
-        return categoryData;
+  // Helper function to determine the category type (DRY principle)
+  const getCategoryType = useCallback(
+    (categoryData: string | object | null | undefined): string => {
+      // Handle when category is an object with type property
+      if (
+        categoryData &&
+        typeof categoryData === "object" &&
+        "type" in categoryData
+      ) {
+        return (categoryData as { type: string }).type;
       }
-
-      // If it's an object, try to extract appropriate values
-      if (typeof categoryData === "object" && categoryData) {
-        // If it has an id property
-        if (categoryData && "id" in categoryData) {
-          return String((categoryData as { id: string | number }).id);
-        }
-
-        // If it has a type property
-        if (categoryData && "type" in categoryData) {
-          return String((categoryData as { type: string }).type);
-        }
-
-        // If it has a name or category property
-        if (categoryData && "name" in categoryData) {
-          return String((categoryData as { name: string }).name);
-        }
-        if (categoryData && "category" in categoryData) {
-          return String((categoryData as { category: string }).category);
+      // Handle when category is an object with id property
+      else if (
+        categoryData &&
+        typeof categoryData === "object" &&
+        "id" in categoryData
+      ) {
+        const categoryId = (categoryData as { id: number | string }).id;
+        const foundCategory = categories.find((c) => c.id === categoryId);
+        if (foundCategory) {
+          return foundCategory.type;
         }
       }
-
-      // Default to "food" if we can't determine
-      return "food";
-    },
-    []
-  );
-
-  // Helper function for refreshing data with current pagination settings
-  const refreshData = async () => {
-    try {
-      console.log(
-        `Refreshing data with: page=${currentPage}, itemsPerPage=${itemsPerPage}, search="${searchTerm}", tab=${currentTab}`
-      );
-
-      const response = await getFoodDrinkItems(
-        currentPage,
-        itemsPerPage,
-        searchTerm,
-        currentTab !== "all" ? currentTab : ""
-      );
-
-      if (response && Array.isArray(response.data) && response.meta) {
-        setItems(response.data);
-        setTotalItems(response.meta.total || 0);
-        setTotalPages(response.meta.lastPage || 1);
-
-        console.log(
-          `Refresh successful: ${response.data.length} items loaded, total=${response.meta.total}, pages=${response.meta.lastPage}`
-        );
-
-        // Check if we're on an empty page that's not the first page
+      // Handle when category is a string
+      else if (typeof categoryData === "string") {
+        // Check if it's already a type
         if (
-          response.data.length === 0 &&
-          currentPage > 1 &&
-          response.meta.total > 0
+          ["food", "beverage", "snack"].includes(categoryData.toLowerCase())
         ) {
-          console.log(
-            `Current page ${currentPage} is empty but there are items. Resetting to page 1.`
-          );
-          setCurrentPage(1);
+          return categoryData.toLowerCase();
         }
-      } else {
-        console.warn(
-          "Unexpected API response format during refresh:",
-          response
-        );
+        // Otherwise try to find matching category
+        else {
+          const foundCategory = categories.find(
+            (c) => c.category.toLowerCase() === categoryData.toLowerCase()
+          );
+          if (foundCategory) {
+            return foundCategory.type;
+          }
+        }
       }
-    } catch (error) {
-      console.error("Error refreshing data:", error);
-      toast.error("Failed to refresh data. Please try again.");
-    }
-  };
+
+      // Default to empty string if we can't determine
+      return "";
+    },
+    [categories]
+  );
 
   // Fetch data from API
   const fetchData = useCallback(async () => {
@@ -557,14 +523,15 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
 
     try {
       console.log(
-        `Fetching food and drink items for page ${currentPage}, items per page: ${itemsPerPage}`
+        `Fetching all food and drink items for page ${currentPage}, items per page: ${itemsPerPage}`
       );
 
+      // Always fetch all items without filtering by category in the API
       const response = await getFoodDrinkItems(
         currentPage,
         itemsPerPage,
         searchTerm,
-        currentTab !== "all" ? currentTab : ""
+        "" // No category filter - we'll filter on frontend
       );
 
       console.log("API response:", response);
@@ -584,7 +551,6 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         );
 
         setItems(itemsArray);
-        setTotalItems(total);
         setTotalPages(pages);
 
         // If we're on a page that no longer exists (e.g., after deleting the last item on the page)
@@ -605,7 +571,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, searchTerm, currentTab]);
+  }, [currentPage, itemsPerPage, searchTerm]);
 
   // Load data when dependencies change
   useEffect(() => {
@@ -618,9 +584,169 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     // No need to call fetchData directly as it's already in the dependency array of fetchData useCallback
   }, [itemsPerPage]);
 
-  // All data is now displayed directly
-  const filteredData = items;
-  const paginatedData = filteredData;
+  // Filter data based on the current tab and search term
+  const filteredData = useMemo(() => {
+    return items.filter((item) => {
+      // Get the category type for proper filtering
+      let categoryType = "";
+
+      // Handle when category is an object with type property
+      if (
+        item.category &&
+        typeof item.category === "object" &&
+        "type" in item.category
+      ) {
+        categoryType = (item.category as { type: string }).type;
+      }
+      // Handle when category is an object with id property (need to look up the type)
+      else if (
+        item.category &&
+        typeof item.category === "object" &&
+        "id" in item.category
+      ) {
+        const categoryId = (item.category as { id: number | string }).id;
+        const foundCategory = categories.find((c) => c.id === categoryId);
+        if (foundCategory) {
+          categoryType = foundCategory.type;
+        }
+      }
+      // Handle when category is a string - could be the type itself or category name
+      else if (typeof item.category === "string") {
+        // Check if it's already a type
+        if (
+          ["food", "beverage", "snack"].includes(item.category.toLowerCase())
+        ) {
+          categoryType = item.category.toLowerCase();
+        }
+        // Otherwise try to find a matching category
+        else {
+          const foundCategory = categories.find(
+            (c) =>
+              c.category.toLowerCase() ===
+              item.category.toString().toLowerCase()
+          );
+          if (foundCategory) {
+            categoryType = foundCategory.type;
+          }
+        }
+      }
+
+      // Apply the tab filter
+      const categoryMatch =
+        currentTab === "all" ||
+        (currentTab === "food" &&
+          (categoryType === "food" || categoryType === "snack")) ||
+        (currentTab === "drink" && categoryType === "beverage");
+
+      // Apply search filter
+      const searchMatch =
+        searchTerm === "" ||
+        item.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return categoryMatch && searchMatch;
+    });
+  }, [items, currentTab, searchTerm, categories]);
+
+  // Apply pagination to the filtered data
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredData, currentPage, itemsPerPage]);
+
+  // Calculate category counts based on actual types
+  const foodCount = useMemo(() => {
+    return items.filter((item) => {
+      let categoryType = "";
+
+      if (
+        item.category &&
+        typeof item.category === "object" &&
+        "type" in item.category
+      ) {
+        categoryType = (item.category as { type: string }).type;
+      } else if (
+        item.category &&
+        typeof item.category === "object" &&
+        "id" in item.category
+      ) {
+        const categoryId = (item.category as { id: number | string }).id;
+        const foundCategory = categories.find((c) => c.id === categoryId);
+        if (foundCategory) {
+          categoryType = foundCategory.type;
+        }
+      } else if (typeof item.category === "string") {
+        if (["food", "snack"].includes(item.category.toLowerCase())) {
+          categoryType = item.category.toLowerCase();
+        } else {
+          const foundCategory = categories.find(
+            (c) =>
+              c.category.toLowerCase() ===
+              item.category.toString().toLowerCase()
+          );
+          if (foundCategory) {
+            categoryType = foundCategory.type;
+          }
+        }
+      }
+
+      return categoryType === "food" || categoryType === "snack";
+    }).length;
+  }, [items, categories]);
+
+  const drinkCount = useMemo(() => {
+    return items.filter((item) => {
+      let categoryType = "";
+
+      if (
+        item.category &&
+        typeof item.category === "object" &&
+        "type" in item.category
+      ) {
+        categoryType = (item.category as { type: string }).type;
+      } else if (
+        item.category &&
+        typeof item.category === "object" &&
+        "id" in item.category
+      ) {
+        const categoryId = (item.category as { id: number | string }).id;
+        const foundCategory = categories.find((c) => c.id === categoryId);
+        if (foundCategory) {
+          categoryType = foundCategory.type;
+        }
+      } else if (typeof item.category === "string") {
+        if (["beverage"].includes(item.category.toLowerCase())) {
+          categoryType = item.category.toLowerCase();
+        } else {
+          const foundCategory = categories.find(
+            (c) =>
+              c.category.toLowerCase() ===
+              item.category.toString().toLowerCase()
+          );
+          if (foundCategory) {
+            categoryType = foundCategory.type;
+          }
+        }
+      }
+
+      return categoryType === "beverage";
+    }).length;
+  }, [items, categories]);
+
+  // Update pagination state based on filtered data
+  useEffect(() => {
+    // Calculate total pages based on filtered data
+    setTotalPages(Math.max(1, Math.ceil(filteredData.length / itemsPerPage)));
+
+    // Only reset to page 1 if the current page is completely out of range
+    // and not during user-initiated pagination
+    if (
+      currentPage > Math.ceil(filteredData.length / itemsPerPage) &&
+      filteredData.length > 0 &&
+      currentPage !== 1
+    ) {
+      setCurrentPage(1);
+    }
+  }, [filteredData.length, itemsPerPage, currentPage]);
 
   // Format price ke Rupiah
   const formatPrice = (price: string | number) => {
@@ -638,14 +764,42 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     console.log("Editing item:", item);
     setCurrentItem(item);
 
-    const categoryValue = determineCategoryValue(item.category);
-    console.log("Determined category value:", categoryValue);
+    // First get the category type for proper display
+    const categoryType = getCategoryType(item.category);
+
+    // Then get the category ID for the form value
+    let categoryId = "";
+    if (
+      item.category &&
+      typeof item.category === "object" &&
+      "id" in item.category
+    ) {
+      categoryId = String((item.category as { id: string | number }).id);
+    } else {
+      // Try to find the category by name or type
+      const foundCategory = categories.find(
+        (c) =>
+          c.type === categoryType ||
+          (typeof item.category === "string" &&
+            c.category.toLowerCase() === item.category.toLowerCase())
+      );
+      if (foundCategory) {
+        categoryId = String(foundCategory.id);
+      }
+    }
+
+    console.log(
+      "Category ID for edit:",
+      categoryId,
+      "Category type:",
+      categoryType
+    );
 
     setNewItem({
       name: item.name,
       price: item.price,
       image: item.image,
-      category: categoryValue,
+      category: categoryId || categoryType, // Prefer ID if available, otherwise use type
       status: item.is_available ? "Available" : "Sold Out", // Map boolean to string for UI state
     });
 
@@ -659,13 +813,43 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   };
 
   const resetForm = () => {
+    // For the new item, prefer using a category ID if available
+    let defaultCategory: string = "";
+
+    // Choose a category ID based on the current tab
+    if (categories.length > 0) {
+      if (currentTab === "drink") {
+        // Find a beverage category
+        const drinkCategory = categories.find((c) => c.type === "beverage");
+        if (drinkCategory) {
+          defaultCategory = String(drinkCategory.id);
+        }
+      } else {
+        // Find a food category
+        const foodCategory = categories.find((c) => c.type === "food");
+        if (foodCategory) {
+          defaultCategory = String(foodCategory.id);
+        }
+      }
+
+      // If we couldn't find a matching category, use the first available
+      if (!defaultCategory && categories.length > 0) {
+        defaultCategory = String(categories[0].id);
+      }
+    }
+
+    // If no categories are available, fallback to type strings
+    if (!defaultCategory) {
+      defaultCategory = currentTab === "drink" ? "beverage" : "food";
+    }
+
     setNewItem({
       name: "",
-      price: "", // Changed to string
+      price: "",
       image: "",
-      category: currentTab === "drink" ? "beverage" : "food", // Use lowercase
-      status: "Available", // Keep status string for UI state
-      imageFile: undefined, // Clear image file
+      category: defaultCategory,
+      status: "Available",
+      imageFile: undefined,
     });
   };
 
@@ -787,7 +971,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         });
 
         // Refresh data
-        await refreshData();
+        await fetchData();
 
         resetForm();
         setIsAddDialogOpen(false);
@@ -864,7 +1048,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         });
 
         // Refresh data
-        await refreshData();
+        await fetchData();
 
         resetForm();
         setCurrentItem(null);
@@ -898,7 +1082,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         });
 
         // Refresh data
-        await refreshData();
+        await fetchData();
 
         setCurrentItem(null);
         setIsDeleteDialogOpen(false);
@@ -1094,18 +1278,13 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                       variant="outline"
                       className="bg-green-50 text-green-700 hover:bg-green-50"
                     >
-                      {items.filter((item) => item.category === "food").length}{" "}
-                      Food
+                      {foodCount} Food
                     </Badge>
                     <Badge
                       variant="outline"
                       className="bg-blue-50 text-blue-700 hover:bg-blue-50"
                     >
-                      {
-                        items.filter((item) => item.category === "beverage")
-                          .length
-                      }{" "}
-                      Drink
+                      {drinkCount} Drink
                     </Badge>
                   </div>
                 </>
@@ -1117,8 +1296,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     variant="outline"
                     className="bg-green-50 text-green-700 hover:bg-green-50"
                   >
-                    {items.filter((item) => item.category === "food").length}{" "}
-                    items
+                    {foodCount} items
                   </Badge>
                 </>
               )}
@@ -1129,11 +1307,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
                     variant="outline"
                     className="bg-blue-50 text-blue-700 hover:bg-blue-50"
                   >
-                    {
-                      items.filter((item) => item.category === "beverage")
-                        .length
-                    }{" "}
-                    items
+                    {drinkCount} items
                   </Badge>
                 </>
               )}
@@ -1289,19 +1463,20 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
           {/* Pagination Footer */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 px-4 py-3 bg-[#f9f9f7] border-t border-gray-200 rounded-b-md">
             <div className="text-sm text-muted-foreground">
-              {totalItems > 0 ? (
+              {filteredData.length > 0 ? (
                 <span>
                   Showing{" "}
                   <span className="font-medium">
-                    {items.length > 0
+                    {paginatedData.length > 0
                       ? (currentPage - 1) * itemsPerPage + 1
                       : 0}
                   </span>{" "}
                   to{" "}
                   <span className="font-medium">
-                    {Math.min(currentPage * itemsPerPage, totalItems)}
+                    {Math.min(currentPage * itemsPerPage, filteredData.length)}
                   </span>{" "}
-                  of <span className="font-medium">{totalItems}</span> entries
+                  of <span className="font-medium">{filteredData.length}</span>{" "}
+                  entries
                 </span>
               ) : (
                 <span>No entries to display</span>

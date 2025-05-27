@@ -42,6 +42,7 @@ import { Room, getRooms, deleteRoom } from "@/api";
 import axios from "axios";
 import { STORAGE_URL, API_BASE_URL } from "@/api/constants";
 import { getAuthHeader } from "@/api/auth/authApi";
+import { getTokenFromCookie, clearAuthCookies } from "@/utils/cookieUtils";
 
 // Helper function to format image URLs correctly
 const formatImageUrl = (imageUrl: string | null): string => {
@@ -106,7 +107,7 @@ export function RoomTable() {
 
       try {
         // Check if we have a token before making the API call
-        const token = localStorage.getItem("token");
+        const token = getTokenFromCookie();
         if (!token) {
           setError("Silakan login terlebih dahulu untuk melihat daftar kamar.");
           setLoading(false);
@@ -138,8 +139,7 @@ export function RoomTable() {
           err.message.includes("login sudah berakhir")
         ) {
           setError("Sesi login Anda telah berakhir. Silakan login kembali.");
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          clearAuthCookies();
         } else if (
           err instanceof Error &&
           err.message.includes("login terlebih dahulu")

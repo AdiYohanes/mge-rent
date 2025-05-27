@@ -771,7 +771,7 @@ const GamesPage: React.FC = () => {
         {/* Page Header */}
         <div className="mb-10">
           <h1 className="text-center font-minecraft text-4xl md:text-7xl font-bold text-gray-800 mb-4">
-            Our Games Collection
+            Games Collection
           </h1>
           <p className="text-center text-gray-600 max-w-2xl mx-auto">
             Explore our extensive library of games across multiple platforms.

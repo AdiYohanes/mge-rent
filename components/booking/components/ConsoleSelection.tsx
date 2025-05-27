@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,57 +11,92 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import useBookingItemStore from "@/store/BookingItemStore"; // Import Zustand store
+import { getConsolesFlattened } from "@/api/console/publicConsoleApi";
 
-// Define the type for Console
+// Define our local console interface that extends the API ConsoleItem
 interface Console {
   id: number;
-  name: string;
+  model: string; // Original model value from API (PS4, PS5)
+  name: string; // Display name (PlayStation 4, PlayStation 5)
+  price: string;
   image: string;
   description: string;
-  price: string;
 }
 
-// Simplified data with only 3 consoles
-const consolesData: Console[] = [
-  {
-    id: 1,
-    name: "PlayStation 4",
-    image: "/images/console/ps3.png",
-    description: "Classic gaming experience with extensive game library.",
-    price: "18k",
-  },
-  {
-    id: 2,
-    name: "PlayStation 5",
-    image: "/images/console/ps4.png",
-    description:
-      "Next-gen gaming with ultra-fast loading and stunning graphics.",
-    price: "28k",
-  },
-  {
-    id: 3,
-    name: "Xbox Series X",
-    image: "/images/console/ps5.png",
-    description:
-      "Powerful performance with Game Pass and backward compatibility.",
-    price: "25k",
-  },
-];
+// Console descriptions by model
+const CONSOLE_DESCRIPTIONS: Record<string, string> = {
+  PS4: "Classic gaming experience with extensive game library.",
+  PS5: "Next-gen gaming with ultra-fast loading and stunning graphics.",
+  "Xbox Series X":
+    "Powerful performance with Game Pass and backward compatibility.",
+};
 
 const ConsoleSelection = () => {
+  // State for API data
+  const [consoles, setConsoles] = useState<Console[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
   // Using Zustand store to manage the selected console globally
   const { selectedConsole, setSelectedConsole, resetSelectedConsole } =
     useBookingItemStore((state) => state);
 
+  // Fetch consoles from API on component mount
+  useEffect(() => {
+    const fetchConsoles = async () => {
+      try {
+        setIsLoading(true);
+        const consolesData = await getConsolesFlattened();
+
+        // Transform API data to match our local Console interface
+        const enhancedConsoles = consolesData.map((item) => ({
+          ...item,
+          // Keep the original model value (PS4, PS5) for API calls
+          model: item.model,
+          // Use friendly display names
+          name:
+            item.model === "PS4"
+              ? "PlayStation 4"
+              : item.model === "PS5"
+              ? "PlayStation 5"
+              : item.model,
+          description:
+            CONSOLE_DESCRIPTIONS[item.model] ||
+            "High-quality gaming experience with the latest features.",
+        }));
+
+        console.log("Consoles with images:", enhancedConsoles);
+        setConsoles(enhancedConsoles as Console[]);
+      } catch (err) {
+        console.error("Error fetching console data:", err);
+        setError("Failed to load consoles. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchConsoles();
+  }, []);
+
   // Handle selection with Zustand global state
-  const handleSelect = (konsol: Console): void => {
-    if (selectedConsole?.id === konsol.id) {
+  const handleSelect = (console: Console): void => {
+    if (selectedConsole?.id === console.id) {
       resetSelectedConsole(); // Deselect if the same console is clicked
     } else {
-      setSelectedConsole({ ...konsol, id: konsol.id }); // Select the new console with explicit id
-      console.log("Console selected:", konsol.name, "with ID:", konsol.id);
+      // Pass the console object directly - it already has the model property correctly set
+      setSelectedConsole(console);
+
+      // Use window.console to avoid naming conflict
+      window.console.log(
+        "Console selected:",
+        console.name,
+        "with ID:",
+        console.id,
+        "Model for API:",
+        console.model
+      );
     }
   };
 
@@ -67,6 +105,15 @@ const ConsoleSelection = () => {
     e: React.SyntheticEvent<HTMLImageElement, Event>
   ): void => {
     e.currentTarget.src = "/placeholder.svg?height=200&width=300";
+  };
+
+  // Format price for display
+  const formatPrice = (price: string): string => {
+    const priceValue = parseInt(price);
+    if (priceValue >= 1000) {
+      return `${priceValue / 1000}k`;
+    }
+    return price;
   };
 
   return (
@@ -79,68 +126,91 @@ const ConsoleSelection = () => {
         hourly rate.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
-        {consolesData.map((console) => (
-          <Card
-            key={console.id}
-            className={`overflow-hidden transition-all duration-300 hover:shadow-lg border cursor-pointer rounded-none ${
-              selectedConsole?.id === console.id
-                ? "ring-2 ring-[#B99733]" // Gold ring for selected
-                : "border-gray-200"
-            }`}
-            onClick={() => handleSelect(console)} // Add click to select card
+      {isLoading ? (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-10 w-10 animate-spin text-[#B99733]" />
+          <span className="ml-2 text-xl">Loading consoles...</span>
+        </div>
+      ) : error ? (
+        <div className="text-center text-red-500 py-10">
+          <p>{error}</p>
+          <Button
+            className="mt-4 bg-[#B99733] hover:bg-[#8a701c]"
+            onClick={() => window.location.reload()}
           >
-            <div className="relative">
-              <Image
-                src={console.image}
-                alt={console.name}
-                width={400}
-                height={250}
-                className="object-cover w-full h-48"
-                onError={handleImageError}
-              />
+            Try Again
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          {consoles.map((console) => (
+            <Card
+              key={console.id}
+              className={`overflow-hidden transition-all duration-300 hover:shadow-lg border cursor-pointer rounded-none ${
+                selectedConsole?.id === console.id
+                  ? "ring-2 ring-[#B99733]" // Gold ring for selected
+                  : "border-gray-200"
+              }`}
+              onClick={() => handleSelect(console)} // Add click to select card
+            >
+              <div className="relative">
+                {/* Image is now coming from API with STORAGE_URL already included */}
+                <Image
+                  src={console.image}
+                  alt={console.name}
+                  width={400}
+                  height={250}
+                  className="object-cover w-full h-48"
+                  onError={handleImageError}
+                  unoptimized={true} // Important for external images
+                />
 
-              {/* Price badge */}
-              <Badge className="absolute top-[-1.5rem] right-0 bg-[#B99733] text-white px-2 py-1 flex flex-col items-end font-minecraft rounded-none">
-                <span className="text-sm m-0">Starts From</span>
-                <span className="text-4xl m-0">{console.price}</span>
-              </Badge>
-            </div>
+                {/* Price badge */}
+                <Badge className="absolute top-[-1.5rem] right-0 bg-[#B99733] text-white px-2 py-1 flex flex-col items-end font-minecraft rounded-none">
+                  <span className="text-sm m-0">Starts From</span>
+                  <span className="text-4xl m-0">
+                    {formatPrice(console.price)}
+                  </span>
+                </Badge>
+              </div>
 
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xl font-bold text-gray-800">
-                {console.name}
-              </CardTitle>
-            </CardHeader>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl font-bold text-gray-800">
+                  {console.name}
+                </CardTitle>
+              </CardHeader>
 
-            <CardContent className="pb-6">
-              <p className="text-gray-600 text-sm">{console.description}</p>
-            </CardContent>
+              <CardContent className="pb-6">
+                <p className="text-gray-600 text-sm">{console.description}</p>
+              </CardContent>
 
-            <CardFooter className="pt-0">
-              <Button
-                className={`w-full rounded-md font-medium transition-all duration-300 cursor-pointer ${
-                  selectedConsole?.id === console.id
-                    ? "bg-[#B99733] text-white hover:bg-[#695721] shadow-md"
-                    : "bg-linear-to-r from-gray-100 to-gray-200 text-gray-800 hover:bg-[#f0f0f0] border border-gray-300"
-                }`}
-                onClick={() => handleSelect(console)}
-                aria-label={`Select ${console.name}`}
-              >
-                <span className="flex items-center justify-center gap-2 py-1">
-                  {selectedConsole?.id === console.id ? "Selected" : "Select"}
-                  <ChevronRight
-                    size={16}
-                    className={
-                      selectedConsole?.id === console.id ? "animate-pulse" : ""
-                    }
-                  />
-                </span>
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+              <CardFooter className="pt-0">
+                <Button
+                  className={`w-full rounded-md font-medium transition-all duration-300 cursor-pointer ${
+                    selectedConsole?.id === console.id
+                      ? "bg-[#B99733] text-white hover:bg-[#695721] shadow-md"
+                      : "bg-linear-to-r from-gray-100 to-gray-200 text-gray-800 hover:bg-[#f0f0f0] border border-gray-300"
+                  }`}
+                  onClick={() => handleSelect(console)}
+                  aria-label={`Select ${console.name}`}
+                >
+                  <span className="flex items-center justify-center gap-2 py-1">
+                    {selectedConsole?.id === console.id ? "Selected" : "Select"}
+                    <ChevronRight
+                      size={16}
+                      className={
+                        selectedConsole?.id === console.id
+                          ? "animate-pulse"
+                          : ""
+                      }
+                    />
+                  </span>
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

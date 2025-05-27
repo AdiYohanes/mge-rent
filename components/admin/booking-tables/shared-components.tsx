@@ -1,49 +1,84 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { BookingStatus } from "../BookingTable";
+import {
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  CalendarCheck,
+  ArrowLeftRight,
+  Ban,
+} from "lucide-react";
 
-// Status badge component
+// Status Booking Types
+export type BookingStatus =
+  | "success"
+  | "cancelled"
+  | "refunded"
+  | "completed"
+  | "rescheduled";
+
+// Array untuk dropdown bulan
+export const months = [
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
+// Array untuk dropdown tahun (tahun sekarang + 2 tahun sebelumnya + 2 tahun berikutnya)
+const currentYear = new Date().getFullYear();
+export const years = Array.from({ length: 5 }, (_, i) =>
+  (currentYear - 2 + i).toString()
+);
+
+// Status Badge Component
 export const StatusBadge = ({ status }: { status: BookingStatus }) => {
   switch (status) {
-    case "booking_success":
+    case "success":
       return (
-        <Badge className="bg-blue-500 hover:bg-blue-600 text-white">
-          Booking Success
+        <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-200 flex items-center gap-1">
+          <CheckCircle2 className="h-3 w-3" /> Success
         </Badge>
       );
-    case "booking_ongoing":
+    case "cancelled":
       return (
-        <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
-          Ongoing
+        <Badge className="bg-red-100 text-red-800 border-red-300 hover:bg-red-200 flex items-center gap-1">
+          <XCircle className="h-3 w-3" /> Cancelled
         </Badge>
       );
-    case "booking_finish":
+    case "refunded":
       return (
-        <Badge className="bg-green-500 hover:bg-green-600 text-white">
-          Finished
+        <Badge className="bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200 flex items-center gap-1">
+          <RotateCcw className="h-3 w-3" /> Refunded
         </Badge>
       );
-    case "booking_canceled":
+    case "completed":
       return (
-        <Badge className="bg-red-500 hover:bg-red-600 text-white">
-          Canceled
+        <Badge className="bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200 flex items-center gap-1">
+          <CalendarCheck className="h-3 w-3" /> Completed
         </Badge>
       );
-    case "return":
+    case "rescheduled":
       return (
-        <Badge className="bg-purple-500 hover:bg-purple-600 text-white">
-          Refunded
-        </Badge>
-      );
-    case "booking_reschedule":
-      return (
-        <Badge className="bg-indigo-500 hover:bg-indigo-600 text-white">
-          Reschedule
+        <Badge className="bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 flex items-center gap-1">
+          <ArrowLeftRight className="h-3 w-3" /> Rescheduled
         </Badge>
       );
     default:
-      return <Badge>{status}</Badge>;
+      return (
+        <Badge className="bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200 flex items-center gap-1">
+          <Ban className="h-3 w-3" /> Unknown
+        </Badge>
+      );
   }
 };
 
@@ -57,22 +92,3 @@ export const generatePaginationButtons = (
   // This is a placeholder to show the structure
   return [];
 };
-
-// Generate years for filter (2023-2025)
-export const years = ["2023", "2024", "2025"];
-
-// Generate months for filter
-export const months = [
-  { value: "01", label: "January" },
-  { value: "02", label: "February" },
-  { value: "03", label: "March" },
-  { value: "04", label: "April" },
-  { value: "05", label: "May" },
-  { value: "06", label: "June" },
-  { value: "07", label: "July" },
-  { value: "08", label: "August" },
-  { value: "09", label: "September" },
-  { value: "10", label: "October" },
-  { value: "11", label: "November" },
-  { value: "12", label: "December" },
-];
