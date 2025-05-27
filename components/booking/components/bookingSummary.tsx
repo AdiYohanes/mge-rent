@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ChevronUp,
   ChevronDown,
@@ -72,7 +72,7 @@ export default function BookingSummary({
   );
   const endTime = useBookingItemStore((state) => state.endTime);
 
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [highlightTotal, setHighlightTotal] = useState(false);
   const [promoCode, setPromoCode] = useState<string>("");
   const [discount, setDiscount] = useState(0);
@@ -84,12 +84,35 @@ export default function BookingSummary({
     useState<ConsoleUnitType | null>(null);
   const [showConsoleUnitSelector, setShowConsoleUnitSelector] = useState(false);
 
+  // Check if summary is empty (no selections made)
+  const hasConsole = Boolean(selectedConsole);
+  const hasRoom = Boolean(selectedRoom);
+  const hasTime = Boolean(selectedTime);
+  const hasFood = foodCart.length > 0;
+
+  // Consider summary empty if no actual selections have been made
+  const isEmptySummary = !hasConsole && !hasRoom && !hasTime && !hasFood;
+
   // Predefined promo codes with discount percentages
   const promoCodes: PromoCodesType = {
     DISCOUNT10: 0.1, // 10% discount
     DISCOUNT20: 0.2, // 20% discount
     DISCOUNT30: 0.3, // 30% discount
   };
+
+  // Auto-expand summary when selections are made
+  useEffect(() => {
+    if (!isEmptySummary && !isOpen) {
+      setIsOpen(true);
+    }
+  }, [
+    selectedConsole,
+    selectedRoom,
+    selectedTime,
+    foodCart.length,
+    isEmptySummary,
+    isOpen,
+  ]);
 
   // Console unit options
   const consoleUnits: UnitOption[] = [
@@ -141,15 +164,20 @@ export default function BookingSummary({
       icon: <Home size={16} className="text-emerald-500" />,
       hasUnitSelection: false, // This refers to the console's specific unit selector, not the room's unit
     },
-    {
-      type: "Duration",
-      description: `${duration} Hour${duration > 1 ? "s" : ""}${
-        selectedTime ? ` | Start From ${selectedTime}` : ""
-      }${endTime ? ` (Ends at ${format(endTime, "HH:mm")})` : ""}`,
-      quantity: 1,
-      total: 30000, // This total seems static, assuming duration cost is calculated elsewhere or included in room/console
-      icon: <Clock size={16} className="text-amber-500" />,
-    },
+    // Only include duration when a time has been selected
+    ...(selectedTime
+      ? [
+          {
+            type: "Duration",
+            description: `${duration} Hour${duration > 1 ? "s" : ""}${
+              selectedTime ? ` | Start From ${selectedTime}` : ""
+            }${endTime ? ` (Ends at ${format(endTime, "HH:mm")})` : ""}`,
+            quantity: 1,
+            total: 30000, // This total seems static, assuming duration cost is calculated elsewhere or included in room/console
+            icon: <Clock size={16} className="text-amber-500" />,
+          },
+        ]
+      : []),
     {
       type: "Food & Drinks",
       description:
@@ -244,9 +272,13 @@ export default function BookingSummary({
           </h2>
           <Badge
             variant="outline"
-            className="bg-indigo-50 border-indigo-200 text-xs md:text-sm"
+            className={`text-xs md:text-sm ${
+              isEmptySummary
+                ? "bg-gray-50 border-gray-200 text-gray-500"
+                : "bg-indigo-50 border-indigo-200"
+            }`}
           >
-            {items.length} items
+            {isEmptySummary ? "Empty" : `${items.length} items`}
           </Badge>
         </div>
         <button
@@ -269,7 +301,9 @@ export default function BookingSummary({
           Selected Date
         </div>
         <div className="text-sm md:text-md text-gray-700">
-          {format(dateToDisplay, "EEEE, MMMM d, yyyy")}
+          {selectedDateFromStore || selectedDateProp
+            ? format(dateToDisplay, "EEEE, MMMM d, yyyy")
+            : "No date selected"}
         </div>
       </div>
 
@@ -284,145 +318,306 @@ export default function BookingSummary({
             className="overflow-hidden"
           >
             <div className="p-3 md:p-5 border-t border-gray-100">
-              {/* Desktop Table View */}
-              <div className="hidden md:block rounded-lg border border-gray-200 overflow-hidden mb-4">
-                <Table className="w-full">
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableCell className="text-sm font-medium text-gray-600 py-3">
-                        Item
-                      </TableCell>
-                      <TableCell className="text-sm font-medium text-gray-600 py-3">
-                        Details
-                      </TableCell>
-                      <TableCell className="text-sm font-medium text-gray-600 py-3 text-center">
-                        Qty
-                      </TableCell>
-                      <TableCell className="text-sm font-medium text-gray-600 py-3 text-right">
-                        Price
-                      </TableCell>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item, index) => (
-                      <TableRow
-                        key={index}
-                        className="hover:bg-gray-50 transition-colors group"
-                      >
-                        <TableCell className="py-3 font-medium">
-                          <div className="flex items-center gap-2">
-                            {item.icon}
-                            {item.type}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <div className="flex items-center gap-2">
-                            {item.description}
-                          </div>
+              {/* Empty State */}
+              {isEmptySummary ? (
+                <div className="text-center py-8">
+                  <div className="flex justify-center mb-4">
+                    <Info className="h-12 w-12 text-[#B99733]/50" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                    No selections made yet
+                  </h3>
+                  <p className="text-gray-500 text-sm max-w-md mx-auto">
+                    Your booking summary will appear here after you select a
+                    console, room, and time.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block rounded-lg border border-gray-200 overflow-hidden mb-4">
+                    <Table className="w-full">
+                      <TableHeader>
+                        <TableRow className="bg-gray-50">
+                          <TableCell className="text-sm font-medium text-gray-600 py-3">
+                            Item
+                          </TableCell>
+                          <TableCell className="text-sm font-medium text-gray-600 py-3">
+                            Details
+                          </TableCell>
+                          <TableCell className="text-sm font-medium text-gray-600 py-3 text-center">
+                            Qty
+                          </TableCell>
+                          <TableCell className="text-sm font-medium text-gray-600 py-3 text-right">
+                            Price
+                          </TableCell>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item, index) => (
+                          <TableRow
+                            key={index}
+                            className="hover:bg-gray-50 transition-colors group"
+                          >
+                            <TableCell className="py-3 font-medium">
+                              <div className="flex items-center gap-2">
+                                {item.icon}
+                                {item.type}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <div className="flex items-center gap-2">
+                                {item.description}
+                              </div>
 
-                          {/* Console Unit Selector */}
-                          {item.hasUnitSelection && showConsoleUnitSelector && (
-                            <div className="mt-2 bg-white border border-gray-200 rounded-md shadow-sm p-2 max-h-[200px] overflow-y-auto grid grid-cols-3 gap-1">
-                              {consoleUnits.map((unit) => (
-                                <button
-                                  key={unit.id}
-                                  onClick={() => handleUnitSelection(unit.id)}
-                                  disabled={unit.status !== "available"}
-                                  className={`text-xs py-1 px-2 rounded flex items-center justify-between ${
-                                    unit.status === "available"
-                                      ? "hover:bg-indigo-50 cursor-pointer"
-                                      : "opacity-50 cursor-not-allowed bg-gray-100"
-                                  } ${
-                                    selectedConsoleUnit === unit.id
-                                      ? "bg-indigo-100 border border-indigo-300"
-                                      : ""
-                                  }`}
-                                >
-                                  <span>{unit.label}</span>
-                                  <span
-                                    className={`ml-1 h-2 w-2 rounded-full ${
-                                      unit.status === "available"
-                                        ? "bg-green-500"
-                                        : unit.status === "occupied"
-                                        ? "bg-red-500"
-                                        : "bg-amber-500"
-                                    }`}
-                                  ></span>
-                                </button>
-                              ))}
+                              {/* Console Unit Selector */}
+                              {item.hasUnitSelection &&
+                                showConsoleUnitSelector && (
+                                  <div className="mt-2 bg-white border border-gray-200 rounded-md shadow-sm p-2 max-h-[200px] overflow-y-auto grid grid-cols-3 gap-1">
+                                    {consoleUnits.map((unit) => (
+                                      <button
+                                        key={unit.id}
+                                        onClick={() =>
+                                          handleUnitSelection(unit.id)
+                                        }
+                                        disabled={unit.status !== "available"}
+                                        className={`text-xs py-1 px-2 rounded flex items-center justify-between ${
+                                          unit.status === "available"
+                                            ? "hover:bg-indigo-50 cursor-pointer"
+                                            : "opacity-50 cursor-not-allowed bg-gray-100"
+                                        } ${
+                                          selectedConsoleUnit === unit.id
+                                            ? "bg-indigo-100 border border-indigo-300"
+                                            : ""
+                                        }`}
+                                      >
+                                        <span>{unit.label}</span>
+                                        <span
+                                          className={`ml-1 h-2 w-2 rounded-full ${
+                                            unit.status === "available"
+                                              ? "bg-green-500"
+                                              : unit.status === "occupied"
+                                              ? "bg-red-500"
+                                              : "bg-amber-500"
+                                          }`}
+                                        ></span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                            </TableCell>
+                            <TableCell className="py-3 text-center">
+                              {item.quantity}
+                            </TableCell>
+                            <TableCell className="py-3 text-right font-medium">
+                              {item.total.toLocaleString("id-ID", {
+                                style: "currency",
+                                currency: "IDR",
+                              })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell colSpan={3} className="py-3">
+                            <div className="font-medium text-gray-700">
+                              Subtotal
                             </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-3 text-center">
-                          {item.quantity}
-                        </TableCell>
-                        <TableCell className="py-3 text-right font-medium">
-                          {item.total.toLocaleString("id-ID", {
-                            style: "currency",
-                            currency: "IDR",
-                          })}
-                        </TableCell>
-                      </TableRow>
+                          </TableCell>
+                          <TableCell className="py-3 text-right font-medium">
+                            {subtotal.toLocaleString("id-ID", {
+                              style: "currency",
+                              currency: "IDR",
+                            })}
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Discount Row - Only show when discount exists */}
+                        {discount > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="py-3">
+                              <div className="font-medium text-green-600">
+                                Discount
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3 text-right font-medium text-green-600">
+                              -{" "}
+                              {discount.toLocaleString("id-ID", {
+                                style: "currency",
+                                currency: "IDR",
+                              })}
+                            </TableCell>
+                          </TableRow>
+                        )}
+
+                        {/* Tax Row */}
+                        <TableRow>
+                          <TableCell colSpan={3} className="py-3">
+                            <div className="font-medium text-gray-700">
+                              Tax (10%)
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 text-right font-medium">
+                            {tax.toLocaleString("id-ID", {
+                              style: "currency",
+                              currency: "IDR",
+                            })}
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Total Row */}
+                        <TableRow className="border-t-2 border-gray-200">
+                          <TableCell colSpan={3} className="py-4">
+                            <div className="font-bold text-gray-900 text-lg">
+                              Total
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 text-right">
+                            <motion.div
+                              className="font-bold text-lg text-black"
+                              animate={{
+                                scale: highlightTotal ? 1.05 : 1,
+                                color: highlightTotal ? "#10b981" : "#000000",
+                              }}
+                              transition={{ duration: 0.5 }}
+                            >
+                              {total.toLocaleString("id-ID", {
+                                style: "currency",
+                                currency: "IDR",
+                              })}
+                            </motion.div>
+                          </TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3 mb-4">
+                    {items.map((item, index) => (
+                      <div
+                        key={index}
+                        className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="rounded-full w-7 h-7 flex items-center justify-center bg-gray-100">
+                              {item.icon}
+                            </div>
+                            <span className="font-medium text-sm">
+                              {item.type}
+                            </span>
+                          </div>
+                          <div className="font-semibold text-right text-sm">
+                            {item.total.toLocaleString("id-ID", {
+                              style: "currency",
+                              currency: "IDR",
+                            })}
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 mb-2">
+                          <div>{item.description}</div>
+                          <div>Qty: {item.quantity}</div>
+                        </div>
+
+                        {/* Mobile Unit Selection */}
+                        {item.hasUnitSelection && (
+                          <div className="mt-1">
+                            <Button
+                              onClick={() => toggleConsoleUnitSelector()}
+                              variant="outline"
+                              size="sm"
+                              className="w-full h-7 text-xs bg-indigo-50 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300"
+                            >
+                              {selectedConsoleUnit
+                                ? `Console Unit: ${selectedConsoleUnit}`
+                                : "Select Console Unit"}
+                            </Button>
+
+                            {/* Mobile Console Unit Selector */}
+                            {showConsoleUnitSelector && (
+                              <div className="mt-2 bg-white border border-gray-200 rounded-md shadow-sm p-2 max-h-[150px] overflow-y-auto grid grid-cols-2 gap-1">
+                                {consoleUnits.map((unit) => (
+                                  <button
+                                    key={unit.id}
+                                    onClick={() => handleUnitSelection(unit.id)}
+                                    disabled={unit.status !== "available"}
+                                    className={`text-xs py-1 px-2 rounded flex items-center justify-between ${
+                                      unit.status === "available"
+                                        ? "hover:bg-indigo-50 cursor-pointer"
+                                        : "opacity-50 cursor-not-allowed bg-gray-100"
+                                    } ${
+                                      selectedConsoleUnit === unit.id
+                                        ? "bg-indigo-100 border border-indigo-300"
+                                        : ""
+                                    }`}
+                                  >
+                                    <span>{unit.label}</span>
+                                    <span
+                                      className={`ml-1 h-2 w-2 rounded-full ${
+                                        unit.status === "available"
+                                          ? "bg-green-500"
+                                          : unit.status === "occupied"
+                                          ? "bg-red-500"
+                                          : "bg-amber-500"
+                                      }`}
+                                    ></span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell colSpan={3} className="py-3">
-                        <div className="font-medium text-gray-700">
+
+                    {/* Mobile Summary */}
+                    <div className="bg-gray-50 p-3 rounded-lg mt-4 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm font-medium text-gray-700">
                           Subtotal
                         </div>
-                      </TableCell>
-                      <TableCell className="py-3 text-right font-medium">
-                        {subtotal.toLocaleString("id-ID", {
-                          style: "currency",
-                          currency: "IDR",
-                        })}
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Discount Row - Only show when discount exists */}
-                    {discount > 0 && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="py-3">
-                          <div className="font-medium text-green-600">
-                            Discount
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-3 text-right font-medium text-green-600">
-                          -{" "}
-                          {discount.toLocaleString("id-ID", {
+                        <div className="font-medium">
+                          {subtotal.toLocaleString("id-ID", {
                             style: "currency",
                             currency: "IDR",
                           })}
-                        </TableCell>
-                      </TableRow>
-                    )}
+                        </div>
+                      </div>
 
-                    {/* Tax Row */}
-                    <TableRow>
-                      <TableCell colSpan={3} className="py-3">
-                        <div className="font-medium text-gray-700">
+                      {/* Discount - Only show when discount exists */}
+                      {discount > 0 && (
+                        <div className="flex justify-between items-center">
+                          <div className="text-sm font-medium text-green-600">
+                            Discount
+                          </div>
+                          <div className="font-medium text-green-600">
+                            -{" "}
+                            {discount.toLocaleString("id-ID", {
+                              style: "currency",
+                              currency: "IDR",
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm font-medium text-gray-700">
                           Tax (10%)
                         </div>
-                      </TableCell>
-                      <TableCell className="py-3 text-right font-medium">
-                        {tax.toLocaleString("id-ID", {
-                          style: "currency",
-                          currency: "IDR",
-                        })}
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Total Row */}
-                    <TableRow className="border-t-2 border-gray-200">
-                      <TableCell colSpan={3} className="py-4">
-                        <div className="font-bold text-gray-900 text-lg">
-                          Total
+                        <div className="font-medium">
+                          {tax.toLocaleString("id-ID", {
+                            style: "currency",
+                            currency: "IDR",
+                          })}
                         </div>
-                      </TableCell>
-                      <TableCell className="py-4 text-right">
+                      </div>
+
+                      <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between items-center">
+                        <div className="font-bold text-gray-900">Total</div>
                         <motion.div
-                          className="font-bold text-lg text-black"
+                          className="font-bold"
                           animate={{
                             scale: highlightTotal ? 1.05 : 1,
                             color: highlightTotal ? "#10b981" : "#000000",
@@ -434,210 +629,73 @@ export default function BookingSummary({
                             currency: "IDR",
                           })}
                         </motion.div>
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Mobile Card View */}
-              <div className="md:hidden space-y-3 mb-4">
-                {items.map((item, index) => (
-                  <div
-                    key={index}
-                    className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm"
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="rounded-full w-7 h-7 flex items-center justify-center bg-gray-100">
-                          {item.icon}
+                  {/* Promo Code Section with Status Feedback */}
+                  {showPromoCode && (
+                    <div className="mt-5">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+                        <div className="relative flex-grow">
+                          <Input
+                            type="text"
+                            placeholder="Enter promo code"
+                            className="w-full border-[#B99733] focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 rounded-md pr-10"
+                            value={promoCode}
+                            onChange={(e) =>
+                              setPromoCode(e.target.value.toUpperCase())
+                            }
+                            onKeyDown={handleKeyDown}
+                          />
+                          {promoStatus === "success" && (
+                            <Check className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 h-5 w-5" />
+                          )}
+                          {promoStatus === "error" && (
+                            <X className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 h-5 w-5" />
+                          )}
                         </div>
-                        <span className="font-medium text-sm">{item.type}</span>
-                      </div>
-                      <div className="font-semibold text-right text-sm">
-                        {item.total.toLocaleString("id-ID", {
-                          style: "currency",
-                          currency: "IDR",
-                        })}
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-2">
-                      <div>{item.description}</div>
-                      <div>Qty: {item.quantity}</div>
-                    </div>
-
-                    {/* Mobile Unit Selection */}
-                    {item.hasUnitSelection && (
-                      <div className="mt-1">
                         <Button
-                          onClick={() => toggleConsoleUnitSelector()}
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-7 text-xs bg-indigo-50 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300"
+                          onClick={handleApplyPromoCode}
+                          className="bg-[#B99733] hover:bg-[#9e8230] text-white rounded-md whitespace-nowrap px-6"
                         >
-                          {selectedConsoleUnit
-                            ? `Console Unit: ${selectedConsoleUnit}`
-                            : "Select Console Unit"}
+                          Apply Code
                         </Button>
+                      </div>
 
-                        {/* Mobile Console Unit Selector */}
-                        {showConsoleUnitSelector && (
-                          <div className="mt-2 bg-white border border-gray-200 rounded-md shadow-sm p-2 max-h-[150px] overflow-y-auto grid grid-cols-2 gap-1">
-                            {consoleUnits.map((unit) => (
-                              <button
-                                key={unit.id}
-                                onClick={() => handleUnitSelection(unit.id)}
-                                disabled={unit.status !== "available"}
-                                className={`text-xs py-1 px-2 rounded flex items-center justify-between ${
-                                  unit.status === "available"
-                                    ? "hover:bg-indigo-50 cursor-pointer"
-                                    : "opacity-50 cursor-not-allowed bg-gray-100"
-                                } ${
-                                  selectedConsoleUnit === unit.id
-                                    ? "bg-indigo-100 border border-indigo-300"
-                                    : ""
-                                }`}
-                              >
-                                <span>{unit.label}</span>
-                                <span
-                                  className={`ml-1 h-2 w-2 rounded-full ${
-                                    unit.status === "available"
-                                      ? "bg-green-500"
-                                      : unit.status === "occupied"
-                                      ? "bg-red-500"
-                                      : "bg-amber-500"
-                                  }`}
-                                ></span>
-                              </button>
-                            ))}
-                          </div>
+                      {/* Promo code message */}
+                      <AnimatePresence>
+                        {promoStatus !== "idle" && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <div
+                              className={`mt-2 text-sm ${
+                                promoStatus === "success"
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {promoMessage}
+                            </div>
+                          </motion.div>
                         )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      </AnimatePresence>
 
-                {/* Mobile Summary */}
-                <div className="bg-gray-50 p-3 rounded-lg mt-4 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="text-sm font-medium text-gray-700">
-                      Subtotal
-                    </div>
-                    <div className="font-medium">
-                      {subtotal.toLocaleString("id-ID", {
-                        style: "currency",
-                        currency: "IDR",
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Discount - Only show when discount exists */}
-                  {discount > 0 && (
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm font-medium text-green-600">
-                        Discount
-                      </div>
-                      <div className="font-medium text-green-600">
-                        -{" "}
-                        {discount.toLocaleString("id-ID", {
-                          style: "currency",
-                          currency: "IDR",
-                        })}
+                      {/* Promo code hints */}
+                      <div className="mt-2 flex items-start gap-1">
+                        <Info size={14} className="text-gray-400 mt-0.5" />
+                        <span className="text-xs text-gray-500">
+                          Try these promo codes: DISCOUNT10, DISCOUNT20,
+                          DISCOUNT30
+                        </span>
                       </div>
                     </div>
                   )}
-
-                  <div className="flex justify-between items-center">
-                    <div className="text-sm font-medium text-gray-700">
-                      Tax (10%)
-                    </div>
-                    <div className="font-medium">
-                      {tax.toLocaleString("id-ID", {
-                        style: "currency",
-                        currency: "IDR",
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between items-center">
-                    <div className="font-bold text-gray-900">Total</div>
-                    <motion.div
-                      className="font-bold"
-                      animate={{
-                        scale: highlightTotal ? 1.05 : 1,
-                        color: highlightTotal ? "#10b981" : "#000000",
-                      }}
-                      transition={{ duration: 0.5 }}
-                    >
-                      {total.toLocaleString("id-ID", {
-                        style: "currency",
-                        currency: "IDR",
-                      })}
-                    </motion.div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Promo Code Section with Status Feedback */}
-              {showPromoCode && (
-                <div className="mt-5">
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-                    <div className="relative flex-grow">
-                      <Input
-                        type="text"
-                        placeholder="Enter promo code"
-                        className="w-full border-[#B99733] focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 rounded-md pr-10"
-                        value={promoCode}
-                        onChange={(e) =>
-                          setPromoCode(e.target.value.toUpperCase())
-                        }
-                        onKeyDown={handleKeyDown}
-                      />
-                      {promoStatus === "success" && (
-                        <Check className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 h-5 w-5" />
-                      )}
-                      {promoStatus === "error" && (
-                        <X className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 h-5 w-5" />
-                      )}
-                    </div>
-                    <Button
-                      onClick={handleApplyPromoCode}
-                      className="bg-[#B99733] hover:bg-[#9e8230] text-white rounded-md whitespace-nowrap px-6"
-                    >
-                      Apply Code
-                    </Button>
-                  </div>
-
-                  {/* Promo code message */}
-                  <AnimatePresence>
-                    {promoStatus !== "idle" && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div
-                          className={`mt-2 text-sm ${
-                            promoStatus === "success"
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {promoMessage}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Promo code hints */}
-                  <div className="mt-2 flex items-start gap-1">
-                    <Info size={14} className="text-gray-400 mt-0.5" />
-                    <span className="text-xs text-gray-500">
-                      Try these promo codes: DISCOUNT10, DISCOUNT20, DISCOUNT30
-                    </span>
-                  </div>
-                </div>
+                </>
               )}
             </div>
           </motion.div>
