@@ -255,7 +255,7 @@ export function FAQTable() {
                         variant={currentPage === i ? "default" : "outline"}
                         size="sm"
                         onClick={() => setCurrentPage(i)}
-                        className={`h-8 w-8 p-0 rounded-full ${currentPage === i ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+                        className={`h-8 w-8 p-0 rounded-full ${currentPage === i ? 'bg-[#B99733] hover:bg-amber-600' : ''}`}
                         disabled={loading}
                     >
                         {i}
@@ -345,7 +345,7 @@ export function FAQTable() {
                         </Button>
 
                         <Button
-                            className="bg-amber-500 hover:bg-amber-600 h-9"
+                            className="bg-[#B99733] hover:bg-amber-600 h-9"
                             onClick={() => setIsAddFAQOpen(true)}
                             disabled={loading}
                         >

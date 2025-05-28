@@ -26,18 +26,11 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarIcon,
-  Clock,
   RefreshCw,
-  RotateCcw,
-  CalendarCheck,
   Loader2,
   Pencil,
   Trash2,
   AlertCircle,
-  CheckCircle2,
-  XCircle,
-  ArrowLeftRight,
-  Ban,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -107,7 +100,7 @@ const addOTSBookingSchema = z.object({
     required_error: "Please select a date",
   }),
   startTime: z.string().min(1, "Please select a start time"),
-  duration: z.coerce.number().min(1, "Duration must be at least 1 Hours"),
+  duration: z.coerce.number().min(60, "Duration must be at least 60 minutes"),
   totalCustomer: z.coerce.number().min(1, "At least 1 customer required"),
 });
 
@@ -120,7 +113,7 @@ const editBookingSchema = z.object({
     required_error: "Please select a date",
   }),
   startTime: z.string().min(1, "Please select a start time"),
-  duration: z.coerce.number().min(1, "Duration must be at least 1 Hour"),
+  duration: z.coerce.number().min(60, "Duration must be at least 60 minutes"),
   totalCustomer: z.coerce.number().min(1, "At least 1 customer required"),
   status: z.enum(
     ["success", "cancelled", "refunded", "completed", "rescheduled"],
@@ -220,7 +213,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
       phoneNumber: "",
       unitId: 0,
       gameId: undefined,
-      duration: 30,
+      duration: 60,
       totalCustomer: 1,
     },
   });
@@ -231,7 +224,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
       bookingId: 0,
       unitId: 0,
       gameId: undefined,
-      duration: 30,
+      duration: 60,
       totalCustomer: 1,
       status: "success",
     },
@@ -476,11 +469,6 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
         break;
     }
 
-    // Convert minutes to hours for display
-    const durationInHours = parseInt(booking.duration) / 60;
-    const durationText =
-      durationInHours === 1 ? "1 hour" : `${durationInHours} hours`;
-
     // Map API booking to UI booking
     return {
       id: booking.id.toString(),
@@ -499,7 +487,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
       totalPerson: parseInt(booking.total_customer || "1"),
       startTime: booking.start_time,
       endTime: "", // API doesn't provide this, would need to be calculated
-      duration: durationText, // Format as hours instead of "X minutes"
+      duration: `${booking.duration} minutes`, // Format as minutes
       gameId: booking.game_id, // Store game_id for reference
       gameTitle: gameTitle, // Add game title
     };
@@ -770,25 +758,28 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
         }
       }
 
-      // Extract duration in minutes from string like "X minutes" or "X hours"
-      let durationMinutes = 30; // Default to 30 minutes
-      let durationHours = 1; // Default to 1 hour
+      // Extract duration in minutes from string like "X minutes"
+      let durationMinutes = 60; // Default to 60 minutes
 
       // Parse the duration from the booking duration string
-      if (booking.duration.includes("hour")) {
-        // If format is "X hour(s)"
+      if (booking.duration.includes("minute")) {
+        // If format is "X minutes"
+        const minuteMatch = booking.duration.match(/(\d+)/);
+        if (minuteMatch && minuteMatch[1]) {
+          durationMinutes = parseInt(minuteMatch[1]);
+        }
+      } else if (booking.duration.includes("hour")) {
+        // Legacy conversion - if format is "X hour(s)"
         const hourMatch = booking.duration.match(/(\d+(\.\d+)?)/);
         if (hourMatch && hourMatch[1]) {
-          durationHours = parseFloat(hourMatch[1]);
-          durationMinutes = durationHours * 60;
+          const durationHours = parseFloat(hourMatch[1]);
+          durationMinutes = Math.round(durationHours * 60);
         }
-      } else {
-        // If format is "X minutes"
-        const durationMatch = booking.duration.match(/(\d+)/);
-        if (durationMatch && durationMatch[1]) {
-          durationMinutes = parseInt(durationMatch[1]);
-          durationHours = durationMinutes / 60;
-        }
+      }
+
+      // Ensure minimum duration is 60 minutes
+      if (durationMinutes < 60) {
+        durationMinutes = 60;
       }
 
       // CRITICAL: Ensure startTime is set correctly from booking
@@ -844,7 +835,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
         gameId: gameId,
         bookingDate: bookingDate,
         startTime: startTime,
-        duration: durationHours,
+        duration: durationMinutes,
         totalCustomer: booking.totalPerson,
         status: status,
       });
@@ -856,7 +847,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
         gameId: gameId,
         bookingDate: bookingDate,
         startTime: startTime,
-        duration: durationHours,
+        duration: durationMinutes,
         totalCustomer: booking.totalPerson,
         status: status,
       });
@@ -898,16 +889,13 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
           break;
       }
 
-      // Convert hours to minutes for API
-      const durationMinutes = Math.round(values.duration * 60);
-
       // Create booking payload
       const bookingPayload = {
         unit_id: values.unitId,
         game_id: values.gameId,
         booking_date: format(values.bookingDate, "yyyy-MM-dd"),
         start_time: values.startTime,
-        duration: durationMinutes, // Hours converted to minutes
+        duration: values.duration,
         total_customer: values.totalCustomer.toString(),
         status: apiStatus,
       };
@@ -1567,17 +1555,11 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                     <FormItem>
                       <FormLabel>Duration (minutes)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          min={30}
-                          max={480}
-                          step={10}
-                          {...field}
-                        />
+                        <Input type="number" min={60} step={30} {...field} />
                       </FormControl>
                       <FormMessage />
                       <p className="text-xs text-muted-foreground mt-1">
-                        Minimum 1 Hours
+                        Minimum 60 minutes, increments of 30
                       </p>
                     </FormItem>
                   )}
@@ -1789,19 +1771,13 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                   name="duration"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Duration (hours)</FormLabel>
+                      <FormLabel>Duration (minutes)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={8}
-                          step={1}
-                          {...field}
-                        />
+                        <Input type="number" min={60} step={30} {...field} />
                       </FormControl>
                       <FormMessage />
                       <p className="text-xs text-muted-foreground mt-1">
-                        Minimum 1 Hour
+                        Minimum 60 minutes, increments of 30
                       </p>
                     </FormItem>
                   )}

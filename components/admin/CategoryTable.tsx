@@ -483,7 +483,7 @@ export function CategoryTable({}: CategoryTableProps) {
             </Button>
 
             <Button
-              className="bg-amber-500 hover:bg-amber-600 h-9"
+              className="bg-[#B99733] hover:bg-amber-600 h-9"
               onClick={() => setIsAddCategoryOpen(true)}
               disabled={loading}
             >

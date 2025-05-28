@@ -277,7 +277,7 @@ export function LandingPageTable() {
               />
             </div>
 
-            <Button className="bg-amber-500 hover:bg-amber-600 text-white h-9">
+            <Button className="bg-[#B99733] hover:bg-amber-600 text-white h-9">
               <Plus className="h-4 w-4 mr-2" />
               Add New
             </Button>
@@ -292,7 +292,7 @@ export function LandingPageTable() {
               variant={activeSectionType === type.value ? "default" : "outline"}
               className={`rounded-full text-sm px-4 py-1 h-8 ${
                 activeSectionType === type.value
-                  ? "bg-amber-500 hover:bg-amber-600 text-white"
+                  ? "bg-[#B99733] hover:bg-amber-600 text-white"
                   : "hover:bg-amber-50"
               }`}
               onClick={() => {

@@ -321,7 +321,7 @@ export function DashboardSidebar() {
                         className={cn(
                           "transition-all duration-200",
                           item.active &&
-                            "bg-amber-600 text-white hover:bg-amber-700"
+                            "bg-[#B99733] text-white hover:bg-amber-700"
                         )}
                       >
                         <Link
@@ -372,7 +372,7 @@ export function DashboardSidebar() {
                       className={cn(
                         "justify-between group transition-all duration-200",
                         item.active &&
-                          "bg-amber-600 text-white hover:bg-amber-700"
+                          "bg-[#B99733] text-white hover:bg-amber-700"
                       )}
                     >
                       <div className="flex items-center">
@@ -381,7 +381,7 @@ export function DashboardSidebar() {
                         {item.badge && (
                           <Badge
                             variant="secondary"
-                            className="ml-2 h-5 px-1.5 bg-amber-200 text-amber-800"
+                            className="ml-2 h-5 px-1.5 bg-[#B99733] text-amber-800"
                           >
                             {item.badge}
                           </Badge>
@@ -421,7 +421,7 @@ export function DashboardSidebar() {
                         className={cn(
                           "transition-all duration-200",
                           item.active &&
-                            "bg-amber-600 text-white hover:bg-amber-700"
+                            "bg-[#B99733] text-white hover:bg-amber-700"
                         )}
                       >
                         <Link

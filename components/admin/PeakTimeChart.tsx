@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -17,65 +17,34 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  TooltipProps,
 } from "recharts";
+import { getPeakHours, PeakHourData } from "@/api";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
-// Sample data for different time periods
-const dailyData = [
-  { hour: "09", units: 7 },
-  { hour: "10", units: 10 },
-  { hour: "11", units: 8 },
-  { hour: "12", units: 9 },
-  { hour: "13", units: 12 },
-  { hour: "14", units: 8 },
-  { hour: "15", units: 18 },
-  { hour: "16", units: 15 },
-  { hour: "17", units: 6 },
-  { hour: "18", units: 16 },
-  { hour: "19", units: 12 },
-  { hour: "20", units: 14 },
-  { hour: "21", units: 99 },
-  { hour: "22", units: 15 },
-  { hour: "23", units: 18 },
-  { hour: "24", units: 17 },
-];
+// Interface for the chart data structure
+interface ChartData {
+  hour: string;
+  units: number;
+}
 
-const weeklyData = [
-  { hour: "09", units: 8 },
-  { hour: "10", units: 11 },
-  { hour: "11", units: 9 },
-  { hour: "12", units: 10 },
-  { hour: "13", units: 13 },
-  { hour: "14", units: 9 },
-  { hour: "15", units: 19 },
-  { hour: "16", units: 16 },
-  { hour: "17", units: 7 },
-  { hour: "18", units: 17 },
-  { hour: "19", units: 13 },
-  { hour: "20", units: 15 },
-  { hour: "21", units: 20 },
-  { hour: "22", units: 16 },
-  { hour: "23", units: 80 },
-  { hour: "24", units: 18 },
-];
+// Fixed hours for the x-axis (9 AM to midnight)
+const HOURS_RANGE = Array.from({ length: 16 }, (_, i) => ({
+  hour: String(i + 9).padStart(2, "0"),
+  units: 0,
+}));
 
-const monthlyData = [
-  { hour: "09", units: 9 },
-  { hour: "10", units: 12 },
-  { hour: "11", units: 10 },
-  { hour: "12", units: 11 },
-  { hour: "13", units: 99 },
-  { hour: "14", units: 10 },
-  { hour: "15", units: 20 },
-  { hour: "16", units: 17 },
-  { hour: "17", units: 8 },
-  { hour: "18", units: 18 },
-  { hour: "19", units: 14 },
-  { hour: "20", units: 16 },
-  { hour: "21", units: 21 },
-  { hour: "22", units: 17 },
-  { hour: "23", units: 20 },
-  { hour: "24", units: 19 },
-];
+// Generate fallback data with consistent hours
+const generateFallbackData = (): ChartData[] => {
+  return HOURS_RANGE.map((item) => ({
+    hour: item.hour,
+    units: Math.floor(Math.random() * 20) + 1, // Random values between 1-20
+  }));
+};
+
+// Sample data for different time periods (fallback)
+const fallbackData = generateFallbackData();
 
 interface PeakTimeChartProps {
   className?: string;
@@ -83,22 +52,57 @@ interface PeakTimeChartProps {
 
 export function PeakTimeChart({ className }: PeakTimeChartProps) {
   const [period, setPeriod] = useState("daily");
+  const [peakHoursData, setPeakHoursData] = useState<PeakHourData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Select data based on period
-  const getData = () => {
-    switch (period) {
-      case "daily":
-        return dailyData;
-      case "weekly":
-        return weeklyData;
-      case "monthly":
-        return monthlyData;
-      default:
-        return dailyData;
+  // Fetch peak hours data
+  useEffect(() => {
+    async function fetchPeakHours() {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getPeakHours();
+        setPeakHoursData(response.data);
+      } catch (error) {
+        console.error("Failed to fetch peak hours data:", error);
+        setError("Failed to load peak hours data");
+        toast.error("Failed to load peak hours data");
+      } finally {
+        setLoading(false);
+      }
     }
+
+    fetchPeakHours();
+  }, []);
+
+  // Convert API data to chart format with consistent hour range
+  const getChartData = (): ChartData[] => {
+    if (loading || peakHoursData.length === 0) {
+      return fallbackData; // Use sample data as fallback
+    }
+
+    // Create a map of hour -> bookings from API data
+    const bookingsByHour = new Map<string, number>();
+
+    peakHoursData.forEach((item) => {
+      // Extract the hour part (e.g., "10" from "10:00 - 11:00")
+      const hour = item.hour.split(" - ")[0].split(":")[0].padStart(2, "0");
+      bookingsByHour.set(hour, item.bookings);
+    });
+
+    // Map our fixed hour range and fill in booking data where available
+    return HOURS_RANGE.map((hourObj) => {
+      return {
+        hour: hourObj.hour,
+        units: bookingsByHour.has(hourObj.hour)
+          ? bookingsByHour.get(hourObj.hour)!
+          : 0,
+      };
+    });
   };
 
-  const data = getData();
+  const data = getChartData();
 
   // Find the peak hour (hour with maximum units)
   const peakHour = data.reduce(
@@ -106,18 +110,37 @@ export function PeakTimeChart({ className }: PeakTimeChartProps) {
     { hour: "", units: 0 }
   );
 
-  // Custom tooltip component using simple type annotation
-  const CustomTooltip = ({ active, payload, label }) => {
+  // Properly typed custom tooltip component
+  const CustomTooltip = ({
+    active,
+    payload,
+    label,
+  }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-2 border rounded-md shadow-sm">
           <p className="font-medium">{`${label}:00`}</p>
-          <p className="text-amber-600">{`${payload[0].value} Units`}</p>
+          <p className="text-amber-600">{`${payload[0].value} Bookings`}</p>
         </div>
       );
     }
     return null;
   };
+
+  // Calculate y-axis domain and ticks based on data
+  const calculateYAxisProps = () => {
+    // Fixed domain from 0 to 32
+    const domain = [0, 32] as [number, number];
+    // Fixed ticks in multiples of 4
+    const ticks = [0, 4, 8, 12, 16, 20, 24, 28, 32];
+
+    return {
+      domain,
+      ticks,
+    };
+  };
+
+  const yAxisProps = calculateYAxisProps();
 
   return (
     <Card className={className}>
@@ -135,69 +158,87 @@ export function PeakTimeChart({ className }: PeakTimeChartProps) {
         </Select>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] relative">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={data}
-              margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
+        {loading ? (
+          <div className="h-[300px] flex flex-col items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500 mb-2" />
+            <span>Loading peak hours data...</span>
+          </div>
+        ) : error ? (
+          <div className="h-[300px] flex flex-col items-center justify-center text-red-500">
+            <span>{error}</span>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 text-sm text-blue-500 hover:underline"
             >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#f0f0f0"
-              />
-              <XAxis
-                dataKey="hour"
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => value}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                domain={[0, "dataMax + 2"]}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="units"
-                stroke="#d97706"
-                strokeWidth={3}
-                dot={false}
-                activeDot={{
-                  r: 8,
-                  fill: "#d97706",
-                  stroke: "#fff",
-                  strokeWidth: 2,
-                }}
-              />
-              {/* Peak marker */}
-              <Line
-                type="monotone"
-                dataKey={(entry) =>
-                  entry.hour === peakHour.hour ? entry.units : null
-                }
-                stroke="transparent"
-                dot={{
-                  r: 10,
-                  fill: "#3b82f6",
-                  stroke: "#fff",
-                  strokeWidth: 2,
-                }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-
-          {/* Y-axis label */}
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 text-xs text-muted-foreground">
-            Total Unit
+              Retry
+            </button>
           </div>
+        ) : (
+          <div className="h-[300px] relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={data}
+                margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#f0f0f0"
+                />
+                <XAxis
+                  dataKey="hour"
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => value}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  domain={yAxisProps.domain}
+                  ticks={yAxisProps.ticks}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="units"
+                  stroke="#d97706"
+                  strokeWidth={3}
+                  dot={false}
+                  activeDot={{
+                    r: 8,
+                    fill: "#d97706",
+                    stroke: "#fff",
+                    strokeWidth: 2,
+                  }}
+                />
+                {/* Peak marker */}
+                <Line
+                  type="monotone"
+                  dataKey={(entry) =>
+                    entry.hour === peakHour.hour ? entry.units : null
+                  }
+                  stroke="transparent"
+                  dot={{
+                    r: 10,
+                    fill: "#3b82f6",
+                    stroke: "#fff",
+                    strokeWidth: 2,
+                  }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
 
-          {/* X-axis label */}
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-xs text-muted-foreground">
-            Hours
+            {/* Y-axis label */}
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 text-xs text-muted-foreground">
+              Total Bookings
+            </div>
+
+            {/* X-axis label */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-xs text-muted-foreground">
+              Hours
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

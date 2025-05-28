@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Select,
@@ -11,6 +11,14 @@ import {
 } from "@/components/ui/select";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Card, CardHeader } from "../ui/card";
+import {
+  getPopularityStats,
+  PopularityStatsResponse,
+  PopularUnit,
+  PopularFnB,
+} from "@/api";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 // Define types for our data structure
 type TrendingItem = {
@@ -161,6 +169,27 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
   const [trendingFilter, setTrendingFilter] = useState<"rental" | "food">(
     "rental"
   );
+  const [popularityStats, setPopularityStats] =
+    useState<PopularityStatsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch popularity statistics
+  useEffect(() => {
+    async function fetchPopularityStats() {
+      try {
+        setLoading(true);
+        const data = await getPopularityStats();
+        setPopularityStats(data);
+      } catch (error) {
+        console.error("Failed to fetch popularity statistics:", error);
+        toast.error("Failed to load popularity statistics");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchPopularityStats();
+  }, []);
 
   // Select data based on period
   const getData = (): PeriodData => {
@@ -179,7 +208,43 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
   };
 
   const data = getData();
-  const trendingData = data.trending[trendingFilter];
+
+  // Convert API data to UI format for trending
+  const mapPopularUnitsToTrendingItems = (
+    units: PopularUnit[] = []
+  ): TrendingItem[] => {
+    return units.map((unit, index) => ({
+      rank: index + 1,
+      name: unit.name,
+      orders: unit.bookings,
+    }));
+  };
+
+  const mapPopularFnBToTrendingItems = (
+    items: PopularFnB[] = []
+  ): TrendingItem[] => {
+    return items.map((item, index) => ({
+      rank: index + 1,
+      name: item.name,
+      orders: item.total_ordered,
+    }));
+  };
+
+  // Get trending data based on filter and API data
+  const getTrendingData = () => {
+    if (loading || !popularityStats) {
+      // Return placeholder when loading
+      return [];
+    }
+
+    if (trendingFilter === "rental") {
+      return mapPopularUnitsToTrendingItems(popularityStats.data.popular_units);
+    } else {
+      return mapPopularFnBToTrendingItems(popularityStats.data.popular_fnb);
+    }
+  };
+
+  const trendingData = getTrendingData();
 
   return (
     <div className={`${className} w-full p-6 bg-gray-50`}>
@@ -338,52 +403,65 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
               </div>
             </div>
 
-            <div className="space-y-5">
-              {trendingData.map((item) => (
-                <div
-                  key={item.rank}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-500 w-4">
-                      {item.rank}
-                    </span>
-                    <div className=" p-2 rounded-full">
-                      <Image
-                        src="/images/logo.png"
-                        alt="Item logo"
-                        width={30}
-                        height={30}
-                        className="rounded-full"
-                      />
-                    </div>
-                    <span className="font-medium">{item.name}</span>
-                  </div>
-                  <div className="flex items-center">
-                    {item.rank === 1 && (
-                      <div className="mr-3 flex items-center">
-                        <div className="p-2 rounded-full flex items-center">
-                          {/* Popular Badge */}
-                          <span className="text-xs font-medium flex items-center gap-1">
-                            <span
-                              role="img"
-                              aria-label="Popular"
-                              className="text-lg"
-                            >
-                              🔥
-                            </span>
-                            Popular
-                          </span>
-                        </div>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-500 mb-2" />
+                <span>Loading trending data...</span>
+              </div>
+            ) : trendingData.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                No trending data available
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {trendingData.map((item) => (
+                  <div
+                    key={item.rank}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-500 w-4">
+                        {item.rank}
+                      </span>
+                      <div className="p-2 rounded-full">
+                        <Image
+                          src="/images/logo.png"
+                          alt="Item logo"
+                          width={30}
+                          height={30}
+                          className="rounded-full"
+                        />
                       </div>
-                    )}
-                    <span className="font-medium">
-                      {item.orders} Order{item.orders !== 1 ? "s" : ""}
-                    </span>
+                      <span className="font-medium">{item.name}</span>
+                    </div>
+                    <div className="flex items-center">
+                      {item.rank === 1 && (
+                        <div className="mr-3 flex items-center">
+                          <div className="p-2 rounded-full flex items-center">
+                            {/* Popular Badge */}
+                            <span className="text-xs font-medium flex items-center gap-1">
+                              <span
+                                role="img"
+                                aria-label="Popular"
+                                className="text-lg"
+                              >
+                                🔥
+                              </span>
+                              Popular
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      <span className="font-medium">
+                        {item.orders}{" "}
+                        {trendingFilter === "rental" ? "Booking" : "Order"}
+                        {item.orders !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Console Stats Card */}

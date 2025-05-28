@@ -140,6 +140,20 @@ export {
   type BookingPayload,
 } from "./booking/bookingApi";
 
+// Analytics API
+export {
+  getStatisticsMain,
+  getPopularityStats,
+  getPeakHours,
+  type StatisticsMainResponse,
+  type PopularityStatsResponse,
+  type PopularUnit,
+  type PopularGame,
+  type PopularFnB,
+  type PeakHoursResponse,
+  type PeakHourData,
+} from "./analytics/analyticsApi";
+
 // Import User for the extended interface
 import { User } from "./user/userApi";
 

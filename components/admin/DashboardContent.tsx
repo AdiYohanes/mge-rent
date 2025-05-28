@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   BarChart,
@@ -22,9 +22,9 @@ import {
   DollarSign,
   ShoppingBag,
   Utensils,
-  Star,
   Users,
   Search,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -43,6 +43,8 @@ import {
 import { RevenueChart } from "./RevenueChart";
 import { StatisticsSection } from "./StatisticsSection";
 import { PeakTimeChart } from "./PeakTimeChart";
+import { getStatisticsMain, StatisticsMainResponse } from "@/api";
+import { toast } from "sonner";
 
 const dailyOrderSummaryData = [
   { name: "09", rental: 20, food: 18 },
@@ -95,6 +97,28 @@ const COLORS = ["#22c55e", "#f97316"];
 export function DashboardContent() {
   const [orderTimeRange, setOrderTimeRange] = useState("daily");
   const [trafficTimeRange, setTrafficTimeRange] = useState("daily");
+  const [statistics, setStatistics] = useState<StatisticsMainResponse | null>(
+    null
+  );
+  const [loading, setLoading] = useState(true);
+
+  // Fetch statistics data
+  useEffect(() => {
+    async function fetchStatistics() {
+      try {
+        setLoading(true);
+        const data = await getStatisticsMain();
+        setStatistics(data);
+      } catch (error) {
+        console.error("Failed to fetch statistics:", error);
+        toast.error("Failed to load dashboard statistics");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStatistics();
+  }, []);
 
   const getOrderSummaryData = () => {
     switch (orderTimeRange) {
@@ -159,41 +183,87 @@ export function DashboardContent() {
           <motion.div variants={item}>
             <StatsCard
               title="Bookings"
-              value="230"
+              value={
+                loading
+                  ? "Loading..."
+                  : String(statistics?.data.total_booking || 0)
+              }
               change={4}
-              icon={<ShoppingBag className="h-5 w-5" />}
+              icon={
+                loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <ShoppingBag className="h-5 w-5" />
+                )
+              }
               iconBg="bg-amber-100"
               iconColor="text-amber-600"
+              isLoading={loading}
             />
           </motion.div>
           <motion.div variants={item}>
             <StatsCard
               title="Food & Drink"
-              value="185"
+              value={
+                loading
+                  ? "Loading..."
+                  : String(statistics?.data.total_fnb_order || 0)
+              }
               change={2}
-              icon={<Utensils className="h-5 w-5" />}
+              icon={
+                loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Utensils className="h-5 w-5" />
+                )
+              }
               iconBg="bg-cyan-100"
               iconColor="text-cyan-600"
+              isLoading={loading}
             />
           </motion.div>
           <motion.div variants={item}>
             <StatsCard
               title="Revenue"
-              value="Rp100.000"
+              value={
+                loading
+                  ? "Loading..."
+                  : `Rp${Number(
+                      statistics?.data.total_revenue || 0
+                    ).toLocaleString("id-ID")}`
+              }
               change={5}
-              icon={<DollarSign className="h-5 w-5" />}
+              icon={
+                loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <DollarSign className="h-5 w-5" />
+                )
+              }
               iconBg="bg-emerald-100"
               iconColor="text-emerald-600"
+              isLoading={loading}
             />
           </motion.div>
           <motion.div variants={item}>
             <StatsCard
-              title="Rating"
-              value="4.5"
-              change={2}
-              icon={<Star className="h-5 w-5" />}
+              title="Customers"
+              value={
+                loading
+                  ? "Loading..."
+                  : String(statistics?.data.total_customer || 0)
+              }
+              change={statistics?.data.new_customer_today || 0}
+              icon={
+                loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Users className="h-5 w-5" />
+                )
+              }
               iconBg="bg-orange-100"
               iconColor="text-orange-600"
+              isLoading={loading}
             />
           </motion.div>
         </motion.div>
@@ -224,7 +294,10 @@ export function DashboardContent() {
                     Rental vs Food & Drink orders
                   </CardDescription>
                 </div>
-                <Select value={orderTimeRange} onValueChange={setOrderTimeRange}>
+                <Select
+                  value={orderTimeRange}
+                  onValueChange={setOrderTimeRange}
+                >
                   <SelectTrigger className="w-[120px]">
                     <SelectValue placeholder="Daily" />
                   </SelectTrigger>
@@ -279,7 +352,10 @@ export function DashboardContent() {
                     Traffic sources and visitor data
                   </CardDescription>
                 </div>
-                <Select value={trafficTimeRange} onValueChange={setTrafficTimeRange}>
+                <Select
+                  value={trafficTimeRange}
+                  onValueChange={setTrafficTimeRange}
+                >
                   <SelectTrigger className="w-[120px]">
                     <SelectValue placeholder="Daily" />
                   </SelectTrigger>
@@ -318,7 +394,9 @@ export function DashboardContent() {
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
                     <div>
-                      <div className="text-lg font-semibold">{getTrafficData()[0].value}</div>
+                      <div className="text-lg font-semibold">
+                        {getTrafficData()[0].value}
+                      </div>
                       <div className="text-sm text-muted-foreground">
                         Bookings
                       </div>
@@ -327,7 +405,9 @@ export function DashboardContent() {
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-orange-500"></div>
                     <div>
-                      <div className="text-lg font-semibold">{getTrafficData()[1].value}</div>
+                      <div className="text-lg font-semibold">
+                        {getTrafficData()[1].value}
+                      </div>
                       <div className="text-sm text-muted-foreground">
                         Visits
                       </div>
@@ -340,7 +420,9 @@ export function DashboardContent() {
                       <Users className="w-5 h-5 text-amber-600" />
                     </div>
                     <div>
-                      <div className="text-lg font-semibold">{getTrafficData()[0].value + getTrafficData()[1].value}</div>
+                      <div className="text-lg font-semibold">
+                        {getTrafficData()[0].value + getTrafficData()[1].value}
+                      </div>
                       <div className="text-sm text-muted-foreground">
                         Visitors
                       </div>
@@ -374,10 +456,11 @@ interface StatsCardProps {
   icon: React.ReactNode;
   iconBg: string;
   iconColor: string;
+  isLoading?: boolean;
 }
 
 function StatsCard(props: StatsCardProps) {
-  const { title, value, change, icon, iconBg, iconColor } = props;
+  const { title, value, change, icon, iconBg, iconColor, isLoading } = props;
   return (
     <Card>
       <CardContent className="p-6">
@@ -393,21 +476,25 @@ function StatsCard(props: StatsCardProps) {
           </div>
         </div>
         <div className="flex items-center mt-4">
-          <div
-            className={`flex items-center ${
-              change > 0 ? "text-emerald-500" : "text-red-500"
-            }`}
-          >
-            {change > 0 ? (
-              <ArrowUp className="w-4 h-4" />
-            ) : (
-              <ArrowDown className="w-4 h-4" />
-            )}
-            <span className="ml-1 text-sm font-medium">{change}%</span>
-          </div>
-          <span className="ml-2 text-xs text-muted-foreground">
-            from last month
-          </span>
+          {!isLoading && (
+            <>
+              <div
+                className={`flex items-center ${
+                  change > 0 ? "text-emerald-500" : "text-red-500"
+                }`}
+              >
+                {change > 0 ? (
+                  <ArrowUp className="w-4 h-4" />
+                ) : (
+                  <ArrowDown className="w-4 h-4" />
+                )}
+                <span className="ml-1 text-sm font-medium">{change}%</span>
+              </div>
+              <span className="ml-2 text-xs text-muted-foreground">
+                from last month
+              </span>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>

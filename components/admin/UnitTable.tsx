@@ -286,6 +286,8 @@ export function UnitTable() {
           const roomsResponse = await getRooms();
           if (roomsResponse && Array.isArray(roomsResponse.data)) {
             setRooms(roomsResponse.data);
+          } else {
+            console.warn("Unexpected rooms response format:", roomsResponse);
           }
         } catch (roomErr) {
           console.error("Error fetching rooms:", roomErr);
@@ -296,6 +298,11 @@ export function UnitTable() {
           const consolesResponse = await getConsoles();
           if (consolesResponse && Array.isArray(consolesResponse.data)) {
             setConsoles(consolesResponse.data);
+          } else {
+            console.warn(
+              "Unexpected consoles response format:",
+              consolesResponse
+            );
           }
         } catch (consoleErr) {
           console.error("Error fetching consoles:", consoleErr);
@@ -304,8 +311,12 @@ export function UnitTable() {
         // Fetch games
         try {
           const gamesResponse = await getGames();
+          console.log("Games API response:", gamesResponse);
           if (gamesResponse && Array.isArray(gamesResponse.games)) {
             setAllGames(gamesResponse.games);
+            console.log(`Loaded ${gamesResponse.games.length} games`);
+          } else {
+            console.warn("Unexpected games response format:", gamesResponse);
           }
         } catch (gameErr) {
           console.error("Error fetching games:", gameErr);
@@ -316,7 +327,7 @@ export function UnitTable() {
     };
 
     fetchRelatedData();
-  }, [mounted]);
+  }, [mounted, refreshTrigger]);
 
   // Format price in IDR
   const formatPrice = (price: number) => {
@@ -473,18 +484,48 @@ export function UnitTable() {
   const handleEditUnit = (unit: Unit) => {
     setCurrentUnit(unit);
 
-    // Get game objects from IDs - pastikan game_ids adalah array
-    const gameIdsArray = Array.isArray(unit.game_ids)
-      ? unit.game_ids
-      : unit.game_ids
-      ? JSON.parse(String(unit.game_ids))
-      : [];
+    console.log("Editing unit:", unit.name, "with game_ids:", unit.game_ids);
 
+    // Parse game_ids properly handling different formats
+    let gameIdsArray: number[] = [];
+
+    try {
+      if (Array.isArray(unit.game_ids)) {
+        gameIdsArray = unit.game_ids;
+      } else if (unit.game_ids) {
+        // Handle string representation
+        const parsed =
+          typeof unit.game_ids === "string"
+            ? JSON.parse(unit.game_ids)
+            : unit.game_ids;
+
+        if (Array.isArray(parsed)) {
+          gameIdsArray = parsed;
+        } else {
+          console.error("Unexpected game_ids format:", parsed);
+          gameIdsArray = [];
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing game_ids:", error);
+      gameIdsArray = [];
+    }
+
+    console.log("Parsed game IDs array for edit:", gameIdsArray);
+    console.log("Available allGames count:", allGames.length);
+
+    // Get game objects from IDs with better error handling
     const unitGames = gameIdsArray
-      .map((id: number) =>
-        allGames.find((game) => String(game.id) === String(id))
-      )
-      .filter(Boolean) as Game[];
+      .map((id) => {
+        const game = allGames.find((g) => Number(g.id) === Number(id));
+        if (!game) {
+          console.warn(`Game with ID ${id} not found in allGames during edit`);
+        }
+        return game;
+      })
+      .filter((game): game is Game => !!game);
+
+    console.log("Found games for unit edit:", unitGames.length);
 
     setSelectedGames(unitGames);
 
@@ -584,6 +625,11 @@ export function UnitTable() {
       // Ensure game_ids is an array of numbers
       const gameIdsArray = selectedGames.map((game) => Number(game.id));
 
+      console.log(
+        "Adding unit with games:",
+        selectedGames.map((g) => `${g.id}: ${g.title}`)
+      );
+
       // Create payload with proper array formatting
       const apiPayload = {
         name: newUnit.name,
@@ -667,17 +713,27 @@ export function UnitTable() {
         apiPayload.features = newFeatures;
       }
 
-      // Only include game_ids if games were changed
+      // Always include game_ids from selectedGames
       if (selectedGames.length > 0) {
-        const currentGameIds = currentUnit.game_ids || [];
+        // Get current game IDs for logging
+        const currentGameIds = Array.isArray(currentUnit.game_ids)
+          ? currentUnit.game_ids
+          : currentUnit.game_ids
+          ? JSON.parse(String(currentUnit.game_ids))
+          : [];
+
+        // Convert selected games to IDs
         const newGameIds = selectedGames.map((game) => Number(game.id));
 
-        if (
-          JSON.stringify(currentGameIds.sort()) !==
-          JSON.stringify(newGameIds.sort())
-        ) {
-          apiPayload.game_ids = newGameIds;
-        }
+        console.log("Current game IDs:", currentGameIds);
+        console.log("New game IDs:", newGameIds);
+        console.log(
+          "Updating unit with games:",
+          selectedGames.map((g) => `${g.id}: ${g.title}`)
+        );
+
+        // Always include game_ids in update to ensure they're properly saved
+        apiPayload.game_ids = newGameIds;
       }
 
       console.log("Updating unit data:", apiPayload);
@@ -752,18 +808,49 @@ export function UnitTable() {
 
   // Handle opening game list modal
   const handleOpenGameList = (unit: Unit) => {
-    // Find the games by IDs
-    const gameIdsArray = Array.isArray(unit.game_ids)
-      ? unit.game_ids
-      : unit.game_ids
-      ? JSON.parse(String(unit.game_ids))
-      : [];
+    console.log("Opening game list for unit:", unit.name);
+    console.log("Raw game_ids:", unit.game_ids);
 
+    // Parse game_ids properly handling different formats
+    let gameIdsArray: number[] = [];
+
+    try {
+      if (Array.isArray(unit.game_ids)) {
+        gameIdsArray = unit.game_ids;
+      } else if (unit.game_ids) {
+        // Handle string representation
+        const parsed =
+          typeof unit.game_ids === "string"
+            ? JSON.parse(unit.game_ids)
+            : unit.game_ids;
+
+        if (Array.isArray(parsed)) {
+          gameIdsArray = parsed;
+        } else {
+          console.error("Unexpected game_ids format:", parsed);
+          gameIdsArray = [];
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing game_ids:", error);
+      gameIdsArray = [];
+    }
+
+    console.log("Parsed game IDs array:", gameIdsArray);
+    console.log("Available allGames count:", allGames.length);
+
+    // Map game IDs to actual game objects with better error handling
     const unitGames = gameIdsArray
-      .map((id: number) =>
-        allGames.find((game) => String(game.id) === String(id))
-      )
-      .filter(Boolean) as Game[];
+      .map((id) => {
+        const game = allGames.find((g) => Number(g.id) === Number(id));
+        if (!game) {
+          console.warn(`Game with ID ${id} not found in allGames`);
+        }
+        return game;
+      })
+      .filter((game): game is Game => !!game);
+
+    console.log("Found games for unit:", unitGames.length);
 
     setCurrentUnitGames(unitGames);
     setCurrentUnit(unit);
@@ -780,16 +867,22 @@ export function UnitTable() {
   };
 
   // Filter games based on search
-  const filteredGames = currentUnitGames.filter((game) =>
-    game.title.toLowerCase().includes(gameSearchTerm.toLowerCase())
+  const filteredGames = currentUnitGames.filter(
+    (game) =>
+      game &&
+      game.title &&
+      game.title.toLowerCase().includes(gameSearchTerm.toLowerCase())
   );
 
-  // Filter games for search results
+  // Replace the game search logic with this
   const gameSearchResults = allGames
     .filter(
       (game) =>
         (gameSearchInput.length === 0 ||
-          game.title.toLowerCase().includes(gameSearchInput.toLowerCase())) &&
+          (game.title &&
+            game.title
+              .toLowerCase()
+              .includes(gameSearchInput.toLowerCase()))) &&
         !selectedGames.some((sg) => String(sg.id) === String(game.id))
     )
     .slice(0, 8); // Limit to 8 results
@@ -849,7 +942,26 @@ export function UnitTable() {
     });
   };
 
-  // Removed unused handleFeatureToggle function
+  // Add a error display component
+  const ErrorDisplay = () => {
+    if (!formError) return null;
+
+    return (
+      <div className="my-3 p-3 border border-red-300 bg-red-50 rounded-md text-red-700 text-sm">
+        <p className="font-medium">{formError}</p>
+        {rawErrorDetails && (
+          <details className="mt-2">
+            <summary className="cursor-pointer text-xs">
+              Technical Details
+            </summary>
+            <pre className="mt-2 text-xs overflow-auto p-2 bg-red-100 rounded">
+              {rawErrorDetails}
+            </pre>
+          </details>
+        )}
+      </div>
+    );
+  };
 
   // Render a simple skeleton UI while not mounted to prevent hydration mismatch
   if (!mounted) {
@@ -1092,8 +1204,15 @@ export function UnitTable() {
           >
             <DialogHeader>
               <DialogTitle className="text-xl font-bold">
-                {getConsoleNameById(currentUnit?.console_id || 0)} Unit{" "}
-                {currentUnit?.name} Game List
+                {currentUnit ? (
+                  <>
+                    {getConsoleNameById(currentUnit.console_id)} Unit{" "}
+                    {currentUnit.name} Game List ({currentUnitGames.length}{" "}
+                    games)
+                  </>
+                ) : (
+                  "Game List"
+                )}
               </DialogTitle>
             </DialogHeader>
 
@@ -1112,7 +1231,9 @@ export function UnitTable() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredGames.length === 0 ? (
                   <div className="col-span-full text-center py-6 text-gray-500">
-                    No games found matching your search
+                    {currentUnitGames.length === 0
+                      ? "No games assigned to this unit"
+                      : "No games found matching your search"}
                   </div>
                 ) : (
                   filteredGames.map((game, index) => (
@@ -1494,6 +1615,8 @@ export function UnitTable() {
               </div>
             </div>
 
+            <ErrorDisplay />
+
             <DialogFooter className="mt-3">
               <Button
                 onClick={submitAddUnit}
@@ -1870,6 +1993,8 @@ export function UnitTable() {
                 </div>
               </div>
             </div>
+
+            <ErrorDisplay />
 
             <DialogFooter className="mt-3">
               <Button

@@ -319,7 +319,7 @@ export function PromoTable() {
             size="sm"
             onClick={() => setCurrentPage(i)}
             className={`h-8 w-8 p-0 rounded-full ${
-              currentPage === i ? "bg-amber-500 hover:bg-amber-600" : ""
+              currentPage === i ? "bg-[#B99733] hover:bg-amber-600" : ""
             }`}
             disabled={loading}
           >
@@ -412,7 +412,7 @@ export function PromoTable() {
             </Button>
 
             <Button
-              className="bg-amber-500 hover:bg-amber-600 h-9"
+              className="bg-[#B99733] hover:bg-amber-600 h-9"
               onClick={() => setIsAddPromoOpen(true)}
               disabled={loading}
             >
