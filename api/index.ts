@@ -154,6 +154,16 @@ export {
   type PeakHourData,
 } from "./analytics/analyticsApi";
 
+// Notification API
+export {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  type Notification,
+  type NotificationResponse,
+  type NotificationMeta,
+} from "./notification/notificationApi";
+
 // Import User for the extended interface
 import { User } from "./user/userApi";
 
