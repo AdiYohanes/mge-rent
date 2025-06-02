@@ -5,8 +5,11 @@ export interface FoodItem {
   id: number;
   name: string;
   price: number;
-  image: string;
+  image: string | null; // Allow null for image
   category: string;
+  description?: string | null;
+  popular?: boolean;
+  outOfStock?: boolean;
 }
 
 export interface CartItem extends FoodItem {

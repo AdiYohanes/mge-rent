@@ -104,7 +104,7 @@ const ConsoleSelection = () => {
   const handleImageError = (
     e: React.SyntheticEvent<HTMLImageElement, Event>
   ): void => {
-    e.currentTarget.src = "/placeholder.svg?height=200&width=300";
+    e.currentTarget.src = "/images/games/1.png?height=200&width=300";
   };
 
   // Format price for display

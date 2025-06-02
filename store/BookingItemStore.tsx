@@ -36,6 +36,7 @@ export interface FoodItem {
   price: number;
   image: string;
   category: string;
+  description?: string | null;
   outOfStock?: boolean;
   popular?: boolean;
 }

@@ -64,6 +64,14 @@ export const FNB_ENDPOINTS = {
   DELETE_FNB: (id: string) => `${API_BASE_URL}/admin/fnb/${id}`,
 };
 
+// Restaurant (public FNB) endpoints
+export const RESTAURANT_ENDPOINTS = {
+  GET_ALL_FNBS: `${API_BASE_URL}/fnbs`,
+  GET_FOOD: `${API_BASE_URL}/fnbs/food`,
+  GET_BEVERAGES: `${API_BASE_URL}/fnbs/beverages`,
+  GET_SNACKS: `${API_BASE_URL}/fnbs/snacks`,
+};
+
 // Food and Drink Category endpoints
 export const FNB_CATEGORY_ENDPOINTS = {
   GET_ALL: `${API_BASE_URL}/admin/fnb-category`,
@@ -106,4 +114,19 @@ export const BOOKING_ENDPOINTS = {
 // Public endpoints for customer-facing features
 export const PUBLIC_ENDPOINTS = {
   GET_FAQS: `${API_BASE_URL}/customer/faq`,
+};
+
+// API Endpoints grouped by feature
+export const API_ENDPOINTS = {
+  AUTH: `${API_BASE_URL}/auth`,
+  USER: `${API_BASE_URL}/admin/user`,
+  CONSOLE: `${API_BASE_URL}/admin/consoles`,
+  ROOM: `${API_BASE_URL}/admin/rooms`,
+  GAME: `${API_BASE_URL}/admin/games`,
+  FNB: `${API_BASE_URL}/admin`,
+  PROMO: `${API_BASE_URL}/admin/promos`,
+  FAQ: `${API_BASE_URL}/admin/faqs`,
+  BOOKING: `${API_BASE_URL}/admin/bookings`,
+  PUBLIC: `${API_BASE_URL}`,
+  RESTAURANT: `${API_BASE_URL}`,
 };

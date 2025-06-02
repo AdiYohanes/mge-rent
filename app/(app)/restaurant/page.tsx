@@ -7,113 +7,11 @@ import BookingSummary from "@/components/restaurant/BookingSummary";
 import FoodItemComponent from "@/components/restaurant/FoodItem";
 import { useRouter } from "next/navigation";
 import useRestaurantStore, { FoodItem } from "@/store/RestaurantStore";
+import { getPublicFnbs, mapFnbItemToFoodItem } from "@/api";
 
 // Types
 // type FoodItem = { ... };
 // type CartItem = FoodItem & { ... };
-
-type BookingInfo = {
-  console: string;
-  roomType: string;
-  dateTime: string;
-  foodAndDrinks: string[];
-};
-
-// Sample data
-const foodItems: FoodItem[] = [
-  {
-    id: 1,
-    name: "Blackpepper RiceBowl",
-    price: 10000,
-    image: "/images/food/chicken.jpg",
-    category: "Ricebowl",
-  },
-  {
-    id: 2,
-    name: "Paket Hemat",
-    price: 10000,
-    image: "/images/food/chicken.jpg",
-    category: "Ricebowl",
-  },
-  {
-    id: 3,
-    name: "Beef",
-    price: 10000,
-    image: "/images/food/beef.jpg",
-    category: "Ricebowl",
-  },
-  {
-    id: 4,
-    name: "Cheese",
-    price: 10000,
-    image: "/images/food/noodle1.jpg",
-    category: "Ricebowl",
-  },
-  {
-    id: 5,
-    name: "Bakil Panggang",
-    price: 10000,
-    image: "/images/food/noodle2.jpg",
-    category: "Ricebowl",
-  },
-  {
-    id: 6,
-    name: "Ikan Bakar",
-    price: 10000,
-    image: "/images/food/noodle1.jpg",
-    category: "Ricebowl",
-  },
-  {
-    id: 7,
-    name: "Mie Goreng",
-    price: 12000,
-    image: "/images/food/noodle1.jpg",
-    category: "Noodles",
-  },
-  {
-    id: 8,
-    name: "Mie Kuah",
-    price: 12000,
-    image: "/images/food/noodle2.jpg",
-    category: "Noodles",
-  },
-  {
-    id: 9,
-    name: "French Fries",
-    price: 8000,
-    image: "/images/food/popcorn.jpg",
-    category: "Snacks",
-  },
-  {
-    id: 10,
-    name: "Chicken Nugget",
-    price: 8000,
-    image: "/images/food/potcips.jpg",
-    category: "Snacks",
-  },
-  {
-    id: 11,
-    name: "Coca Cola",
-    price: 7000,
-    image: "/images/food/soda.jpg",
-    category: "Drinks",
-  },
-  {
-    id: 12,
-    name: "Mineral Water",
-    price: 5000,
-    image: "/images/food/mineral.jpg",
-    category: "Drinks",
-  },
-];
-
-// Sample booking information
-const sampleBooking: BookingInfo = {
-  console: "Playstation 4",
-  roomType: "Regular",
-  dateTime: "Friday, 23rd February 2023 at 20:00 - 21:00",
-  foodAndDrinks: ["Blackpepper RiceBowl (1)", "Nasi Putih (1)"],
-};
 
 const fadeIn = {
   hidden: { opacity: 0 },
@@ -132,9 +30,12 @@ const containerVariants = {
 
 export default function RestaurantPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeCategory, setActiveCategory] = useState("Ricebowl");
-  const [isBookingSummaryOpen, setIsBookingSummaryOpen] = useState(true);
-  const [bookingInfo, setBookingInfo] = useState<BookingInfo | null>(null);
+  const [activeCategory, setActiveCategory] = useState("All"); // Set initial category to "All"
+  const [isBookingSummaryOpen, setIsBookingSummaryOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   // Zustand store integration
@@ -147,11 +48,54 @@ export default function RestaurantPage() {
     getCartTotalItems: getCartTotalItemsFromStore,
   } = useRestaurantStore();
 
-  // Fetch booking info from localStorage
+  // Mark component as hydrated
   useEffect(() => {
-    // In a real app, this would come from your backend or localStorage
-    setBookingInfo(sampleBooking);
+    setIsClient(true);
+    setIsBookingSummaryOpen(true);
   }, []);
+
+  // Fetch food items from API
+  useEffect(() => {
+    const fetchFoodItems = async () => {
+      try {
+        setIsLoading(true);
+        const response = await getPublicFnbs();
+
+        if (response.status === "success") {
+          // Map API response to our FoodItem format
+          const mappedItems: FoodItem[] = [
+            ...response.data.food.map((item) => ({
+              ...mapFnbItemToFoodItem(item),
+              category: "food",
+            })),
+            ...response.data.beverage.map((item) => ({
+              ...mapFnbItemToFoodItem(item),
+              category: "drinks",
+            })),
+            ...response.data.snack.map((item) => ({
+              ...mapFnbItemToFoodItem(item),
+              category: "snacks",
+            })),
+          ];
+
+          setFoodItems(mappedItems);
+        } else {
+          setError("Failed to fetch food items");
+        }
+      } catch (err) {
+        console.error("Error fetching food items:", err);
+        setError("Failed to load food items. Please try again later.");
+        // Fallback to sample data if API fails
+        setFoodItems([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isClient) {
+      fetchFoodItems();
+    }
+  }, [isClient]);
 
   // Filter food items based on search term and category
   const filteredItems = foodItems.filter(
@@ -174,16 +118,18 @@ export default function RestaurantPage() {
   const totalPrice = getCartTotalPriceFromStore();
   const totalItems = getCartTotalItemsFromStore();
 
-  // Categories
-  const categories = ["Ricebowl", "Noodles", "Snacks", "Drinks"];
+  // Get available categories from the loaded data
+  const categories = [...new Set(foodItems.map((item) => item.category))];
 
   // Handle order submission
   const handleSubmitOrder = () => {
     if (cart.length === 0) return;
 
-    // Store cart items in localStorage or state management
-    localStorage.setItem("restaurantCart", JSON.stringify(cart));
-    localStorage.setItem("restaurantTotal", totalPrice.toString());
+    // Only access localStorage on the client
+    if (typeof window !== "undefined") {
+      localStorage.setItem("restaurantCart", JSON.stringify(cart));
+      localStorage.setItem("restaurantTotal", totalPrice.toString());
+    }
 
     // Navigate to order confirmation page
     router.push("/restaurant-invoice");
@@ -206,15 +152,14 @@ export default function RestaurantPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Booking Summary */}
-        <AnimatePresence>
-          {isBookingSummaryOpen && bookingInfo && (
-            <BookingSummary
-              bookingInfo={bookingInfo}
-              onClose={() => setIsBookingSummaryOpen(false)}
-            />
-          )}
-        </AnimatePresence>
+        {/* Booking Summary - Only render on client side */}
+        {isClient && (
+          <AnimatePresence>
+            {isBookingSummaryOpen && ( // Removed bookingInfo check as component doesn't use it
+              <BookingSummary onClose={() => setIsBookingSummaryOpen(false)} />
+            )}
+          </AnimatePresence>
+        )}
 
         {/* Search */}
         <div className="relative mb-6">
@@ -253,34 +198,66 @@ export default function RestaurantPage() {
         </motion.div>
 
         {/* Food Grid */}
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6 mb-16"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {filteredItems.map((item) => (
-            <FoodItemComponent
-              key={item.id}
-              id={item.id}
-              name={item.name}
-              price={item.price}
-              image={item.image}
-              quantity={getItemQuantityFromStore(item.id)}
-              onAdd={() => handleAddToCart(item)}
-              onRemove={() => handleRemoveFromCart(item.id)}
-            />
-          ))}
-        </motion.div>
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6 mb-16">
+            {[...Array(6)].map((_, index) => (
+              <div
+                key={index}
+                className="h-64 bg-gray-200 rounded-lg animate-pulse"
+              ></div>
+            ))}
+          </div>
+        ) : isClient ? (
+          <motion.div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6 mb-16"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {filteredItems.map((item) => (
+              <FoodItemComponent
+                key={item.id}
+                id={item.id}
+                name={item.name}
+                price={item.price}
+                image={item.image}
+                description={item.description}
+                quantity={getItemQuantityFromStore(item.id)}
+                onAdd={() => handleAddToCart(item)}
+                onRemove={() => handleRemoveFromCart(item.id)}
+              />
+            ))}
+          </motion.div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6 mb-16">
+            {[...Array(6)].map((_, index) => (
+              <div
+                key={index}
+                className="h-64 bg-gray-100 rounded-lg animate-pulse"
+              ></div>
+            ))}
+          </div>
+        )}
 
         {/* Show message when no items found */}
-        {filteredItems.length === 0 && (
+        {!isLoading && filteredItems.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-center py-12 text-gray-500 text-lg"
           >
             No items found. Try a different search term or category.
+          </motion.div>
+        )}
+
+        {/* Show error message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-12 text-red-500 text-lg"
+          >
+            {error}
           </motion.div>
         )}
 
@@ -295,7 +272,7 @@ export default function RestaurantPage() {
           disabled={cart.length === 0}
           onClick={handleSubmitOrder}
         >
-          {cart.length > 0
+          {isClient && cart.length > 0
             ? `Order (${totalItems} items): Rp${totalPrice.toLocaleString()}`
             : "Order"}
         </motion.button>

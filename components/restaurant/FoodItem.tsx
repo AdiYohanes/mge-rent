@@ -2,8 +2,19 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Plus, Minus } from "lucide-react";
 
-export default function FoodItem(props) {
-  const { name, price, image, quantity, onAdd, onRemove } = props;
+interface FoodItemProps {
+  id: number;
+  name: string;
+  price: number;
+  image: string | null; // Allow null for image prop
+  description?: string | null;
+  quantity: number;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
+export default function FoodItem(props: FoodItemProps) {
+  const { name, price, image, description, quantity, onAdd, onRemove } = props;
 
   return (
     <motion.div
@@ -14,7 +25,7 @@ export default function FoodItem(props) {
     >
       <div className="relative h-40 overflow-hidden">
         <Image
-          src={image}
+          src={image || "/placeholder-image.jpg"} // Use fallback image if image is null
           alt={name}
           fill
           className="object-cover hover:scale-105 transition-transform duration-300"
@@ -23,6 +34,11 @@ export default function FoodItem(props) {
       </div>
       <div className="p-4 flex flex-col flex-grow">
         <h3 className="font-medium text-base mb-1 truncate">{name}</h3>
+        {description && (
+          <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+            {description}
+          </p>
+        )}
         <div className="flex justify-between items-center mt-auto">
           <p className="text-lg font-semibold text-[#B99733]">
             Rp{price.toLocaleString()}

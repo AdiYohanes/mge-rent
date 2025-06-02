@@ -420,7 +420,7 @@ const RoomSelection: React.FC = () => {
                       unoptimized={true}
                       onError={(e) => {
                         e.currentTarget.src =
-                          "/placeholder.svg?height=200&width=300";
+                          "/images/rooms/reguler.png?height=200&width=300";
                       }}
                     />
                   </div>

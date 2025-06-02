@@ -90,6 +90,15 @@ export {
   type FnbCategoryPayload,
 } from "./fnb/fnbCategoryApi";
 
+// Restaurant API (Public Food & Drinks)
+export {
+  getPublicFnbs,
+  mapFnbItemToFoodItem,
+  type FnbItem,
+  type FnbResponse,
+  type FnbCategory as RestaurantFnbCategory,
+} from "./fnb/publicFnbApi";
+
 // Promo API
 export {
   getPromos,
