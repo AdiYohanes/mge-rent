@@ -17,8 +17,6 @@ import {
   Cell,
 } from "recharts";
 import {
-  ArrowUp,
-  ArrowDown,
   DollarSign,
   ShoppingBag,
   Utensils,
@@ -160,7 +158,7 @@ export function DashboardContent() {
   return (
     <div className="flex-1 w-full">
       <motion.div
-        className="w-full px-6 py-6 space-y-6"
+        className="w-full px-3 py-3 space-y-4 sm:px-4 sm:py-4 sm:space-y-5 md:px-6 md:py-6 md:space-y-6"
         variants={container}
         initial="hidden"
         animate="show"
@@ -177,7 +175,7 @@ export function DashboardContent() {
 
         {/* Stats Cards */}
         <motion.div
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
+          className="grid grid-cols-2 gap-2 xs:gap-3 sm:gap-4 md:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4"
           variants={container}
         >
           <motion.div variants={item}>
@@ -188,7 +186,6 @@ export function DashboardContent() {
                   ? "Loading..."
                   : String(statistics?.data.total_booking || 0)
               }
-              change={4}
               icon={
                 loading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -198,7 +195,6 @@ export function DashboardContent() {
               }
               iconBg="bg-amber-100"
               iconColor="text-amber-600"
-              isLoading={loading}
             />
           </motion.div>
           <motion.div variants={item}>
@@ -209,7 +205,6 @@ export function DashboardContent() {
                   ? "Loading..."
                   : String(statistics?.data.total_fnb_order || 0)
               }
-              change={2}
               icon={
                 loading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -219,7 +214,6 @@ export function DashboardContent() {
               }
               iconBg="bg-cyan-100"
               iconColor="text-cyan-600"
-              isLoading={loading}
             />
           </motion.div>
           <motion.div variants={item}>
@@ -232,7 +226,6 @@ export function DashboardContent() {
                       statistics?.data.total_revenue || 0
                     ).toLocaleString("id-ID")}`
               }
-              change={5}
               icon={
                 loading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -242,7 +235,6 @@ export function DashboardContent() {
               }
               iconBg="bg-emerald-100"
               iconColor="text-emerald-600"
-              isLoading={loading}
             />
           </motion.div>
           <motion.div variants={item}>
@@ -253,7 +245,6 @@ export function DashboardContent() {
                   ? "Loading..."
                   : String(statistics?.data.total_customer || 0)
               }
-              change={statistics?.data.new_customer_today || 0}
               icon={
                 loading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -263,7 +254,6 @@ export function DashboardContent() {
               }
               iconBg="bg-orange-100"
               iconColor="text-orange-600"
-              isLoading={loading}
             />
           </motion.div>
         </motion.div>
@@ -452,49 +442,32 @@ export function DashboardContent() {
 interface StatsCardProps {
   title: string;
   value: string;
-  change: number;
   icon: React.ReactNode;
   iconBg: string;
   iconColor: string;
-  isLoading?: boolean;
 }
 
 function StatsCard(props: StatsCardProps) {
-  const { title, value, change, icon, iconBg, iconColor, isLoading } = props;
+  const { title, value, icon, iconBg, iconColor } = props;
   return (
-    <Card>
-      <CardContent className="p-6">
+    <Card className="overflow-hidden">
+      <CardContent className="p-3 sm:p-4 md:p-6">
         <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold">{value}</p>
+          <div className="space-y-0.5 sm:space-y-1">
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+              {title}
+            </p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold">{value}</p>
           </div>
           <div
-            className={`flex items-center justify-center w-12 h-12 rounded-full ${iconBg}`}
+            className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full ${iconBg}`}
           >
-            <div className={iconColor}>{icon}</div>
+            <div
+              className={`${iconColor} transform scale-75 sm:scale-90 md:scale-100`}
+            >
+              {icon}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center mt-4">
-          {!isLoading && (
-            <>
-              <div
-                className={`flex items-center ${
-                  change > 0 ? "text-emerald-500" : "text-red-500"
-                }`}
-              >
-                {change > 0 ? (
-                  <ArrowUp className="w-4 h-4" />
-                ) : (
-                  <ArrowDown className="w-4 h-4" />
-                )}
-                <span className="ml-1 text-sm font-medium">{change}%</span>
-              </div>
-              <span className="ml-2 text-xs text-muted-foreground">
-                from last month
-              </span>
-            </>
-          )}
         </div>
       </CardContent>
     </Card>

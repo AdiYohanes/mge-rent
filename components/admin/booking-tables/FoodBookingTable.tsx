@@ -229,13 +229,13 @@ const FoodBookingTable: React.FC<BookingTableBaseProps> = ({
         </div>
 
         {/* Date Filter */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
+        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-4">
           <div className="flex items-center gap-2">
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Filter by Date:</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[130px] h-8">
                 <SelectValue placeholder="Select Month" />
@@ -286,8 +286,11 @@ const FoodBookingTable: React.FC<BookingTableBaseProps> = ({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
+        <div
+          className="rounded-md border overflow-x-auto max-w-full"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <Table className="min-w-max">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[50px]">No</TableHead>
@@ -295,7 +298,7 @@ const FoodBookingTable: React.FC<BookingTableBaseProps> = ({
                   className="cursor-pointer hover:bg-gray-50 w-[150px]"
                   onClick={() => handleSort("transactionNumber")}
                 >
-                  <div className="flex items-center">
+                  <div className="flex items-center whitespace-nowrap">
                     No. Transaction
                     {sortField === "transactionNumber" && (
                       <ArrowUpDown
@@ -310,7 +313,7 @@ const FoodBookingTable: React.FC<BookingTableBaseProps> = ({
                   className="cursor-pointer hover:bg-gray-50"
                   onClick={() => handleSort("customerName")}
                 >
-                  <div className="flex items-center">
+                  <div className="flex items-center whitespace-nowrap">
                     Name
                     {sortField === "customerName" && (
                       <ArrowUpDown
@@ -321,12 +324,14 @@ const FoodBookingTable: React.FC<BookingTableBaseProps> = ({
                     )}
                   </div>
                 </TableHead>
-                <TableHead>Phone Number</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Order Name</TableHead>
-                <TableHead>Quantity</TableHead>
+                <TableHead className="whitespace-nowrap">
+                  Phone Number
+                </TableHead>
+                <TableHead className="whitespace-nowrap">Type</TableHead>
+                <TableHead className="whitespace-nowrap">Order Name</TableHead>
+                <TableHead className="whitespace-nowrap">Quantity</TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("date")}
                 >
                   <div className="flex items-center">
@@ -341,7 +346,7 @@ const FoodBookingTable: React.FC<BookingTableBaseProps> = ({
                   </div>
                 </TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("amount")}
                 >
                   <div className="flex items-center">
@@ -355,9 +360,11 @@ const FoodBookingTable: React.FC<BookingTableBaseProps> = ({
                     )}
                   </div>
                 </TableHead>
-                <TableHead>Metode Pembayaran</TableHead>
+                <TableHead className="whitespace-nowrap">
+                  Metode Pembayaran
+                </TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("status")}
                 >
                   <div className="flex items-center">

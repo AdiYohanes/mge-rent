@@ -73,20 +73,23 @@ import {
 } from "@/components/ui/popover";
 
 import { BookingTableBaseProps, RoomBooking, formatCurrency } from "./types";
-import { StatusBadge, months, years } from "./shared-components";
+import { BookingStatus, StatusBadge, months, years } from "./shared-components";
 
-// Import API functions
+// Import API functions from the central API export
 import {
   getBookings,
   createBooking,
   updateBooking,
   deleteBooking,
   Booking,
-} from "@/api/booking/bookingApi";
+  getUnits,
+  Unit,
+  getGames,
+  Game,
+} from "@/api";
 
-// Import Unit API functions
-import { getUnits, Unit } from "@/api/unit/unitApi";
-import { getGames, Game as GameType } from "@/api/game/gameApi";
+// Use Game as GameType for clarity
+type GameType = Game;
 
 // Add OTS Booking Form Schema
 const addOTSBookingSchema = z.object({
@@ -126,14 +129,6 @@ const editBookingSchema = z.object({
   ),
 });
 
-// Update BookingStatus enum untuk sesuai dengan permintaan
-export type BookingStatus =
-  | "success"
-  | "cancelled"
-  | "refunded"
-  | "completed"
-  | "rescheduled";
-
 const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
   filterStatus,
 }) => {
@@ -146,16 +141,10 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
   const [selectedMonth, setSelectedMonth] = useState<string>("all_months");
   const [selectedYear, setSelectedYear] = useState<string>("all_years");
 
-  // State for modals
-  const [isRescheduleModalOpen, setIsRescheduleModalOpen] =
-    useState<boolean>(false);
-  const [isRefundModalOpen, setIsRefundModalOpen] = useState<boolean>(false);
+  // State for modals - remove unused state variables
   const [selectedBooking, setSelectedBooking] = useState<RoomBooking | null>(
     null
   );
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
-    useState<boolean>(false);
-  const [confirmAction, setConfirmAction] = useState<string>("");
   const [isOTSBookingModalOpen, setIsOTSBookingModalOpen] =
     useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
@@ -176,7 +165,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
 
   // Update gameOptions to use real games from API instead of hardcoded values
   const [gameOptions, setGameOptions] = useState<GameType[]>([]);
-  const [timeOptions, setTimeOptions] = useState<string[]>([
+  const [timeOptions] = useState<string[]>([
     "09:00",
     "09:30",
     "10:00",
@@ -339,10 +328,18 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
       const response = await getUnits(1, 100); // Get first 100 units
       console.log("Units response:", response);
       if (response && Array.isArray(response.data)) {
-        setUnitOptions(response.data);
-        console.log("Units loaded successfully:", response.data.length);
+        // Filter out any null/undefined values and ensure valid data structure
+        const filteredUnits = response.data.filter(
+          (unit) => unit && typeof unit === "object" && unit.id
+        );
+
+        console.log(
+          `Units loaded successfully: ${filteredUnits.length} valid units out of ${response.data.length}`
+        );
+        setUnitOptions(filteredUnits);
       } else {
         console.error("Invalid units response format:", response);
+        setUnitOptions([]);
       }
     } catch (err: unknown) {
       console.error("Error fetching units:", err);
@@ -375,10 +372,18 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
       const response = await getGames(); // Get all games
       console.log("Games response:", response);
       if (response && Array.isArray(response.games)) {
-        setGameOptions(response.games);
-        console.log("Games loaded successfully:", response.games.length);
+        // Filter out any null/undefined values and ensure valid data structure
+        const filteredGames = response.games.filter(
+          (game) => game && typeof game === "object" && game.id && game.title
+        );
+
+        console.log(
+          `Games loaded successfully: ${filteredGames.length} valid games out of ${response.games.length}`
+        );
+        setGameOptions(filteredGames);
       } else {
         console.error("Invalid games response format:", response);
+        setGameOptions([]);
       }
     } catch (err: unknown) {
       console.error("Error fetching games:", err);
@@ -421,73 +426,121 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
 
   // Convert API Booking to RoomBooking for UI
   const mapApiToRoomBooking = (booking: Booking): RoomBooking => {
+    if (!booking) {
+      console.error("Booking data is null or undefined");
+      // Return default RoomBooking object to avoid errors
+      return {
+        id: "0",
+        transactionNumber: "N/A",
+        customerName: "Unknown",
+        phoneNumber: "N/A",
+        status: "success",
+        date: new Date().toISOString().split("T")[0],
+        amount: 0,
+        paymentMethod: "N/A",
+        console: "PlayStation 5",
+        roomType: "Regular",
+        unitNumber: "Unknown Unit",
+        totalPerson: 1,
+        startTime: "00:00",
+        endTime: "",
+        duration: "0 minutes",
+      };
+    }
+
     // Parse customer data
     let customerData: { name: string; phone: string } = { name: "", phone: "" };
     try {
       if (typeof booking.customer_data === "string") {
         customerData = JSON.parse(booking.customer_data);
-      } else {
+      } else if (
+        booking.customer_data &&
+        typeof booking.customer_data === "object"
+      ) {
         customerData = booking.customer_data as { name: string; phone: string };
       }
     } catch (e) {
       console.error("Error parsing customer data:", e);
     }
 
-    // Find unit name from unitOptions
-    const unit = unitOptions.find((u) => u.id === booking.unit_id);
-    const unitName = unit ? unit.name : `Unit ${booking.unit_id}`;
-
-    // Find game name from gameOptions
-    let gameTitle = "-";
-    if (booking.game_id) {
-      const game = gameOptions.find((g) => g.id === booking.game_id);
-      if (game) {
-        gameTitle = game.title;
+    // Find unit name from unitOptions with extra safeguards
+    let unitName = `Unit ${booking.unit_id || "Unknown"}`;
+    try {
+      if (booking.unit_id && unitOptions && unitOptions.length > 0) {
+        const unit = unitOptions.find((u) => u && u.id === booking.unit_id);
+        if (unit && unit.name) {
+          unitName = unit.name;
+        }
       }
+    } catch (e) {
+      console.error("Error finding unit name:", e);
     }
 
-    // Map API status to our status format
+    // Find game name from gameOptions with extra safeguards
+    let gameTitle = "-";
+    try {
+      if (booking.game_id && gameOptions && gameOptions.length > 0) {
+        const game = gameOptions.find((g) => g && g.id === booking.game_id);
+        if (game && game.title) {
+          gameTitle = game.title;
+        }
+      }
+    } catch (e) {
+      console.error("Error finding game title:", e);
+    }
+
+    // Map API status to our status format with safety checks
     let mappedStatus: BookingStatus = "success";
-    switch (booking.status) {
-      case "success":
-        mappedStatus = "success";
-        break;
-      case "cancelled":
-        mappedStatus = "cancelled";
-        break;
-      case "refunded":
-        mappedStatus = "refunded";
-        break;
-      case "completed":
-        mappedStatus = "completed";
-        break;
-      case "rescheduled":
-        mappedStatus = "rescheduled";
-        break;
-      default:
-        mappedStatus = "success"; // Default fallback
-        break;
+    try {
+      if (booking.status) {
+        switch (booking.status) {
+          case "success":
+            mappedStatus = "success";
+            break;
+          case "cancelled":
+            mappedStatus = "cancelled";
+            break;
+          case "refunded":
+            mappedStatus = "refunded";
+            break;
+          case "completed":
+            mappedStatus = "completed";
+            break;
+          case "rescheduled":
+            mappedStatus = "rescheduled";
+            break;
+          default:
+            mappedStatus = "success"; // Default fallback
+            break;
+        }
+      }
+    } catch (e) {
+      console.error("Error mapping status:", e);
     }
 
-    // Map API booking to UI booking
+    // Map API booking to UI booking with safety for all fields
     return {
-      id: booking.id.toString(),
-      transactionNumber: `TRX-${booking.created_at
-        .substring(0, 10)
-        .replace(/-/g, "")}-${booking.id}`,
-      customerName: customerData.name,
-      phoneNumber: customerData.phone,
+      id: booking.id?.toString() || "0",
+      transactionNumber: booking.created_at
+        ? `TRX-${booking.created_at.substring(0, 10).replace(/-/g, "")}-${
+            booking.id
+          }`
+        : `TRX-${booking.id || "Unknown"}`,
+      customerName: customerData?.name || "Unknown Customer",
+      phoneNumber: customerData?.phone || "N/A",
       status: mappedStatus,
-      date: booking.booking_date,
+      date: booking.booking_date || new Date().toISOString().split("T")[0],
       amount: 0, // API doesn't provide this, would need to be added
       paymentMethod: "N/A", // API doesn't provide this, would need to be added
       console: "PlayStation 5", // API doesn't provide this, would need to be added
       roomType: "Regular", // API doesn't provide this, would need to be added
       unitNumber: unitName, // Use the unit name instead of just "Unit X"
-      totalPerson: parseInt(booking.total_customer || "1"),
-      startTime: booking.start_time,
+      totalPerson: booking.total_customer
+        ? parseInt(booking.total_customer)
+        : 1,
+      startTime: booking.start_time || "00:00",
       endTime: "", // API doesn't provide this, would need to be calculated
-      duration: `${booking.duration} minutes`, // Format as minutes
+      duration: booking.duration ? `${booking.duration} minutes` : "0 minutes", // Format as minutes
       gameId: booking.game_id, // Store game_id for reference
       gameTitle: gameTitle, // Add game title
     };
@@ -518,58 +571,6 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
       setSortDirection("asc");
     }
     // Would need server implementation to sort data properly
-  };
-
-  // Handle reschedule booking
-  const handleRescheduleBooking = async (booking: RoomBooking) => {
-    setSelectedBooking(booking);
-    setIsRescheduleModalOpen(true);
-  };
-
-  // Save reschedule changes
-  const saveRescheduleChanges = async () => {
-    if (!selectedBooking) return;
-
-    try {
-      setIsLoading(true);
-      // Call API to update booking
-      // Would need to extract the date and time from UI fields
-
-      toast.success("Booking rescheduled successfully!");
-      setIsRescheduleModalOpen(false);
-      fetchBookings(); // Refresh data
-    } catch (err) {
-      console.error("Error rescheduling booking:", err);
-      toast.error("Failed to reschedule booking");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle refund booking
-  const handleRefundBooking = async (booking: RoomBooking) => {
-    setSelectedBooking(booking);
-    setIsRefundModalOpen(true);
-  };
-
-  // Process refund
-  const processRefund = async () => {
-    if (!selectedBooking) return;
-
-    try {
-      setIsLoading(true);
-      // Call API to process refund
-      // This would likely be a custom endpoint for refunds
-
-      toast.success("Refund processed successfully!");
-      setIsRefundModalOpen(false);
-      fetchBookings(); // Refresh data
-    } catch (err) {
-      console.error("Error processing refund:", err);
-      toast.error("Failed to process refund");
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // Generate pagination buttons
@@ -738,43 +739,64 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
     try {
       console.log("Setting up edit form for booking:", booking);
 
+      // Pastikan booking valid
+      if (!booking) {
+        console.error("Booking is null or undefined");
+        toast.error("Invalid booking data");
+        return;
+      }
+
       // Convert the booking to the form format
-      const bookingDate = new Date(booking.date);
+      const bookingDate = booking.date ? new Date(booking.date) : new Date();
 
       // Extract unit ID from unitNumber if needed
       let unitId = 0;
 
-      // Find matching unit from unitOptions using name
-      const foundUnit = unitOptions.find(
-        (unit) => unit.name === booking.unitNumber
-      );
-      if (foundUnit) {
-        unitId = foundUnit.id;
-      } else {
-        // Fallback to parse unit ID from the string if format is "Unit X"
-        const unitMatch = booking.unitNumber.match(/Unit (\d+)/);
-        if (unitMatch && unitMatch[1]) {
-          unitId = parseInt(unitMatch[1]);
+      try {
+        // Find matching unit from unitOptions using name
+        if (booking.unitNumber && unitOptions && unitOptions.length > 0) {
+          const foundUnit = unitOptions.find(
+            (unit) => unit && unit.name === booking.unitNumber
+          );
+          if (foundUnit && foundUnit.id) {
+            // Make sure it's a number
+            unitId =
+              typeof foundUnit.id === "string"
+                ? parseInt(foundUnit.id)
+                : foundUnit.id;
+          } else {
+            // Fallback to parse unit ID from the string if format is "Unit X"
+            const unitMatch = booking.unitNumber.match(/Unit (\d+)/);
+            if (unitMatch && unitMatch[1]) {
+              unitId = parseInt(unitMatch[1]);
+            }
+          }
         }
+      } catch (e) {
+        console.error("Error finding unit ID:", e);
       }
 
       // Extract duration in minutes from string like "X minutes"
       let durationMinutes = 60; // Default to 60 minutes
 
-      // Parse the duration from the booking duration string
-      if (booking.duration.includes("minute")) {
-        // If format is "X minutes"
-        const minuteMatch = booking.duration.match(/(\d+)/);
-        if (minuteMatch && minuteMatch[1]) {
-          durationMinutes = parseInt(minuteMatch[1]);
+      try {
+        // Parse the duration from the booking duration string
+        if (booking.duration && booking.duration.includes("minute")) {
+          // If format is "X minutes"
+          const minuteMatch = booking.duration.match(/(\d+)/);
+          if (minuteMatch && minuteMatch[1]) {
+            durationMinutes = parseInt(minuteMatch[1]);
+          }
+        } else if (booking.duration && booking.duration.includes("hour")) {
+          // Legacy conversion - if format is "X hour(s)"
+          const hourMatch = booking.duration.match(/(\d+(\.\d+)?)/);
+          if (hourMatch && hourMatch[1]) {
+            const durationHours = parseFloat(hourMatch[1]);
+            durationMinutes = Math.round(durationHours * 60);
+          }
         }
-      } else if (booking.duration.includes("hour")) {
-        // Legacy conversion - if format is "X hour(s)"
-        const hourMatch = booking.duration.match(/(\d+(\.\d+)?)/);
-        if (hourMatch && hourMatch[1]) {
-          const durationHours = parseFloat(hourMatch[1]);
-          durationMinutes = Math.round(durationHours * 60);
-        }
+      } catch (e) {
+        console.error("Error parsing duration:", e);
       }
 
       // Ensure minimum duration is 60 minutes
@@ -787,72 +809,91 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
 
       // Ensure we have a valid startTime - first check booking.startTime, then fall back to timeOptions[0]
       let startTime = timeOptions[0];
-      if (booking.startTime && booking.startTime.trim() !== "") {
-        // Check if the time exists in our timeOptions
-        if (timeOptions.includes(booking.startTime)) {
-          startTime = booking.startTime;
-        } else {
-          // If not exact match, try to find closest 30-min interval
-          const [hours, minutes] = booking.startTime.split(":").map(Number);
-          const roundedMinutes = minutes >= 30 ? 30 : 0;
-          const formattedTime = `${hours
-            .toString()
-            .padStart(2, "0")}:${roundedMinutes.toString().padStart(2, "0")}`;
+      try {
+        if (booking.startTime && booking.startTime.trim() !== "") {
+          // Check if the time exists in our timeOptions
+          if (timeOptions.includes(booking.startTime)) {
+            startTime = booking.startTime;
+          } else {
+            // If not exact match, try to find closest 30-min interval
+            const [hours, minutes] = booking.startTime.split(":").map(Number);
+            const roundedMinutes = minutes >= 30 ? 30 : 0;
+            const formattedTime = `${hours
+              .toString()
+              .padStart(2, "0")}:${roundedMinutes.toString().padStart(2, "0")}`;
 
-          if (timeOptions.includes(formattedTime)) {
-            startTime = formattedTime;
+            if (timeOptions.includes(formattedTime)) {
+              startTime = formattedTime;
+            }
           }
         }
+      } catch (e) {
+        console.error("Error setting startTime:", e);
       }
 
       console.log("Selected startTime for form:", startTime);
 
-      // Find game ID if available (from gameOptions)
-      let gameId = undefined;
-      if (booking.gameId) {
-        gameId = booking.gameId;
+      // Find game ID if available
+      let gameId: number | undefined = undefined;
+      try {
+        if (booking.gameId !== undefined && booking.gameId !== null) {
+          gameId = Number(booking.gameId);
+        }
+      } catch (e) {
+        console.error("Error setting gameId:", e);
       }
 
-      // Pastikan status booking valid
-      let status = booking.status;
+      // Ensure status is a valid enum value for the form
       const validStatuses = [
         "success",
         "cancelled",
         "refunded",
         "completed",
         "rescheduled",
-      ];
-      if (!validStatuses.includes(status)) {
-        status = "success"; // Default ke success jika tidak valid
-        console.warn(
-          `Invalid status "${status}" found, defaulting to "success"`
-        );
+      ] as const;
+      let status: (typeof validStatuses)[number] = "success";
+
+      try {
+        if (
+          booking.status &&
+          validStatuses.includes(
+            booking.status as (typeof validStatuses)[number]
+          )
+        ) {
+          status = booking.status as (typeof validStatuses)[number];
+        } else {
+          console.warn(
+            `Invalid status "${booking.status}" found, defaulting to "success"`
+          );
+        }
+      } catch (e) {
+        console.error("Error setting status:", e);
       }
 
       console.log("Setting form values:", {
-        bookingId: parseInt(booking.id),
+        bookingId: parseInt(booking.id || "0"),
         unitId: unitId,
         gameId: gameId,
         bookingDate: bookingDate,
         startTime: startTime,
         duration: durationMinutes,
-        totalCustomer: booking.totalPerson,
+        totalCustomer: booking.totalPerson || 1,
         status: status,
       });
 
-      // Penting: set nilai form sebelum membuka modal
+      // Set form values
       editBookingForm.reset({
-        bookingId: parseInt(booking.id),
+        bookingId: parseInt(booking.id || "0"),
         unitId: unitId,
         gameId: gameId,
         bookingDate: bookingDate,
         startTime: startTime,
         duration: durationMinutes,
-        totalCustomer: booking.totalPerson,
+        totalCustomer: booking.totalPerson || 1,
         status: status,
       });
 
-      // Beri waktu untuk form di-reset sebelum membuka modal
+      // Open modal after form is set
       setTimeout(() => {
         setSelectedBooking(booking);
         setIsEditModalOpen(true);
@@ -869,26 +910,6 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
     try {
       setIsLoading(true);
 
-      // Map status from UI format to API format
-      let apiStatus = values.status;
-      switch (values.status) {
-        case "success":
-          apiStatus = "success";
-          break;
-        case "cancelled":
-          apiStatus = "cancelled";
-          break;
-        case "refunded":
-          apiStatus = "refunded";
-          break;
-        case "completed":
-          apiStatus = "completed";
-          break;
-        case "rescheduled":
-          apiStatus = "rescheduled";
-          break;
-      }
-
       // Create booking payload
       const bookingPayload = {
         unit_id: values.unitId,
@@ -897,7 +918,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
         start_time: values.startTime,
         duration: values.duration,
         total_customer: values.totalCustomer.toString(),
-        status: apiStatus,
+        status: values.status,
       };
 
       // Call API to update booking
@@ -983,7 +1004,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
           </Tooltip>
         </TooltipProvider>
 
-        {/* Status-specific action buttons */}
+        {/* Reschedule Button - only for success status */}
         {status === "success" && (
           <TooltipProvider>
             <Tooltip>
@@ -992,7 +1013,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                   variant="outline"
                   size="icon"
                   className="h-8 w-8 border-blue-500 text-blue-500"
-                  onClick={() => handleRescheduleBooking(booking)}
+                  onClick={() => handleEditBooking(booking)}
                   disabled={isLoading}
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -1136,7 +1157,7 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
           )}
 
           {/* Add OTS Booking Button */}
-          <div className="ml-auto">
+          <div className="w-full flex justify-center md:justify-end md:ml-auto">
             <Button
               className="bg-[#B99733] hover:bg-[#a38429] text-white"
               onClick={() => setIsOTSBookingModalOpen(true)}
@@ -1162,8 +1183,11 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
           </div>
         )}
 
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
+        <div
+          className="rounded-md border overflow-x-auto max-w-full"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <Table className="min-w-max">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[50px]">No</TableHead>
@@ -1288,41 +1312,75 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                 </TableRow>
               ) : bookings.length > 0 ? (
                 bookings.map((booking, index) => {
-                  const roomBooking = mapApiToRoomBooking(booking);
-                  return (
-                    <TableRow key={booking.id} className="hover:bg-gray-50">
-                      <TableCell>
-                        {(currentPage - 1) * itemsPerPage + index + 1}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {roomBooking.transactionNumber}
-                      </TableCell>
-                      <TableCell>{roomBooking.customerName}</TableCell>
-                      <TableCell>{roomBooking.phoneNumber}</TableCell>
-                      <TableCell>{roomBooking.console}</TableCell>
-                      <TableCell>{roomBooking.roomType}</TableCell>
-                      <TableCell>{roomBooking.unitNumber}</TableCell>
-                      <TableCell>{roomBooking.gameTitle}</TableCell>
-                      <TableCell>{roomBooking.totalPerson}</TableCell>
-                      <TableCell>{roomBooking.startTime}</TableCell>
-                      <TableCell>{roomBooking.duration}</TableCell>
-                      <TableCell>
-                        {roomBooking.date
-                          ? format(new Date(roomBooking.date), "dd/MM/yyyy")
-                          : "-"}
-                      </TableCell>
-                      <TableCell>
-                        {formatCurrency(roomBooking.amount)}
-                      </TableCell>
-                      <TableCell>{roomBooking.paymentMethod}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={roomBooking.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {getActionButtons(roomBooking.status, roomBooking)}
-                      </TableCell>
-                    </TableRow>
-                  );
+                  try {
+                    // Pastikan booking valid sebelum di-map
+                    if (!booking || !booking.id) {
+                      console.error("Invalid booking data:", booking);
+                      return null;
+                    }
+
+                    const roomBooking = mapApiToRoomBooking(booking);
+                    return (
+                      <TableRow key={booking.id} className="hover:bg-gray-50">
+                        <TableCell>
+                          {(currentPage - 1) * itemsPerPage + index + 1}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {roomBooking.transactionNumber || "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          {roomBooking.customerName || "Unknown"}
+                        </TableCell>
+                        <TableCell>
+                          {roomBooking.phoneNumber || "N/A"}
+                        </TableCell>
+                        <TableCell>{roomBooking.console || "PS5"}</TableCell>
+                        <TableCell>
+                          {roomBooking.roomType || "Regular"}
+                        </TableCell>
+                        <TableCell>
+                          {roomBooking.unitNumber || "Unknown Unit"}
+                        </TableCell>
+                        <TableCell>{roomBooking.gameTitle || "-"}</TableCell>
+                        <TableCell>{roomBooking.totalPerson || 1}</TableCell>
+                        <TableCell>
+                          {roomBooking.startTime || "00:00"}
+                        </TableCell>
+                        <TableCell>
+                          {roomBooking.duration || "0 minutes"}
+                        </TableCell>
+                        <TableCell>
+                          {roomBooking.date
+                            ? format(new Date(roomBooking.date), "dd/MM/yyyy")
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {formatCurrency(roomBooking.amount || 0)}
+                        </TableCell>
+                        <TableCell>
+                          {roomBooking.paymentMethod || "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge
+                            status={roomBooking.status || "success"}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {getActionButtons(
+                            roomBooking.status || "success",
+                            roomBooking
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  } catch (error) {
+                    console.error(
+                      "Error rendering booking row:",
+                      error,
+                      booking
+                    );
+                    return null; // Skip rendering this row if there's an error
+                  }
                 })
               ) : (
                 <TableRow>
@@ -1417,14 +1475,19 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                         </FormControl>
                         <SelectContent>
                           {unitOptions.length > 0 ? (
-                            unitOptions.map((unit) => (
-                              <SelectItem
-                                key={unit.id}
-                                value={unit.id.toString()}
-                              >
-                                {unit.name}
-                              </SelectItem>
-                            ))
+                            unitOptions.map((unit) => {
+                              if (!unit || !unit.id) return null;
+                              return (
+                                <SelectItem
+                                  key={unit.id}
+                                  value={unit.id.toString()}
+                                >
+                                  {unit && unit.name
+                                    ? unit.name
+                                    : `Unit ${unit.id}`}
+                                </SelectItem>
+                              );
+                            })
                           ) : (
                             <SelectItem value="0" disabled>
                               No units available
@@ -1456,14 +1519,19 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                         <SelectContent>
                           <SelectItem value="0">None</SelectItem>
                           {gameOptions.length > 0 ? (
-                            gameOptions.map((game) => (
-                              <SelectItem
-                                key={game.id}
-                                value={game.id.toString()}
-                              >
-                                {game.title}
-                              </SelectItem>
-                            ))
+                            gameOptions.map((game) => {
+                              if (!game || !game.id) return null;
+                              return (
+                                <SelectItem
+                                  key={game.id}
+                                  value={game.id.toString()}
+                                >
+                                  {game && game.title
+                                    ? game.title
+                                    : `Game ${game.id}`}
+                                </SelectItem>
+                              );
+                            })
                           ) : (
                             <SelectItem value="no-games" disabled>
                               No games available
@@ -1636,14 +1704,19 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                         </FormControl>
                         <SelectContent>
                           {unitOptions.length > 0 ? (
-                            unitOptions.map((unit) => (
-                              <SelectItem
-                                key={unit.id}
-                                value={unit.id.toString()}
-                              >
-                                {unit.name}
-                              </SelectItem>
-                            ))
+                            unitOptions.map((unit) => {
+                              if (!unit || !unit.id) return null;
+                              return (
+                                <SelectItem
+                                  key={unit.id}
+                                  value={unit.id.toString()}
+                                >
+                                  {unit && unit.name
+                                    ? unit.name
+                                    : `Unit ${unit.id}`}
+                                </SelectItem>
+                              );
+                            })
                           ) : (
                             <SelectItem value="0" disabled>
                               No units available
@@ -1676,14 +1749,19 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                         <SelectContent>
                           <SelectItem value="0">None</SelectItem>
                           {gameOptions.length > 0 ? (
-                            gameOptions.map((game) => (
-                              <SelectItem
-                                key={game.id}
-                                value={game.id.toString()}
-                              >
-                                {game.title}
-                              </SelectItem>
-                            ))
+                            gameOptions.map((game) => {
+                              if (!game || !game.id) return null;
+                              return (
+                                <SelectItem
+                                  key={game.id}
+                                  value={game.id.toString()}
+                                >
+                                  {game && game.title
+                                    ? game.title
+                                    : `Game ${game.id}`}
+                                </SelectItem>
+                              );
+                            })
                           ) : (
                             <SelectItem value="no-games" disabled>
                               No games available
@@ -1744,7 +1822,6 @@ const RoomBookingTable: React.FC<BookingTableBaseProps> = ({
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
-                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>

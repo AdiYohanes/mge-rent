@@ -49,14 +49,24 @@ const Login = () => {
       const response = await login(formData);
 
       if (response) {
-        toast.success("Login successful!");
-
-        // Redirect based on user role
+        // Check if user has admin role, redirect to admin page if true
         if (response.user.role === "ADMN" || response.user.role === "SADMN") {
-          router.push("/admin/dashboard");
-        } else {
-          // Default redirect for CUST or any other roles
+          toast.info("Please use the admin login page.");
+          router.push("/admin");
+          return;
+        }
+
+        // Only proceed for CUST role
+        if (response.user.role === "CUST") {
+          toast.success("Login successful!");
           router.push("/");
+        } else {
+          // For any unexpected roles
+          toast.error("Invalid role for this login page.");
+          setFormData((prev) => ({
+            ...prev,
+            password: "",
+          }));
         }
       }
     } catch (error) {
@@ -227,6 +237,17 @@ const Login = () => {
                 className="text-[#b99733] underline hover:text-[#967515] transition-colors duration-300"
               >
                 Register
+              </Link>
+            </div>
+
+            {/* Admin Link */}
+            <div className="text-center text-[10px] sm:text-xs md:text-sm">
+              <span className="text-gray-600">Admin user? </span>
+              <Link
+                href="/admin"
+                className="text-[#b99733] underline hover:text-[#967515] transition-colors duration-300"
+              >
+                Admin login
               </Link>
             </div>
           </form>

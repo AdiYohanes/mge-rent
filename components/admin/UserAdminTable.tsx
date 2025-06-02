@@ -639,13 +639,16 @@ export function UserAdminTable() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border">
-          <Table>
+        <div
+          className="rounded-md border overflow-x-auto max-w-full"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <Table className="min-w-max">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[50px]">No</TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("fullName")}
                 >
                   <div className="flex items-center">
@@ -660,7 +663,7 @@ export function UserAdminTable() {
                   </div>
                 </TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("phoneNumber")}
                 >
                   <div className="flex items-center">
@@ -675,7 +678,7 @@ export function UserAdminTable() {
                   </div>
                 </TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("email")}
                 >
                   <div className="flex items-center">
@@ -690,7 +693,7 @@ export function UserAdminTable() {
                   </div>
                 </TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("permission")}
                 >
                   <div className="flex items-center">
@@ -705,7 +708,7 @@ export function UserAdminTable() {
                   </div>
                 </TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("status")}
                 >
                   <div className="flex items-center">
@@ -720,7 +723,7 @@ export function UserAdminTable() {
                   </div>
                 </TableHead>
                 <TableHead
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50 whitespace-nowrap"
                   onClick={() => handleSort("registrationDate")}
                 >
                   <div className="flex items-center">
@@ -734,7 +737,9 @@ export function UserAdminTable() {
                     )}
                   </div>
                 </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right whitespace-nowrap">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

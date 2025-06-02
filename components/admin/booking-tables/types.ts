@@ -1,4 +1,4 @@
-import { BookingStatus } from "../BookingTable";
+import { BookingStatus } from "./shared-components";
 
 // Base booking interface with common properties
 export interface BaseBooking {
@@ -22,6 +22,8 @@ export interface RoomBooking extends BaseBooking {
   endTime: string;
   time?: string;
   duration: string;
+  gameId?: number;
+  gameTitle?: string;
 }
 
 // Event booking specific fields

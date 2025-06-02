@@ -17,9 +17,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { login, LoginRequestData, ErrorResponse } from "@/api";
+import { AxiosError } from "axios";
+import axios from "axios";
 
 const AdminLoginPage = () => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LoginRequestData>({
     username: "",
     password: "",
   });
@@ -50,38 +53,69 @@ const AdminLoginPage = () => {
 
     setLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      // Check for admin credentials
-      if (
-        formData.username === "admin@example.com" &&
-        formData.password === "adminPassword"
-      ) {
-        toast.success("Welcome back, Administrator!");
+    // Connect to backend API
+    try {
+      const response = await login(formData);
 
-        // Save to localStorage or sessionStorage if available
-        const adminData = {
-          username: formData.username,
-          role: "admin",
-          rememberMe,
-        };
+      if (response) {
+        // Check user role
+        if (response.user.role === "ADMN" || response.user.role === "SADMN") {
+          toast.success("Welcome back, Administrator!");
 
-        if (typeof window !== "undefined") {
-          if (rememberMe) {
-            localStorage.setItem("admin", JSON.stringify(adminData));
-          } else {
-            sessionStorage.setItem("admin", JSON.stringify(adminData));
+          // Save to localStorage or sessionStorage if available
+          const adminData = {
+            username: response.user.username,
+            role: response.user.role,
+            rememberMe,
+          };
+
+          if (typeof window !== "undefined") {
+            if (rememberMe) {
+              localStorage.setItem("admin", JSON.stringify(adminData));
+            } else {
+              sessionStorage.setItem("admin", JSON.stringify(adminData));
+            }
           }
-        }
 
-        setTimeout(() => {
           router.push("/admin/dashboard");
-        }, 500);
-      } else {
-        toast.error("Invalid credentials. Please try again.");
-        setLoading(false);
+        } else {
+          // Redirect non-admin users to the regular login page
+          toast.info("Please use the regular login page.");
+          router.push("/signin");
+        }
       }
-    }, 1500);
+    } catch (error) {
+      console.error("Login error:", error);
+
+      let errorMessage = "Login failed. Please try again.";
+
+      // Check for different error scenarios
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError<ErrorResponse>;
+
+        if (axiosError.response?.status === 401) {
+          errorMessage = "Incorrect username or password. Please try again.";
+        } else if (axiosError.response?.status === 404) {
+          errorMessage = "User not found. Please check your username.";
+        } else if (axiosError.response?.data?.message) {
+          // Use the error message from the server
+          errorMessage = axiosError.response.data.message;
+        } else if (axiosError.message === "Network Error") {
+          errorMessage = "Network error. Please check your connection.";
+        }
+      }
+
+      // Show the error message
+      toast.error(errorMessage);
+
+      // Reset the password field but keep the username
+      setFormData((prev) => ({
+        ...prev,
+        password: "",
+      }));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -204,13 +238,13 @@ const AdminLoginPage = () => {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Email Field */}
+              {/* Username Field */}
               <div className="space-y-2">
                 <Label
                   htmlFor="username"
                   className="text-sm font-medium text-gray-700"
                 >
-                  Email
+                  Username
                 </Label>
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -219,12 +253,12 @@ const AdminLoginPage = () => {
                   <Input
                     id="username"
                     name="username"
-                    type="email"
+                    type="text"
                     required
                     value={formData.username}
                     onChange={handleChange}
                     className="pl-10 pr-4 py-3 w-full bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 focus:bg-white transition-all duration-200"
-                    placeholder="admin@example.com"
+                    placeholder="Enter your username"
                   />
                 </div>
               </div>
@@ -331,15 +365,15 @@ const AdminLoginPage = () => {
               </p>
               <div className="text-center text-sm text-amber-700 space-y-1">
                 <p>
-                  Email:{" "}
+                  Admin Username:{" "}
                   <code className="px-2 py-1 bg-white rounded font-mono text-xs">
-                    admin@example.com
+                    admin_user
                   </code>
                 </p>
                 <p>
                   Password:{" "}
                   <code className="px-2 py-1 bg-white rounded font-mono text-xs">
-                    adminPassword
+                    admin_password
                   </code>
                 </p>
               </div>
