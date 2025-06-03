@@ -83,41 +83,81 @@ export function TransactionTable() {
         // Transform API data to match our transaction structure
         const transformedData: Transaction[] = successBookings.map(
           (booking: Booking) => {
-            let customerData: CustomerData;
-            try {
-              customerData = JSON.parse(booking.customer_data);
-            } catch {
-              customerData = { name: "Unknown", phone: "Unknown" };
+            // Default customer data in case parsing fails or data is missing
+            let customerData: CustomerData = {
+              name: "Unknown",
+              phone: "Unknown",
+            };
+
+            // Only try to parse if customer_data exists and is not null
+            if (booking.customer_data) {
+              try {
+                const parsedData = JSON.parse(booking.customer_data);
+
+                // Ensure parsedData has the required properties
+                if (parsedData && typeof parsedData === "object") {
+                  customerData = {
+                    name: parsedData.name || "Unknown",
+                    phone: parsedData.phone || "Unknown",
+                  };
+                }
+              } catch (error) {
+                console.error("Error parsing customer data:", error);
+                // Keep using the default values set above
+              }
             }
 
-            // Format the booking date
-            const bookingDate = new Date(booking.booking_date);
-            const formattedDate = `${bookingDate
-              .getDate()
-              .toString()
-              .padStart(2, "0")}/${(bookingDate.getMonth() + 1)
-              .toString()
-              .padStart(2, "0")}/${bookingDate.getFullYear()}`;
+            // Format the booking date safely
+            let formattedDate = "Unknown";
+            if (booking.booking_date) {
+              try {
+                const bookingDate = new Date(booking.booking_date);
+                if (!isNaN(bookingDate.getTime())) {
+                  formattedDate = `${bookingDate
+                    .getDate()
+                    .toString()
+                    .padStart(2, "0")}/${(bookingDate.getMonth() + 1)
+                    .toString()
+                    .padStart(2, "0")}/${bookingDate.getFullYear()}`;
+                }
+              } catch (error) {
+                console.error("Error formatting booking date:", error);
+              }
+            }
 
-            // Format created_at for payment date
-            const paymentDate = new Date(booking.created_at);
-            const formattedPaymentDate = `${paymentDate
-              .getDate()
-              .toString()
-              .padStart(2, "0")}/${(paymentDate.getMonth() + 1)
-              .toString()
-              .padStart(2, "0")}/${paymentDate.getFullYear()}`;
+            // Format created_at for payment date safely
+            let formattedPaymentDate = "Unknown";
+            if (booking.created_at) {
+              try {
+                const paymentDate = new Date(booking.created_at);
+                if (!isNaN(paymentDate.getTime())) {
+                  formattedPaymentDate = `${paymentDate
+                    .getDate()
+                    .toString()
+                    .padStart(2, "0")}/${(paymentDate.getMonth() + 1)
+                    .toString()
+                    .padStart(2, "0")}/${paymentDate.getFullYear()}`;
+                }
+              } catch (error) {
+                console.error("Error formatting payment date:", error);
+              }
+            }
+
+            // Calculate duration safely
+            const duration = booking.duration || 0;
 
             return {
-              id: booking.id.toString(),
-              transactionNumber: `TRX${booking.id.toString().padStart(6, "0")}`,
+              id: booking.id ? booking.id.toString() : "0",
+              transactionNumber: `TRX${
+                booking.id ? booking.id.toString().padStart(6, "0") : "000000"
+              }`,
               type: "Room", // Assuming all bookings are for rooms
               name: customerData.name,
               phoneNumber: customerData.phone,
               details: `Booking for ${booking.event_name || "Unknown Event"}`,
-              quantity: `${booking.duration} hrs`,
+              quantity: `${duration} hrs`,
               bookingDate: formattedDate,
-              totalPayment: `Rp${(booking.duration * 50000).toLocaleString()}`, // Example calculation
+              totalPayment: `Rp${(duration * 50000).toLocaleString()}`, // Example calculation
               paymentMethod: "QRIS", // Assuming QRIS for all
               paymentDate: formattedPaymentDate,
               status: "booking_success", // Mapping API "success" to UI "booking_success"

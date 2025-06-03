@@ -1,13 +1,21 @@
 import axios from "axios";
 import { API_BASE_URL } from "../constants";
 
+export interface ConsoleModel {
+  id: number;
+  name: string;
+  model: string;
+  image?: string;
+  description?: string;
+}
+
 export interface UnitItem {
   id: number;
   name: string;
   room_id: number;
   console_id: number;
   features: string[];
-  console: any | null;
+  console: ConsoleModel | null;
 }
 
 export interface UnitResponse {

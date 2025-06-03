@@ -19,6 +19,39 @@ export interface Game {
   deleted_at?: string | null;
 }
 
+// Public game interface for booking
+export interface PublicGame {
+  id: number;
+  name: string;
+  image: string;
+  description?: string;
+  unit: string;
+  available: boolean;
+}
+
+// Define a type for the game object in the response
+interface GameResponseObject {
+  id?: number;
+  title?: string;
+  image?: string;
+  description?: string;
+  genre?: string;
+  quantity_available?: number;
+}
+
+// Updated response interface to handle both array and object formats
+export interface PublicGameListResponse {
+  status: string;
+  data: {
+    unit?: {
+      id?: number;
+      name?: string;
+      console_model?: string;
+    };
+    games: PublicGame[] | Record<string, GameResponseObject>;
+  };
+}
+
 export interface GamePayload {
   title: string;
   image?: File | null;
@@ -42,7 +75,115 @@ const ACCEPTED_IMAGE_TYPES = [
   "image/png",
   "image/jpg",
   "image/gif",
+  "image/webp",
 ];
+
+/**
+ * Fetch games list for a specific unit (public booking API)
+ * @param unitId - ID of the unit to fetch games for (required)
+ * @returns Promise with list of games available for the unit
+ */
+export const publicGameList = async (
+  unitId: number | string
+): Promise<PublicGame[]> => {
+  try {
+    if (!unitId) {
+      throw new Error("Unit ID is required to fetch games list");
+    }
+
+    // Build query parameters with required unit_id
+    const url = `${API_BASE_URL}/booking/games-list?unit_id=${unitId}`;
+
+    console.log(`Fetching games for unit: ${unitId}`);
+
+    const response = await axios.get<PublicGameListResponse>(url, {
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+
+    // Handle various response formats that might be returned
+    if (!response.data) {
+      console.error("Empty response received");
+      return [];
+    }
+
+    // If the API returns an empty object, just return an empty array
+    if (Object.keys(response.data).length === 0) {
+      console.log("API returned empty object for unit:", unitId);
+      return [];
+    }
+
+    // Check for error status
+    if (response.data.status && response.data.status !== "success") {
+      console.error("API returned error status:", response.data.status);
+      return [];
+    }
+
+    // Make sure data.games exists
+    if (!response.data.data || !response.data.data.games) {
+      console.error("Response missing data.games property:", response.data);
+      return [];
+    }
+
+    // Handle the case where games is an object with IDs as keys instead of an array
+    if (
+      typeof response.data.data.games === "object" &&
+      !Array.isArray(response.data.data.games)
+    ) {
+      console.log("Converting games object to array format");
+
+      // Get the unit name from the response if available
+      const unitName = response.data.data.unit?.name || "";
+
+      // Convert object format to array format
+      const gamesArray: PublicGame[] = [];
+
+      Object.entries(response.data.data.games).forEach(
+        ([key, gameData]: [string, GameResponseObject]) => {
+          if (gameData && typeof gameData === "object") {
+            gamesArray.push({
+              id: gameData.id || parseInt(key),
+              name: gameData.title || "Unknown Game",
+              image: gameData.image || "",
+              description: gameData.description || gameData.genre || "",
+              unit: unitName,
+              available: (gameData.quantity_available || 0) > 0,
+            });
+          }
+        }
+      );
+
+      console.log(
+        `Successfully converted ${gamesArray.length} games for unit ${unitId}`
+      );
+      return gamesArray;
+    }
+
+    // Handle the case where games is already an array
+    if (Array.isArray(response.data.data.games)) {
+      console.log(
+        `Successfully fetched ${response.data.data.games.length} games for unit ${unitId}`
+      );
+      return response.data.data.games;
+    }
+
+    // If we reach here, games has an unexpected format
+    console.error("Unexpected games format:", response.data.data.games);
+    return [];
+  } catch (error) {
+    console.error("Error fetching games list:", error);
+
+    if (axios.isAxiosError(error)) {
+      const errorMessage =
+        error.response?.data?.message || "Failed to fetch games list";
+      throw new Error(errorMessage);
+    }
+
+    throw new Error("Failed to fetch games list. Please try again later.");
+  }
+};
 
 /**
  * Get all games with optional pagination

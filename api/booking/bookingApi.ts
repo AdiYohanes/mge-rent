@@ -1,4 +1,4 @@
-import { get, post, put, del } from "../apiUtils";
+import { get, post, del } from "../apiUtils";
 import { BOOKING_ENDPOINTS } from "../constants";
 
 // Types
@@ -126,7 +126,7 @@ export const createBooking = async (
 
 // Update a booking
 export const updateBooking = async (
-  id: string, 
+  id: string,
   bookingData: Partial<BookingPayload>
 ): Promise<Booking> => {
   try {

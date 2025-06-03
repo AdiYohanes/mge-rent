@@ -1,7 +1,3 @@
-// @ts-nocheck
-// @jsx React.createElement
-// @jsxRuntime classic
-/// <reference types="react" />
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -19,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { gamesData } from "@/data/mockData";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Gamepad2, Check, Loader2, AlertCircle } from "lucide-react";
@@ -27,6 +22,7 @@ import { useMounted } from "@/hooks/use-mounted";
 import useBookingItemStore from "@/store/BookingItemStore";
 import { RoomItem, getRoomsForDisplay } from "@/api/room/publicRoomApi";
 import { UnitItem, getUnitsForDisplay } from "@/api/booking/unitPublicApi";
+import { PublicGame, publicGameList } from "@/api/game/gameApi";
 
 // Room type from the store
 interface StoreRoom {
@@ -43,93 +39,7 @@ interface DisplayRoom extends RoomItem {
   description: string; // Description from ROOM_DESCRIPTIONS
 }
 
-// Define game interface for consistency
-type Game = {
-  id: number;
-  name: string;
-  unit: string;
-  available: boolean;
-  image: string;
-  description: string;
-};
-
-// Extended mock data for additional games
-const extendedGames: Game[] = [
-  ...gamesData,
-  {
-    id: 13,
-    name: "Balsalgi",
-    unit: "Unit G",
-    available: true,
-    image: "/images/games/1.png",
-    description: "A popular card game with strategic gameplay mechanics.",
-  },
-  {
-    id: 14,
-    name: "Police",
-    unit: "Unit H",
-    available: true,
-    image: "/images/games/2.png",
-    description: "An action-packed law enforcement simulation game.",
-  },
-  {
-    id: 15,
-    name: "Cooking Academy 2",
-    unit: "Unit I",
-    available: true,
-    image: "/images/games/3.png",
-    description:
-      "Learn to cook various dishes in this fun culinary simulation.",
-  },
-  {
-    id: 16,
-    name: "Cash Connection 2",
-    unit: "Unit J",
-    available: true,
-    image: "/images/games/4.png",
-    description: "Build your business empire in this economic strategy game.",
-  },
-  {
-    id: 17,
-    name: "League of Legends",
-    unit: "Unit K",
-    available: true,
-    image: "/images/games/5.png",
-    description: "A competitive multiplayer online battle arena game.",
-  },
-  {
-    id: 18,
-    name: "Red Dead Redemption II",
-    unit: "Unit G",
-    available: true,
-    image: "/images/games/6.png",
-    description: "An epic Western-themed action-adventure game.",
-  },
-  {
-    id: 19,
-    name: "Grand Theft Auto V",
-    unit: "Unit H",
-    available: true,
-    image: "/images/games/7.png",
-    description: "An open-world action game with multiple playable characters.",
-  },
-  {
-    id: 20,
-    name: "Valorant",
-    unit: "Unit I",
-    available: true,
-    image: "/images/games/8.png",
-    description: "A tactical first-person hero shooter game.",
-  },
-  {
-    id: 21,
-    name: "DOTA 2",
-    unit: "Unit J",
-    available: true,
-    image: "/images/games/9.png",
-    description: "A multiplayer online battle arena game with diverse heroes.",
-  },
-];
+// Use PublicGame interface from the API for consistency
 
 // Room descriptions by type - since API doesn't provide detailed descriptions
 const ROOM_DESCRIPTIONS: Record<string, string> = {
@@ -146,6 +56,8 @@ const RoomSelection: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoadingUnits, setIsLoadingUnits] = useState<boolean>(false);
   const [unitError, setUnitError] = useState<string | null>(null);
+  const [isLoadingGames, setIsLoadingGames] = useState<boolean>(false);
+  const [gamesError, setGamesError] = useState<string | null>(null);
 
   const { selectedRoom, setSelectedRoom } = useBookingItemStore();
   const { selectedUnitName: selectedUnit, setSelectedUnitName } =
@@ -153,7 +65,8 @@ const RoomSelection: React.FC = () => {
   const { selectedGame, setSelectedGame } = useBookingItemStore();
   const { selectedConsole } = useBookingItemStore();
   const [availableUnits, setAvailableUnits] = useState<UnitItem[]>([]);
-  const [filteredGames, setFilteredGames] = useState<Game[]>([]);
+  const [filteredGames, setFilteredGames] = useState<PublicGame[]>([]);
+  const [allGames, setAllGames] = useState<PublicGame[]>([]);
   const mounted = useMounted();
 
   // Helper function to format room type
@@ -228,17 +141,15 @@ const RoomSelection: React.FC = () => {
           setAvailableUnits(unitsData);
           setSelectedUnitName("all"); // Reset selected unit when room changes
 
-          // Filter games based on available units
-          const unitNames = unitsData.map((unit) => unit.name);
-          const availableGames = extendedGames.filter(
-            (game) => unitNames.includes(game.unit) && game.available
-          );
-          setFilteredGames(availableGames);
-          setSelectedGame(null); // Reset selected game when room changes
+          // Reset games when units change
+          setFilteredGames([]);
+          setAllGames([]);
+          setSelectedGame(null);
         } catch (err) {
           console.error("Error fetching unit data:", err);
           setUnitError("Failed to load units. Please try again later.");
           setAvailableUnits([]);
+          setFilteredGames([]);
         } finally {
           setIsLoadingUnits(false);
         }
@@ -247,6 +158,7 @@ const RoomSelection: React.FC = () => {
         setAvailableUnits([]);
         setSelectedUnitName(null);
         setFilteredGames([]);
+        setAllGames([]);
         setSelectedGame(null);
       }
     };
@@ -254,25 +166,74 @@ const RoomSelection: React.FC = () => {
     fetchUnits();
   }, [selectedRoom, selectedConsole, setSelectedUnitName]);
 
-  // Filter games based on selected unit
+  // Fetch and filter games when a specific unit is selected
   useEffect(() => {
-    if (selectedUnit === "all" || (selectedUnit === null && selectedRoom)) {
-      // If "all" is selected or no unit selected yet but room is, show all games for that room type
-      const unitNames = availableUnits.map((unit) => unit.name);
-      const availableGames = extendedGames.filter(
-        (game) => unitNames.includes(game.unit) && game.available
-      );
-      setFilteredGames(availableGames);
-    } else if (selectedUnit) {
-      // Show games specific to the selected unit
-      const games = extendedGames.filter(
-        (game) => game.unit === selectedUnit && game.available
-      );
-      setFilteredGames(games);
-    } else {
-      setFilteredGames([]);
-    }
-    setSelectedGame(null); // Reset selected game when unit changes
+    const fetchGamesForUnit = async () => {
+      // Only fetch games if a specific unit (not "all") is selected
+      if (selectedUnit && selectedUnit !== "all" && selectedRoom) {
+        setIsLoadingGames(true);
+        setGamesError(null);
+
+        try {
+          // Find the selected unit in the available units
+          const selectedUnitObj = availableUnits.find(
+            (unit) => unit.name === selectedUnit
+          );
+
+          if (!selectedUnitObj) {
+            setGamesError("Selected unit not found");
+            setFilteredGames([]);
+            setIsLoadingGames(false);
+            return;
+          }
+
+          // Fetch games for the selected unit
+          console.log(`Fetching games for unit ID: ${selectedUnitObj.id}`);
+          const gamesData = await publicGameList(selectedUnitObj.id);
+          console.log("Games from API:", gamesData);
+
+          // Check for empty response
+          if (!gamesData || gamesData.length === 0) {
+            console.log("No games available for this unit");
+            setAllGames([]);
+            setFilteredGames([]);
+            // Don't set an error here, just show an empty state
+          } else if (Array.isArray(gamesData)) {
+            // Store all fetched games
+            setAllGames(gamesData);
+
+            // Filter games that are available
+            const availableGames = gamesData.filter((game) => game.available);
+            setFilteredGames(availableGames);
+
+            console.log(
+              `Found ${availableGames.length} available games out of ${gamesData.length} total`
+            );
+          } else {
+            console.error("Games data is not an array:", gamesData);
+            setGamesError("Invalid games data format from server");
+            setAllGames([]);
+            setFilteredGames([]);
+          }
+        } catch (error) {
+          console.error("Error fetching games:", error);
+          setGamesError("Failed to load games. Please try again later.");
+          setFilteredGames([]);
+        } finally {
+          setIsLoadingGames(false);
+        }
+      } else if (selectedUnit === "all") {
+        // When "all" is selected, clear games and show a message to select a specific unit
+        setFilteredGames([]);
+      } else {
+        setFilteredGames([]);
+      }
+
+      // Always reset selected game when unit changes
+      setSelectedGame(null);
+    };
+
+    fetchGamesForUnit();
   }, [selectedUnit, selectedRoom, availableUnits]);
 
   // Handle change in the selected number of people
@@ -306,7 +267,7 @@ const RoomSelection: React.FC = () => {
   };
 
   // Handle game selection
-  const handleGameSelect = (game: Game) => {
+  const handleGameSelect = (game: PublicGame) => {
     if (selectedGame?.id === game.id) {
       setSelectedGame(null);
       console.log("Game deselected:", game.name);
@@ -526,71 +487,108 @@ const RoomSelection: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {filteredGames.length > 0 ? (
-                    filteredGames.map((game) => (
-                      <Card
-                        key={game.id}
-                        className={`overflow-hidden rounded-none border transition-all cursor-pointer hover:shadow-sm group 
-                          ${
-                            selectedGame?.id === game.id
-                              ? "border-2 border-[#B99733] bg-[#B99733]/5"
-                              : "border-gray-200 hover:border-[#B99733]/50 hover:bg-gray-50"
-                          }`}
-                        onClick={() => handleGameSelect(game)}
-                      >
-                        <div className="flex items-center p-3">
-                          {/* Game Image - Square on the left */}
-                          <div className="relative h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 bg-gray-100 border border-gray-200 group-hover:border-[#B99733] transition-colors">
-                            <Image
-                              src={game.image || "/placeholder.svg"}
-                              alt={game.name}
-                              fill
-                              className="object-cover"
-                              onError={(e) => {
-                                e.currentTarget.src =
-                                  "/placeholder.svg?height=64&width=64";
-                              }}
-                            />
-                            {selectedGame?.id === game.id && (
-                              <div className="absolute -top-2 -right-2 bg-[#B99733] rounded-full p-0.5 border-2 border-white">
-                                <Check className="h-3 w-3 text-white" />
-                              </div>
-                            )}
-                          </div>
+                {isLoadingGames ? (
+                  <div className="flex justify-center items-center py-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#B99733] mr-2" />
+                    <span>Loading games...</span>
+                  </div>
+                ) : gamesError ? (
+                  <div className="col-span-full text-center py-10 bg-gray-50">
+                    <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-2" />
+                    <p className="text-red-500 mb-2">{gamesError}</p>
+                    <Button
+                      className="bg-[#B99733] hover:bg-[#8a701c]"
+                      onClick={() => {
+                        setGamesError(null);
+                        // Trigger re-fetch of games
+                        if (selectedUnit === "all") {
+                          const unitNames = availableUnits.map(
+                            (unit) => unit.name
+                          );
+                          const availableGames = allGames.filter(
+                            (game) =>
+                              unitNames.includes(game.unit) && game.available
+                          );
+                          setFilteredGames(availableGames);
+                        } else if (selectedUnit) {
+                          const games = allGames.filter(
+                            (game) =>
+                              game.unit === selectedUnit && game.available
+                          );
+                          setFilteredGames(games);
+                        }
+                      }}
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {filteredGames.length > 0 ? (
+                      filteredGames.map((game) => (
+                        <Card
+                          key={game.id}
+                          className={`overflow-hidden rounded-none border transition-all cursor-pointer hover:shadow-sm group 
+                            ${
+                              selectedGame?.id === game.id
+                                ? "border-2 border-[#B99733] bg-[#B99733]/5"
+                                : "border-gray-200 hover:border-[#B99733]/50 hover:bg-gray-50"
+                            }`}
+                          onClick={() => handleGameSelect(game)}
+                        >
+                          <div className="flex items-center p-3">
+                            {/* Game Image - Square on the left */}
+                            <div className="relative h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 bg-gray-100 border border-gray-200 group-hover:border-[#B99733] transition-colors">
+                              <Image
+                                src={game.image || "/placeholder.svg"}
+                                alt={game.name}
+                                fill
+                                className="object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src =
+                                    "/placeholder.svg?height=64&width=64";
+                                }}
+                              />
+                              {selectedGame?.id === game.id && (
+                                <div className="absolute -top-2 -right-2 bg-[#B99733] rounded-full p-0.5 border-2 border-white">
+                                  <Check className="h-3 w-3 text-white" />
+                                </div>
+                              )}
+                            </div>
 
-                          {/* Game Title - Right side */}
-                          <div className="ml-3 flex-1">
-                            <h4
-                              className={`font-medium text-sm sm:text-base truncate 
-                              ${
-                                selectedGame?.id === game.id
-                                  ? "text-[#B99733]"
-                                  : "group-hover:text-[#B99733]"
-                              } 
-                              transition-colors`}
-                            >
-                              {game.name}
-                            </h4>
-                            <div className="flex items-center mt-1">
-                              <div className="w-2 h-2 rounded-full bg-[#B99733] mr-1"></div>
-                              <p className="text-xs text-gray-500">
-                                Unit: {game.unit}
-                              </p>
+                            {/* Game Title - Right side */}
+                            <div className="ml-3 flex-1">
+                              <h4
+                                className={`font-medium text-sm sm:text-base truncate 
+                                ${
+                                  selectedGame?.id === game.id
+                                    ? "text-[#B99733]"
+                                    : "group-hover:text-[#B99733]"
+                                } 
+                                transition-colors`}
+                              >
+                                {game.name}
+                              </h4>
+                              <div className="flex items-center mt-1">
+                                <div className="w-2 h-2 rounded-full bg-[#B99733] mr-1"></div>
+                                <p className="text-xs text-gray-500">
+                                  Unit: {game.unit}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </Card>
-                    ))
-                  ) : (
-                    <div className="col-span-full text-center py-10 bg-gray-50">
-                      <Gamepad2 className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                      <p className="text-gray-500">
-                        No games available for this selection.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                        </Card>
+                      ))
+                    ) : (
+                      <div className="col-span-full text-center py-10 bg-gray-50">
+                        <Gamepad2 className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500">
+                          No games available for this selection.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Selected Game Summary */}
                 {selectedGame && (

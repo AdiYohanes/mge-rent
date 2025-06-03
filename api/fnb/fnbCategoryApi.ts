@@ -101,7 +101,7 @@ export const updateFnbCategory = async (
     // Using POST with _method: PUT
     const response = await axios.post(
       FNB_CATEGORY_ENDPOINTS.UPDATE_CATEGORY(id),
-      { ...data, _method: "PUT" },
+      { ...data, _method: "POST" },
       {
         headers: {
           "Content-Type": "application/json",

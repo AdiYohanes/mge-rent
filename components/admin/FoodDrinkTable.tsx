@@ -516,7 +516,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     [categories]
   );
 
-  // Fetch data from API
+  // Fetch data from API - updated to handle pagination properly
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -526,10 +526,10 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         `Fetching all food and drink items for page ${currentPage}, items per page: ${itemsPerPage}`
       );
 
-      // Always fetch all items without filtering by category in the API
+      // Fetch all items without server-side filtering - we'll handle it client-side
       const response = await getFoodDrinkItems(
-        currentPage,
-        itemsPerPage,
+        1, // Request page 1
+        1000, // Request a large number to get all items at once
         searchTerm,
         "" // No category filter - we'll filter on frontend
       );
@@ -538,25 +538,17 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
 
       let itemsArray: FoodDrinkItemTypeAPI[] = [];
       let total = 0;
-      let pages = 1;
 
       // Process API response
       if (response && Array.isArray(response.data) && response.meta) {
         itemsArray = response.data;
         total = response.meta.total || 0;
-        pages = response.meta.lastPage || 1;
 
-        console.log(
-          `Received ${itemsArray.length} items, total: ${total}, pages: ${pages}`
-        );
+        console.log(`Received ${itemsArray.length} items, total: ${total}`);
 
         setItems(itemsArray);
-        setTotalPages(pages);
 
-        // If we're on a page that no longer exists (e.g., after deleting the last item on the page)
-        if (itemsArray.length === 0 && total > 0 && currentPage > 1) {
-          setCurrentPage(1);
-        }
+        // No need to set totalPages here as we'll calculate it based on filtered data
       } else {
         throw new Error("Unexpected API response format");
       }
@@ -571,7 +563,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, searchTerm]);
+  }, [searchTerm]); // Remove currentPage and itemsPerPage from dependencies
 
   // Load data when dependencies change
   useEffect(() => {
@@ -650,7 +642,9 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   // Apply pagination to the filtered data
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredData.slice(startIndex, startIndex + itemsPerPage);
+    const endIndex = startIndex + itemsPerPage;
+    // Make sure we don't go out of bounds
+    return filteredData.slice(startIndex, endIndex);
   }, [filteredData, currentPage, itemsPerPage]);
 
   // Calculate category counts based on actual types
@@ -735,15 +729,14 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   // Update pagination state based on filtered data
   useEffect(() => {
     // Calculate total pages based on filtered data
-    setTotalPages(Math.max(1, Math.ceil(filteredData.length / itemsPerPage)));
+    const calculatedTotalPages = Math.max(
+      1,
+      Math.ceil(filteredData.length / itemsPerPage)
+    );
+    setTotalPages(calculatedTotalPages);
 
-    // Only reset to page 1 if the current page is completely out of range
-    // and not during user-initiated pagination
-    if (
-      currentPage > Math.ceil(filteredData.length / itemsPerPage) &&
-      filteredData.length > 0 &&
-      currentPage !== 1
-    ) {
+    // If current page is out of range after filtering, reset to page 1
+    if (currentPage > calculatedTotalPages) {
       setCurrentPage(1);
     }
   }, [filteredData.length, itemsPerPage, currentPage]);
@@ -1124,11 +1117,19 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
   const generatePaginationButtons = () => {
     const buttons = [];
     const maxButtons = 5; // Show 5 pagination buttons in design
-    let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
-    const endPage = Math.min(totalPages, startPage + maxButtons - 1);
 
-    if (endPage - startPage + 1 < maxButtons) {
-      startPage = Math.max(1, endPage - maxButtons + 1);
+    // Calculate the range of page buttons to show
+    let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    // Adjust startPage if we can't show maxButtons
+    if (endPage - startPage + 1 < maxButtons && endPage < totalPages) {
+      // If we're near the end, just show the last maxButtons pages
+      startPage = Math.max(1, totalPages - maxButtons + 1);
+    } else if (endPage - startPage + 1 < maxButtons) {
+      // If we're near the beginning, show pages 1 to maxButtons
+      startPage = 1;
+      endPage = Math.min(maxButtons, totalPages);
     }
 
     // Previous button
@@ -1138,29 +1139,88 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         variant="outline"
         size="icon"
         className="rounded-full"
-        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
         disabled={currentPage === 1 || loading}
       >
         &lt;
       </Button>
     );
 
-    // Page buttons
-    for (let i = startPage; i <= endPage; i++) {
+    // First page and ellipsis if needed
+    if (startPage > 1) {
       buttons.push(
         <Button
-          key={i}
-          variant={i === currentPage ? "default" : "outline"}
+          key={1}
+          variant={1 === currentPage ? "default" : "outline"}
           size="icon"
           className={
-            i === currentPage
+            1 === currentPage
               ? "rounded-full bg-amber-500 hover:bg-amber-600"
               : "rounded-full"
           }
-          onClick={() => setCurrentPage(i)}
+          onClick={() => setCurrentPage(1)}
           disabled={loading}
         >
-          {i}
+          1
+        </Button>
+      );
+
+      if (startPage > 2) {
+        buttons.push(
+          <span key="ellipsis-start" className="px-2">
+            ...
+          </span>
+        );
+      }
+    }
+
+    // Page buttons
+    for (let i = startPage; i <= endPage; i++) {
+      if (i !== 1 && i !== totalPages) {
+        // Skip first and last pages as they're handled separately
+        buttons.push(
+          <Button
+            key={i}
+            variant={i === currentPage ? "default" : "outline"}
+            size="icon"
+            className={
+              i === currentPage
+                ? "rounded-full bg-amber-500 hover:bg-amber-600"
+                : "rounded-full"
+            }
+            onClick={() => setCurrentPage(i)}
+            disabled={loading}
+          >
+            {i}
+          </Button>
+        );
+      }
+    }
+
+    // Last page and ellipsis if needed
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        buttons.push(
+          <span key="ellipsis-end" className="px-2">
+            ...
+          </span>
+        );
+      }
+
+      buttons.push(
+        <Button
+          key={totalPages}
+          variant={totalPages === currentPage ? "default" : "outline"}
+          size="icon"
+          className={
+            totalPages === currentPage
+              ? "rounded-full bg-amber-500 hover:bg-amber-600"
+              : "rounded-full"
+          }
+          onClick={() => setCurrentPage(totalPages)}
+          disabled={loading}
+        >
+          {totalPages}
         </Button>
       );
     }
@@ -1172,7 +1232,7 @@ export function FoodDrinkTable({ initialTab = "all" }: FoodDrinkTableProps) {
         variant="outline"
         size="icon"
         className="rounded-full"
-        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
         disabled={currentPage === totalPages || loading}
       >
         &gt;

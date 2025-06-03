@@ -15,6 +15,7 @@ import {
   getPopularityStats,
   PopularityStatsResponse,
   PopularUnit,
+  PopularGame,
   PopularFnB,
 } from "@/api";
 import { Loader2 } from "lucide-react";
@@ -25,11 +26,6 @@ type TrendingItem = {
   rank: number;
   name: string;
   orders: number;
-};
-
-type TrendingData = {
-  rental: TrendingItem[];
-  food: TrendingItem[];
 };
 
 type ConsoleStats = {
@@ -45,120 +41,22 @@ type MostPopular = {
   drink: { name: string; description: string };
 };
 
-type PeriodData = {
-  mostPopular: MostPopular;
-  trending: TrendingData;
-  consoleStats: ConsoleStats[];
-};
+// Extended API interfaces for additional fields
+interface ExtendedPopularFnB extends PopularFnB {
+  type?: "food" | "drink";
+}
 
-// Sample data for different time periods
-const dailyData: PeriodData = {
-  mostPopular: {
-    unit: { name: "VIP Unit 1", description: "Most Popular Unit" },
-    game: { name: "PES 2024", description: "Most Popular Game" },
-    food: { name: "Tahu Bakso", description: "Most Popular Food" },
-    drink: { name: "Jus Lemon", description: "Most Popular Drink" },
-  },
-  trending: {
-    rental: [
-      { rank: 1, name: "VVIP Unit A", orders: 23 },
-      { rank: 2, name: "VVIP Unit B", orders: 20 },
-      { rank: 3, name: "Regular Unit A", orders: 11 },
-      { rank: 4, name: "VIP Unit C", orders: 9 },
-    ],
-    food: [
-      { rank: 1, name: "Tahu Bakso", orders: 18 },
-      { rank: 2, name: "Jus Lemon", orders: 15 },
-      { rank: 3, name: "Nasi Goreng", orders: 12 },
-      { rank: 4, name: "Es Teh", orders: 10 },
-    ],
-  },
-  consoleStats: [
-    { name: "Playstation 4", value: 70, color: "#4ade80" },
-    { name: "Playstation 5", value: 30, color: "#fb923c" },
-  ],
-};
-
-const weeklyData: PeriodData = {
-  mostPopular: {
-    unit: { name: "VVIP Unit A", description: "Most Popular Unit" },
-    game: { name: "FIFA 2024", description: "Most Popular Game" },
-    food: { name: "Nasi Goreng", description: "Most Popular Food" },
-    drink: { name: "Es Teh", description: "Most Popular Drink" },
-  },
-  trending: {
-    rental: [
-      { rank: 1, name: "VVIP Unit A", orders: 120 },
-      { rank: 2, name: "VIP Unit 1", orders: 95 },
-      { rank: 3, name: "VVIP Unit B", orders: 82 },
-      { rank: 4, name: "Regular Unit B", orders: 65 },
-    ],
-    food: [
-      { rank: 1, name: "Nasi Goreng", orders: 85 },
-      { rank: 2, name: "Es Teh", orders: 72 },
-      { rank: 3, name: "Ayam Goreng", orders: 65 },
-      { rank: 4, name: "Kopi Susu", orders: 58 },
-    ],
-  },
-  consoleStats: [
-    { name: "Playstation 4", value: 65, color: "#4ade80" },
-    { name: "Playstation 5", value: 35, color: "#fb923c" },
-  ],
-};
-
-const monthlyData: PeriodData = {
-  mostPopular: {
-    unit: { name: "VVIP Unit B", description: "Most Popular Unit" },
-    game: { name: "GTA V", description: "Most Popular Game" },
-    food: { name: "Mie Goreng", description: "Most Popular Food" },
-    drink: { name: "Kopi Susu", description: "Most Popular Drink" },
-  },
-  trending: {
-    rental: [
-      { rank: 1, name: "VVIP Unit B", orders: 450 },
-      { rank: 2, name: "VVIP Unit A", orders: 380 },
-      { rank: 3, name: "VIP Unit 1", orders: 320 },
-      { rank: 4, name: "Regular Unit C", orders: 280 },
-    ],
-    food: [
-      { rank: 1, name: "Mie Goreng", orders: 320 },
-      { rank: 2, name: "Kopi Susu", orders: 290 },
-      { rank: 3, name: "Nasi Goreng", orders: 250 },
-      { rank: 4, name: "Es Teh", orders: 220 },
-    ],
-  },
-  consoleStats: [
-    { name: "Playstation 4", value: 60, color: "#4ade80" },
-    { name: "Playstation 5", value: 40, color: "#fb923c" },
-  ],
-};
-
-const yearlyData: PeriodData = {
-  mostPopular: {
-    unit: { name: "VVIP Unit A", description: "Most Popular Unit" },
-    game: { name: "Call of Duty", description: "Most Popular Game" },
-    food: { name: "Ayam Goreng", description: "Most Popular Food" },
-    drink: { name: "Soda", description: "Most Popular Drink" },
-  },
-  trending: {
-    rental: [
-      { rank: 1, name: "VVIP Unit A", orders: 2300 },
-      { rank: 2, name: "VVIP Unit B", orders: 1850 },
-      { rank: 3, name: "VIP Unit 1", orders: 1540 },
-      { rank: 4, name: "VIP Unit C", orders: 1320 },
-    ],
-    food: [
-      { rank: 1, name: "Ayam Goreng", orders: 1800 },
-      { rank: 2, name: "Soda", orders: 1650 },
-      { rank: 3, name: "Nasi Goreng", orders: 1450 },
-      { rank: 4, name: "Es Teh", orders: 1200 },
-    ],
-  },
-  consoleStats: [
-    { name: "Playstation 4", value: 55, color: "#4ade80" },
-    { name: "Playstation 5", value: 45, color: "#fb923c" },
-  ],
-};
+interface ExtendedPopularityStatsResponse extends PopularityStatsResponse {
+  data: {
+    popular_units: PopularUnit[];
+    popular_games: PopularGame[];
+    popular_fnb: ExtendedPopularFnB[];
+    console_stats?: Array<{
+      name: string;
+      bookings: number;
+    }>;
+  };
+}
 
 interface StatisticsSectionProps {
   className?: string;
@@ -170,7 +68,7 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
     "rental"
   );
   const [popularityStats, setPopularityStats] =
-    useState<PopularityStatsResponse | null>(null);
+    useState<ExtendedPopularityStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch popularity statistics
@@ -179,7 +77,7 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
       try {
         setLoading(true);
         const data = await getPopularityStats();
-        setPopularityStats(data);
+        setPopularityStats(data as ExtendedPopularityStatsResponse);
       } catch (error) {
         console.error("Failed to fetch popularity statistics:", error);
         toast.error("Failed to load popularity statistics");
@@ -189,25 +87,7 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
     }
 
     fetchPopularityStats();
-  }, []);
-
-  // Select data based on period
-  const getData = (): PeriodData => {
-    switch (period) {
-      case "daily":
-        return dailyData;
-      case "weekly":
-        return weeklyData;
-      case "monthly":
-        return monthlyData;
-      case "yearly":
-        return yearlyData;
-      default:
-        return dailyData;
-    }
-  };
-
-  const data = getData();
+  }, [period]);
 
   // Convert API data to UI format for trending
   const mapPopularUnitsToTrendingItems = (
@@ -221,7 +101,7 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
   };
 
   const mapPopularFnBToTrendingItems = (
-    items: PopularFnB[] = []
+    items: ExtendedPopularFnB[] = []
   ): TrendingItem[] => {
     return items.map((item, index) => ({
       rank: index + 1,
@@ -233,7 +113,6 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
   // Get trending data based on filter and API data
   const getTrendingData = () => {
     if (loading || !popularityStats) {
-      // Return placeholder when loading
       return [];
     }
 
@@ -244,7 +123,89 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
     }
   };
 
+  // Get console statistics from API data
+  const getConsoleStats = (): ConsoleStats[] => {
+    if (loading || !popularityStats) {
+      return [
+        { name: "Playstation 4", value: 50, color: "#4ade80" },
+        { name: "Playstation 5", value: 50, color: "#fb923c" },
+      ];
+    }
+
+    const { console_stats = [] } = popularityStats.data;
+
+    // Process console stats
+    const totalBookings = console_stats.reduce(
+      (sum: number, item: { bookings: number }) => sum + item.bookings,
+      0
+    );
+
+    return console_stats.map(
+      (stat: { name: string; bookings: number }, index: number) => ({
+        name: stat.name,
+        value:
+          totalBookings > 0
+            ? Math.round((stat.bookings / totalBookings) * 100)
+            : 0,
+        color: index === 0 ? "#4ade80" : "#fb923c", // Alternate colors
+      })
+    );
+  };
+
+  // Get most popular items from API data
+  const getMostPopular = (): MostPopular => {
+    if (loading || !popularityStats) {
+      return {
+        unit: { name: "Loading...", description: "Most Popular Unit" },
+        game: { name: "Loading...", description: "Most Popular Game" },
+        food: { name: "Loading...", description: "Most Popular Food" },
+        drink: { name: "Loading...", description: "Most Popular Drink" },
+      };
+    }
+
+    const { popular_units, popular_games, popular_fnb } = popularityStats.data;
+
+    // Get most popular unit
+    const topUnit =
+      popular_units && popular_units.length > 0
+        ? { name: popular_units[0].name, description: "Most Popular Unit" }
+        : { name: "No data", description: "Most Popular Unit" };
+
+    // Get most popular game
+    const topGame =
+      popular_games && popular_games.length > 0
+        ? { name: popular_games[0].title, description: "Most Popular Game" }
+        : { name: "No data", description: "Most Popular Game" };
+
+    // Filter food and drinks from popular_fnb
+    const foods = popular_fnb
+      ? popular_fnb.filter((item) => item.type === "food")
+      : [];
+    const drinks = popular_fnb
+      ? popular_fnb.filter((item) => item.type === "drink")
+      : [];
+
+    const topFood =
+      foods.length > 0
+        ? { name: foods[0].name, description: "Most Popular Food" }
+        : { name: "No data", description: "Most Popular Food" };
+
+    const topDrink =
+      drinks.length > 0
+        ? { name: drinks[0].name, description: "Most Popular Drink" }
+        : { name: "No data", description: "Most Popular Drink" };
+
+    return {
+      unit: topUnit,
+      game: topGame,
+      food: topFood,
+      drink: topDrink,
+    };
+  };
+
   const trendingData = getTrendingData();
+  const consoleStats = getConsoleStats();
+  const mostPopular = getMostPopular();
 
   return (
     <div
@@ -279,107 +240,116 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
             Most Popular
           </h3>
 
-          <div className="space-y-3 sm:space-y-4 md:space-y-6">
-            {/* Most Popular Unit */}
-            <Card className="shadow-sm sm:shadow-md rounded-xl border border-gray-200">
-              <CardHeader className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
-                <div className="flex-shrink-0">
-                  <div className="p-1 sm:p-2 rounded-lg bg-gray-100">
-                    <Image
-                      src="/images/logo.png"
-                      alt="Unit logo"
-                      width={30}
-                      height={30}
-                      className="rounded-md w-[24px] h-[24px] sm:w-[30px] sm:h-[30px] md:w-[40px] md:h-[40px]"
-                    />
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-32 sm:h-40">
+              <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-gray-500 mb-2" />
+              <span className="text-xs sm:text-sm">
+                Loading popularity data...
+              </span>
+            </div>
+          ) : (
+            <div className="space-y-3 sm:space-y-4 md:space-y-6">
+              {/* Most Popular Unit */}
+              <Card className="shadow-sm sm:shadow-md rounded-xl border border-gray-200">
+                <CardHeader className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
+                  <div className="flex-shrink-0">
+                    <div className="p-1 sm:p-2 rounded-lg bg-gray-100">
+                      <Image
+                        src="/images/logo.png"
+                        alt="Unit logo"
+                        width={30}
+                        height={30}
+                        className="rounded-md w-[24px] h-[24px] sm:w-[30px] sm:h-[30px] md:w-[40px] md:h-[40px]"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm sm:text-base md:text-lg">
-                    {data.mostPopular.unit.name}
-                  </h4>
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    {data.mostPopular.unit.description}
-                  </p>
-                </div>
-              </CardHeader>
-            </Card>
+                  <div>
+                    <h4 className="font-bold text-sm sm:text-base md:text-lg">
+                      {mostPopular.unit.name}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-gray-600">
+                      {mostPopular.unit.description}
+                    </p>
+                  </div>
+                </CardHeader>
+              </Card>
 
-            {/* Most Popular Game */}
-            <Card className="shadow-sm sm:shadow-md rounded-xl border border-gray-200">
-              <CardHeader className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
-                <div className="flex-shrink-0">
-                  <div className="p-1 sm:p-2 rounded-full bg-gray-100">
-                    <Image
-                      src="/images/logo.png"
-                      alt="Game logo"
-                      width={30}
-                      height={30}
-                      className="rounded-full w-[24px] h-[24px] sm:w-[30px] sm:h-[30px] md:w-[40px] md:h-[40px]"
-                    />
+              {/* Most Popular Game */}
+              <Card className="shadow-sm sm:shadow-md rounded-xl border border-gray-200">
+                <CardHeader className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
+                  <div className="flex-shrink-0">
+                    <div className="p-1 sm:p-2 rounded-full bg-gray-100">
+                      <Image
+                        src="/images/logo.png"
+                        alt="Game logo"
+                        width={30}
+                        height={30}
+                        className="rounded-full w-[24px] h-[24px] sm:w-[30px] sm:h-[30px] md:w-[40px] md:h-[40px]"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm sm:text-base md:text-lg">
-                    {data.mostPopular.game.name}
-                  </h4>
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    {data.mostPopular.game.description}
-                  </p>
-                </div>
-              </CardHeader>
-            </Card>
+                  <div>
+                    <h4 className="font-bold text-sm sm:text-base md:text-lg">
+                      {mostPopular.game.name}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-gray-600">
+                      {mostPopular.game.description}
+                    </p>
+                  </div>
+                </CardHeader>
+              </Card>
 
-            {/* Most Popular Food */}
-            <Card className="shadow-sm sm:shadow-md rounded-xl border border-gray-200">
-              <CardHeader className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
-                <div className="flex-shrink-0">
-                  <div className="p-1 sm:p-2 rounded-full bg-gray-100">
-                    <Image
-                      src="/images/logo.png"
-                      alt="Food logo"
-                      width={30}
-                      height={30}
-                      className="rounded-full w-[24px] h-[24px] sm:w-[30px] sm:h-[30px] md:w-[40px] md:h-[40px]"
-                    />
+              {/* Most Popular Food */}
+              <Card className="shadow-sm sm:shadow-md rounded-xl border border-gray-200">
+                <CardHeader className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
+                  <div className="flex-shrink-0">
+                    <div className="p-1 sm:p-2 rounded-full bg-gray-100">
+                      <Image
+                        src="/images/logo.png"
+                        alt="Food logo"
+                        width={30}
+                        height={30}
+                        className="rounded-full w-[24px] h-[24px] sm:w-[30px] sm:h-[30px] md:w-[40px] md:h-[40px]"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm sm:text-base md:text-lg">
-                    {data.mostPopular.food.name}
-                  </h4>
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    {data.mostPopular.food.description}
-                  </p>
-                </div>
-              </CardHeader>
-            </Card>
+                  <div>
+                    <h4 className="font-bold text-sm sm:text-base md:text-lg">
+                      {mostPopular.food.name}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-gray-600">
+                      {mostPopular.food.description}
+                    </p>
+                  </div>
+                </CardHeader>
+              </Card>
 
-            {/* Most Popular Drink */}
-            <Card className="shadow-sm sm:shadow-md rounded-xl border border-gray-200">
-              <CardHeader className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
-                <div className="flex-shrink-0">
-                  <div className="p-1 sm:p-2 rounded-lg bg-gray-100">
-                    <Image
-                      src="/images/logo.png"
-                      alt="Drink logo"
-                      width={30}
-                      height={30}
-                      className="rounded-md w-[24px] h-[24px] sm:w-[30px] sm:h-[30px] md:w-[40px] md:h-[40px]"
-                    />
+              {/* Most Popular Drink */}
+              <Card className="shadow-sm sm:shadow-md rounded-xl border border-gray-200">
+                <CardHeader className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
+                  <div className="flex-shrink-0">
+                    <div className="p-1 sm:p-2 rounded-lg bg-gray-100">
+                      <Image
+                        src="/images/logo.png"
+                        alt="Drink logo"
+                        width={30}
+                        height={30}
+                        className="rounded-md w-[24px] h-[24px] sm:w-[30px] sm:h-[30px] md:w-[40px] md:h-[40px]"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm sm:text-base md:text-lg">
-                    {data.mostPopular.drink.name}
-                  </h4>
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    {data.mostPopular.drink.description}
-                  </p>
-                </div>
-              </CardHeader>
-            </Card>
-          </div>
+                  <div>
+                    <h4 className="font-bold text-sm sm:text-base md:text-lg">
+                      {mostPopular.drink.name}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-gray-600">
+                      {mostPopular.drink.description}
+                    </p>
+                  </div>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
         </div>
 
         {/* Right Side - Trending & Console Stats */}
@@ -482,49 +452,61 @@ export function StatisticsSection({ className }: StatisticsSectionProps) {
               Console Stats
             </h3>
 
-            <div className="flex flex-col sm:flex-row">
-              {/* Donut Chart */}
-              <div className="w-full sm:w-1/2 h-[120px] sm:h-[150px] flex justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data.consoleStats}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={30}
-                      outerRadius={50}
-                      paddingAngle={5}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {data.consoleStats.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center h-32 sm:h-40">
+                <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-gray-500 mb-2" />
+                <span className="text-xs sm:text-sm">
+                  Loading console stats...
+                </span>
               </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row">
+                {/* Donut Chart */}
+                <div className="w-full sm:w-1/2 h-[120px] sm:h-[150px] flex justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={consoleStats}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={50}
+                        paddingAngle={5}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {consoleStats.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
 
-              {/* Legend */}
-              <div className="w-full sm:w-1/2 flex flex-row sm:flex-col justify-center space-x-4 sm:space-x-0 sm:space-y-4 md:space-y-6 mt-2 sm:mt-0">
-                {data.consoleStats.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2 sm:gap-3">
+                {/* Legend */}
+                <div className="w-full sm:w-1/2 flex flex-row sm:flex-col justify-center space-x-4 sm:space-x-0 sm:space-y-4 md:space-y-6 mt-2 sm:mt-0">
+                  {consoleStats.map((item, index) => (
                     <div
-                      className="h-2 w-2 sm:h-3 sm:w-3 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    ></div>
-                    <div>
-                      <span className="font-bold text-sm sm:text-lg md:text-xl">
-                        {item.value}%
-                      </span>
-                      <p className="text-[10px] xs:text-xs sm:text-sm text-gray-500">
-                        {item.name}
-                      </p>
+                      key={index}
+                      className="flex items-center gap-2 sm:gap-3"
+                    >
+                      <div
+                        className="h-2 w-2 sm:h-3 sm:w-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      ></div>
+                      <div>
+                        <span className="font-bold text-sm sm:text-lg md:text-xl">
+                          {item.value}%
+                        </span>
+                        <p className="text-[10px] xs:text-xs sm:text-sm text-gray-500">
+                          {item.name}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

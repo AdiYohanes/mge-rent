@@ -54,6 +54,31 @@ export interface PeakHoursResponse {
   data: PeakHourData[];
 }
 
+// Define types for revenue comparison
+export interface PeriodData {
+  label: string;
+  revenue: number;
+  transactions: number;
+  start_date: string;
+  end_date: string;
+}
+
+export interface ComparisonData {
+  revenue_percentage: number;
+  revenue_amount: number;
+  transactions_percentage: number;
+  transactions_amount: number;
+}
+
+export interface RevenueComparisonResponse {
+  status: string;
+  data: {
+    current_period: PeriodData;
+    previous_period: PeriodData;
+    comparison: ComparisonData;
+  };
+}
+
 /**
  * Fetches main statistics data
  * @returns Promise with statistics data
@@ -98,5 +123,32 @@ export async function getPeakHours(): Promise<PeakHoursResponse> {
       throw new Error(error.message);
     }
     throw new Error("Failed to fetch peak hours data");
+  }
+}
+
+/**
+ * Fetches revenue comparison data
+ * @param filter - The time period filter (daily, weekly, monthly)
+ * @param date - The reference date in YYYY-MM-DD format
+ * @returns Promise with revenue comparison data
+ */
+export async function getRevenueComparison(
+  filter: "daily" | "weekly" | "monthly",
+  date?: string
+): Promise<RevenueComparisonResponse> {
+  try {
+    let url = `/admin/analytics/revenue-comparison?filter=${filter}`;
+
+    // Add date parameter if provided
+    if (date) {
+      url += `&date=${date}`;
+    }
+
+    return await get<RevenueComparisonResponse>(url);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      throw new Error(error.message);
+    }
+    throw new Error("Failed to fetch revenue comparison data");
   }
 }
