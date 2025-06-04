@@ -6,9 +6,7 @@ export const USER_COOKIE = "auth_user";
 
 // Detect if we're running on HTTPS
 const isHttps =
-  typeof window !== "undefined" &&
-  (window.location.protocol === "https:" ||
-    process.env.NODE_ENV === "production");
+  typeof window !== "undefined" && window.location.protocol === "https:";
 
 // Get domain for cookies
 const getDomain = (): string | undefined => {
@@ -62,12 +60,16 @@ export const setAuthCookies = (token: string, userData: any) => {
     Cookies.set(TOKEN_COOKIE, token, options);
 
     console.log("Auth cookies set successfully:", {
-      token: token.substring(0, 5) + "...",
-      user: userData.username,
+      token: token ? token.substring(0, 5) + "..." : "NO TOKEN",
+      user: userData ? userData.username : "NO USER DATA",
       options: JSON.stringify({
         ...options,
-        domain: options.domain || "default",
+        domain: options.domain || "default (full hostname)", // Tampilkan dengan lebih jelas
       }),
+      protocol:
+        typeof window !== "undefined" ? window.location.protocol : "N/A",
+      calculatedIsHttps: isHttps,
+      calculatedDomain: getDomain() || "default (full hostname)",
     });
   } catch (e) {
     console.error("Failed to set auth cookies:", e);
