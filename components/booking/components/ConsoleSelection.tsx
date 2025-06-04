@@ -143,72 +143,80 @@ const ConsoleSelection = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {consoles.map((console) => (
-            <Card
-              key={console.id}
-              className={`overflow-hidden transition-all duration-300 hover:shadow-lg border cursor-pointer rounded-none ${
-                selectedConsole?.id === console.id
-                  ? "ring-2 ring-[#B99733]" // Gold ring for selected
-                  : "border-gray-200"
-              }`}
-              onClick={() => handleSelect(console)} // Add click to select card
-            >
-              <div className="relative">
-                {/* Image is now coming from API with STORAGE_URL already included */}
-                <Image
-                  src={console.image}
-                  alt={console.name}
-                  width={400}
-                  height={250}
-                  className="object-cover w-full h-48"
-                  onError={handleImageError}
-                  unoptimized={true} // Important for external images
-                />
-
-                {/* Price badge */}
-                <Badge className="absolute top-[-1.5rem] right-0 bg-[#B99733] text-white px-2 py-1 flex flex-col items-end font-minecraft rounded-none">
-                  <span className="text-sm m-0">Starts From</span>
-                  <span className="text-4xl m-0">
-                    {formatPrice(console.price)}
-                  </span>
-                </Badge>
-              </div>
-
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl font-bold text-gray-800">
-                  {console.name}
-                </CardTitle>
-              </CardHeader>
-
-              <CardContent className="pb-6">
-                <p className="text-gray-600 text-sm">{console.description}</p>
-              </CardContent>
-
-              <CardFooter className="pt-0">
-                <Button
-                  className={`w-full rounded-md font-medium transition-all duration-300 cursor-pointer ${
+          <div className="col-span-1 sm:col-span-2 lg:col-span-3 flex justify-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              {consoles.map((console) => (
+                <Card
+                  key={console.id}
+                  className={`overflow-hidden transition-all duration-300 hover:shadow-lg border rounded-none w-full max-w-sm cursor-pointer ${
                     selectedConsole?.id === console.id
-                      ? "bg-[#B99733] text-white hover:bg-[#695721] shadow-md"
-                      : "bg-linear-to-r from-gray-100 to-gray-200 text-gray-800 hover:bg-[#f0f0f0] border border-gray-300"
+                      ? "ring-2 ring-[#B99733]" // Gold ring for selected
+                      : "border-gray-200"
                   }`}
-                  onClick={() => handleSelect(console)}
-                  aria-label={`Select ${console.name}`}
+                  onClick={() => handleSelect(console)} // Add click to select card
                 >
-                  <span className="flex items-center justify-center gap-2 py-1">
-                    {selectedConsole?.id === console.id ? "Selected" : "Select"}
-                    <ChevronRight
-                      size={16}
-                      className={
-                        selectedConsole?.id === console.id
-                          ? "animate-pulse"
-                          : ""
-                      }
+                  <div className="relative">
+                    {/* Image is now coming from API with STORAGE_URL already included */}
+                    <Image
+                      src={console.image}
+                      alt={console.name}
+                      width={400}
+                      height={250}
+                      className="object-cover w-full h-48"
+                      onError={handleImageError}
+                      unoptimized={true} // Important for external images
                     />
-                  </span>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+
+                    {/* Price badge */}
+                    <Badge className="absolute top-[-1.5rem] right-0 bg-[#B99733] text-white px-2 py-1 flex flex-col items-end font-minecraft rounded-none">
+                      <span className="text-sm m-0">Starts From</span>
+                      <span className="text-4xl m-0">
+                        {formatPrice(console.price)}
+                      </span>
+                    </Badge>
+                  </div>
+
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xl font-bold text-gray-800">
+                      {console.name}
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent className="pb-6">
+                    <p className="text-gray-600 text-sm">
+                      {console.description}
+                    </p>
+                  </CardContent>
+
+                  <CardFooter className="pt-0">
+                    <Button
+                      className={`w-full rounded-md font-medium transition-all duration-300 cursor-pointer ${
+                        selectedConsole?.id === console.id
+                          ? "bg-[#B99733] text-white hover:bg-[#695721] shadow-md"
+                          : "bg-linear-to-r from-gray-100 to-gray-200 text-gray-800 hover:bg-[#f0f0f0] border border-gray-300"
+                      }`}
+                      onClick={() => handleSelect(console)}
+                      aria-label={`Select ${console.name}`}
+                    >
+                      <span className="flex items-center justify-center gap-2 py-1">
+                        {selectedConsole?.id === console.id
+                          ? "Selected"
+                          : "Select"}
+                        <ChevronRight
+                          size={16}
+                          className={
+                            selectedConsole?.id === console.id
+                              ? "animate-pulse"
+                              : ""
+                          }
+                        />
+                      </span>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

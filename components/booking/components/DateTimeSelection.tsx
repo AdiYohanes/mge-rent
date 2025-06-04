@@ -31,7 +31,10 @@ import {
 } from "@/components/ui/popover";
 import { useMounted } from "@/hooks/use-mounted";
 import useBookingItemStore from "@/store/BookingItemStore";
-import { getProcessedAvailableTimes } from "@/api/booking/datePublicApi";
+import {
+  getAvailableTimes,
+  TimeSlot as ApiTimeSlot,
+} from "@/api/booking/datePublicApi";
 
 // Define types for time slots and hour slots
 interface TimeSlot {
@@ -53,6 +56,12 @@ interface HourSlot {
   minutes: MinuteSlot[];
 }
 
+interface BusinessHours {
+  open: string;
+  close: string;
+  rest_time: string;
+}
+
 // Main component
 export default function DateTimeSelection() {
   const [today, setToday] = useState<Date | null>(null);
@@ -66,6 +75,9 @@ export default function DateTimeSelection() {
 
   const [hourSlots, setHourSlots] = useState<HourSlot[]>([]);
   const [rawTimeSlots, setRawTimeSlots] = useState<TimeSlot[]>([]);
+  const [businessHours, setBusinessHours] = useState<BusinessHours | null>(
+    null
+  );
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState<boolean>(false);
   const [timeSlotError, setTimeSlotError] = useState<string | null>(null);
@@ -79,8 +91,14 @@ export default function DateTimeSelection() {
       if (selectedDate === undefined) {
         setSelectedDate(currentDate);
       }
+
+      // Set default duration to 1 hour if not already set
+      if (duration === undefined || duration <= 0) {
+        setDuration(1);
+        console.log("Setting default duration to 1 hour");
+      }
     }
-  }, [mounted, setSelectedDate, selectedDate]);
+  }, [mounted, setSelectedDate, selectedDate, duration, setDuration]);
 
   useEffect(() => {
     if (selectedDate && selectedTime && duration > 0) {
@@ -98,7 +116,6 @@ export default function DateTimeSelection() {
 
           // Check if this booking has conflicts
           if (rawTimeSlots && rawTimeSlots.length > 0) {
-            // The duration check would happen here when booking
             console.log(
               `Selected time ${selectedTime} with ${duration}h duration, ending at ${format(
                 calculatedEndTime,
@@ -118,115 +135,130 @@ export default function DateTimeSelection() {
     }
   }, [selectedDate, selectedTime, duration, setEndTime, rawTimeSlots]);
 
-  // Process raw time slots into hour/minute structure
-  const processTimeSlots = useCallback((slots: TimeSlot[]) => {
-    console.log("Processing time slots:", slots.length);
+  // Process raw time slots into hour/minute structure with duration support
+  const processTimeSlots = useCallback(
+    (apiSlots: ApiTimeSlot[], businessHours: BusinessHours | null) => {
+      console.log("Processing time slots:", apiSlots.length);
 
-    if (!slots || slots.length === 0) {
-      console.log("No slots to process");
-      return [];
-    }
-
-    const hours: HourSlot[] = [];
-    const processedHours = new Set<number>();
-
-    // First, display all the slot data for debugging
-    console.log("First 5 slots:", slots.slice(0, 5));
-
-    // Process slots in order
-    slots.forEach((slot) => {
-      // Skip invalid slots
-      if (!slot.startTime) {
-        console.log("Skipping invalid slot:", slot);
-        return;
+      if (!apiSlots || apiSlots.length === 0) {
+        console.log("No slots to process");
+        return [];
       }
 
-      const [hourStr, minuteStr] = slot.startTime.split(":");
-      if (!hourStr || !minuteStr) {
-        console.log("Invalid time format:", slot.startTime);
-        return;
+      // Parse rest time if available
+      let restStartHour = -1;
+      let restEndHour = -1;
+
+      if (businessHours?.rest_time) {
+        const [restStart, restEnd] = businessHours.rest_time.split(" - ");
+        restStartHour = parseInt(restStart.split(":")[0], 10);
+        restEndHour = parseInt(restEnd.split(":")[0], 10);
+        console.log(`Rest time: ${restStartHour}:00 - ${restEndHour}:00`);
       }
 
-      const hour = parseInt(hourStr, 10);
-      const minute = parseInt(minuteStr, 10);
+      // Build a map of available hours based on API response
+      const availabilityMap = new Map<string, boolean>();
 
-      if (isNaN(hour) || isNaN(minute)) {
-        console.log("Invalid time numbers:", hourStr, minuteStr);
-        return;
+      apiSlots.forEach((slot) => {
+        // Store availability status keyed by start_time (e.g. "10:00")
+        availabilityMap.set(slot.start_time, slot.available);
+
+        // Extract hour from start_time
+        const hour = parseInt(slot.start_time.split(":")[0], 10);
+
+        // Mark rest hours as unavailable
+        if (hour === restStartHour) {
+          availabilityMap.set(slot.start_time, false);
+        }
+      });
+
+      // Create hours and minutes structure
+      const hours: HourSlot[] = [];
+      const processedHours = new Set<number>();
+
+      // First, display some slots for debugging
+      console.log("First 5 slots:", apiSlots.slice(0, 5));
+
+      // Process slots in order to create hour/minute structure
+      for (const slot of apiSlots) {
+        // Split start_time into hour and minute
+        const [hourStr, minuteStr] = slot.start_time.split(":");
+        const hour = parseInt(hourStr, 10);
+        const minute = parseInt(minuteStr, 10);
+
+        if (isNaN(hour) || isNaN(minute)) {
+          console.log("Invalid time format:", slot.start_time);
+          continue;
+        }
+
+        // Create hour slot if it doesn't exist
+        if (!processedHours.has(hour)) {
+          const timeDate = new Date();
+          timeDate.setHours(hour, 0);
+          const hourLabel = format(timeDate, "HH:mm");
+
+          hours.push({
+            hour,
+            label: hourLabel,
+            available: false, // Will update based on available minutes
+            minutes: [],
+          });
+          processedHours.add(hour);
+        }
+
+        // Find the hour slot
+        const hourSlot = hours.find((h) => h.hour === hour);
+        if (!hourSlot) continue;
+
+        // Only process slots at :00 and :30 minutes
+        if (minute === 0 || minute === 30) {
+          const timeDate = new Date();
+          timeDate.setHours(hour, minute);
+          const label = format(timeDate, "HH:mm");
+
+          // Get availability from map or default to true
+          const isAvailable = availabilityMap.get(slot.start_time) ?? false;
+
+          // Special handling for rest time slots
+          const isRestTime = hour === restStartHour;
+
+          hourSlot.minutes.push({
+            label,
+            value: slot.start_time,
+            available: isRestTime ? false : isAvailable,
+          });
+
+          // Update hour availability if any minute is available
+          if (!isRestTime && isAvailable) {
+            hourSlot.available = true;
+          }
+        }
       }
 
-      // Skip if not on the hour or half-hour
-      if (minute !== 0 && minute !== 30) return;
+      console.log(`Processed ${hours.length} hour slots`);
 
-      // Create hour slot if it doesn't exist
-      if (!processedHours.has(hour)) {
-        const timeDate = new Date();
-        timeDate.setHours(hour, 0);
-        const hourLabel = format(timeDate, "HH:mm");
+      // Sort hours with special handling for midnight and early morning hours
+      hours.sort((a, b) => {
+        // For hours after midnight (0, 1), add 24 to make them sort after all other hours
+        const adjustedHourA = a.hour < 2 ? a.hour + 24 : a.hour;
+        const adjustedHourB = b.hour < 2 ? b.hour + 24 : b.hour;
+        return adjustedHourA - adjustedHourB;
+      });
 
-        hours.push({
-          hour,
-          label: hourLabel,
-          available: false, // Will update based on minutes
-          minutes: [],
+      // Sort minutes within each hour
+      hours.forEach((hour) => {
+        hour.minutes.sort((a, b) => {
+          // Extract minutes from the time values
+          const minuteA = parseInt(a.value.split(":")[1], 10);
+          const minuteB = parseInt(b.value.split(":")[1], 10);
+          return minuteA - minuteB;
         });
-
-        processedHours.add(hour);
-      }
-
-      // Find the hour slot
-      const hourSlot = hours.find((h) => h.hour === hour);
-      if (!hourSlot) return;
-
-      // Create minute slot
-      const timeDate = new Date();
-      timeDate.setHours(hour, minute);
-      const label = format(timeDate, "HH:mm");
-      const value = slot.startTime;
-
-      // Use the slot's available status directly
-      const slotAvailable = slot.available;
-
-      hourSlot.minutes.push({
-        label,
-        value,
-        available: slotAvailable,
       });
 
-      // Update hour availability if any minute is available
-      if (slotAvailable) {
-        hourSlot.available = true;
-      }
-    });
-
-    console.log(`Processed ${hours.length} hour slots`);
-
-    // Sort hours with special handling for midnight and early morning hours
-    hours.sort((a, b) => {
-      // For hours after midnight (0, 1), add 24 to make them sort after all other hours
-      const adjustedHourA = a.hour < 2 ? a.hour + 24 : a.hour;
-      const adjustedHourB = b.hour < 2 ? b.hour + 24 : b.hour;
-      return adjustedHourA - adjustedHourB;
-    });
-
-    // Sort minutes within each hour
-    hours.forEach((hour) => {
-      hour.minutes.sort((a, b) => {
-        const [aHour, aMin] = a.value.split(":").map(Number);
-        const [bHour, bMin] = b.value.split(":").map(Number);
-
-        // For minutes in hours after midnight, add 24 to the hour for sorting
-        const adjustedAHour = aHour < 2 ? aHour + 24 : aHour;
-        const adjustedBHour = bHour < 2 ? bHour + 24 : bHour;
-
-        return adjustedAHour === adjustedBHour
-          ? aMin - bMin
-          : adjustedAHour - adjustedBHour;
-      });
-    });
-
-    return hours;
-  }, []);
+      return hours;
+    },
+    []
+  );
 
   // Generate time slots based on business hours
   const generateTimeSlots = useCallback(
@@ -235,83 +267,92 @@ export default function DateTimeSelection() {
       const dayOfWeek = date.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
 
       // Define business hours for each day
-      const businessHours: { [key: number]: { start: number; end: number } } = {
-        0: { start: 10, end: 24 }, // Sunday (Minggu): 10 AM - 00:00 (midnight)
-        1: { start: 10, end: 24 }, // Monday (Senin): 10 AM - 00:00 (midnight)
-        2: { start: 10, end: 24 }, // Tuesday (Selasa): 10 AM - 00:00 (midnight)
-        3: { start: 10, end: 24 }, // Wednesday (Rabu): 10 AM - 00:00 (midnight)
-        4: { start: 10, end: 24 }, // Thursday (Kamis): 10 AM - 00:00 (midnight)
-        5: { start: 14, end: 25 }, // Friday (Jumat): 2 PM - 01:00 (1 AM next day)
-        6: { start: 10, end: 25 }, // Saturday (Sabtu): 10 AM - 01:00 (1 AM next day)
+      const businessHoursMap: {
+        [key: number]: { start: number; end: number };
+      } = {
+        0: { start: 10, end: 24 }, // Sunday
+        1: { start: 10, end: 24 }, // Monday
+        2: { start: 10, end: 24 }, // Tuesday
+        3: { start: 10, end: 24 }, // Wednesday
+        4: { start: 10, end: 24 }, // Thursday
+        5: { start: 14, end: 25 }, // Friday (ends at 1 AM)
+        6: { start: 10, end: 25 }, // Saturday (ends at 1 AM)
       };
 
       // Get business hours for the selected day
-      const { start: startHour, end: endHour } = businessHours[dayOfWeek];
+      const { start: startHour, end: endHour } = businessHoursMap[dayOfWeek];
 
-      const mockTimeSlots: TimeSlot[] = [];
+      // Create a rest time for fallback scenario (18:00 - 19:00)
+      const restStartHour = 18;
+      const restEndHour = 19;
 
-      // Generate time slots every 30 minutes
-      for (let hour = startHour; hour <= endHour; hour++) {
-        for (const minute of [0, 30]) {
-          // Skip the 1:30 AM slot if we're going up to 1 AM
-          if (hour === endHour && minute === 30) continue;
+      // Convert to API TimeSlot format for consistency
+      const mockApiTimeSlots: ApiTimeSlot[] = [];
 
-          // Handle hours > 23 for next day slots (after midnight)
-          const displayHour = hour > 23 ? hour - 24 : hour;
-          const startHourFormatted = displayHour.toString().padStart(2, "0");
-          const startMinuteFormatted = minute.toString().padStart(2, "0");
+      // Generate time slots every hour as per API
+      for (let hour = startHour; hour < endHour; hour++) {
+        const displayHour = hour >= 24 ? hour - 24 : hour;
+        const hourStr = displayHour.toString().padStart(2, "0");
 
-          // Calculate end time (30 minutes later)
-          let endHourVal = hour;
-          let endMinuteVal = minute + 30;
+        // Check if this hour is in the past for today
+        let isAvailable = true;
+        if (isToday(date)) {
+          const now = new Date();
+          const hourDate = new Date(date);
+          hourDate.setHours(displayHour, 0, 0, 0);
 
-          if (endMinuteVal >= 60) {
-            endHourVal += 1;
-            endMinuteVal -= 60;
+          if (hourDate <= now) {
+            isAvailable = false;
           }
-
-          // Handle hours > 23 for next day slots (after midnight)
-          const displayEndHour = endHourVal > 23 ? endHourVal - 24 : endHourVal;
-          const endHourFormatted = displayEndHour.toString().padStart(2, "0");
-          const endMinuteFormatted = endMinuteVal.toString().padStart(2, "0");
-
-          // Create time slot
-          const startTime = `${startHourFormatted}:${startMinuteFormatted}`;
-          const endTime = `${endHourFormatted}:${endMinuteFormatted}`;
-
-          // Check if slot is in the past for today
-          let available = true;
-          if (isToday(date)) {
-            const now = new Date();
-            const slotDate = new Date(date);
-
-            // Special handling for midnight (00:00) to prevent it from being marked as past time incorrectly
-            if (displayHour === 0 && minute === 0) {
-              // For midnight, we need to set it to the next day to compare correctly
-              slotDate.setDate(slotDate.getDate() + 1);
-              slotDate.setHours(0, 0, 0, 0);
-            } else {
-              slotDate.setHours(displayHour, minute);
-            }
-
-            if (slotDate <= now) {
-              available = false;
-            }
-          }
-
-          mockTimeSlots.push({
-            startTime,
-            endTime,
-            available,
-          });
         }
+
+        // Check if this is rest time
+        if (hour === restStartHour) {
+          isAvailable = false;
+        }
+
+        // Add slot for the hour itself
+        mockApiTimeSlots.push({
+          start_time: `${hourStr}:00`,
+          end_time: `${hourStr}:00`,
+          available: isAvailable,
+        });
+
+        // Add slot for hour to next hour
+        const nextHour = hour + 1;
+        const nextDisplayHour = nextHour >= 24 ? nextHour - 24 : nextHour;
+        const nextHourStr = nextDisplayHour.toString().padStart(2, "0");
+
+        mockApiTimeSlots.push({
+          start_time: `${hourStr}:00`,
+          end_time: `${nextHourStr}:00`,
+          available: isAvailable,
+        });
+
+        // Also add slots for half hours (for minute-level representation)
+        mockApiTimeSlots.push({
+          start_time: `${hourStr}:30`,
+          end_time: `${hourStr}:30`,
+          available: isAvailable,
+        });
       }
 
-      console.log("Generated time slots:", mockTimeSlots.length);
-      setRawTimeSlots(mockTimeSlots);
+      console.log("Generated API-format time slots:", mockApiTimeSlots.length);
 
-      // Process the mock time slots
-      const processedHours = processTimeSlots(mockTimeSlots);
+      // Create a mock business hours object
+      const mockBusinessHours: BusinessHours = {
+        open: `${startHour}:00`,
+        close: `${endHour}:00`,
+        rest_time: `${restStartHour}:00 - ${restEndHour}:00`,
+      };
+
+      setBusinessHours(mockBusinessHours);
+
+      // Process the time slots and update the UI
+      const processedHours = processTimeSlots(
+        mockApiTimeSlots,
+        mockBusinessHours
+      );
       setHourSlots(processedHours);
     },
     [processTimeSlots]
@@ -351,133 +392,45 @@ export default function DateTimeSelection() {
         console.log(`Fetching times for unit ${unitId} on ${formattedDate}`);
 
         try {
-          // Fetch available times from API
-          const response = await getProcessedAvailableTimes(
-            unitId,
-            formattedDate
-          );
+          // Fetch available times directly from API
+          const apiResponse = await getAvailableTimes(unitId, formattedDate);
+          console.log("API response received:", apiResponse.status);
 
-          console.log("API response received");
+          if (apiResponse.status === "success" && apiResponse.data) {
+            const apiTimeSlots = apiResponse.data.time_slots || [];
+            console.log(`Got ${apiTimeSlots.length} time slots from API`);
 
-          // Store raw time slots
-          const apiTimeSlots = response.timeSlots || [];
-          console.log(`Got ${apiTimeSlots.length} time slots from API`);
-
-          if (apiTimeSlots.length === 0) {
-            console.log("No slots returned from API, using fallback");
-            generateTimeSlots(date);
-            return;
-          }
-
-          // Get the day of week to determine business hours
-          const dayOfWeek = date.getDay();
-          const businessHours: {
-            [key: number]: { start: number; end: number };
-          } = {
-            0: { start: 10, end: 24 }, // Sunday (Minggu): 10 AM - 00:00 (midnight)
-            1: { start: 10, end: 24 }, // Monday (Senin): 10 AM - 00:00 (midnight)
-            2: { start: 10, end: 24 }, // Tuesday (Selasa): 10 AM - 00:00 (midnight)
-            3: { start: 10, end: 24 }, // Wednesday (Rabu): 10 AM - 00:00 (midnight)
-            4: { start: 10, end: 24 }, // Thursday (Kamis): 10 AM - 00:00 (midnight)
-            5: { start: 14, end: 25 }, // Friday (Jumat): 2 PM - 01:00 (1 AM next day)
-            6: { start: 10, end: 25 }, // Saturday (Sabtu): 10 AM - 01:00 (1 AM next day)
-          };
-
-          // Get business hours for the selected day
-          const { start: startHour, end: endHour } = businessHours[dayOfWeek];
-
-          // Generate all possible time slots based on business hours
-          const allTimeSlots: TimeSlot[] = [];
-
-          for (let hour = startHour; hour <= endHour; hour++) {
-            for (const minute of [0, 30]) {
-              // Skip the 1:30 AM slot if we're going up to 1 AM
-              if (hour === endHour && minute === 30) continue;
-
-              // Handle hours > 23 for next day slots (after midnight)
-              const displayHour = hour > 23 ? hour - 24 : hour;
-              const startHourFormatted = displayHour
-                .toString()
-                .padStart(2, "0");
-              const startMinuteFormatted = minute.toString().padStart(2, "0");
-
-              // Calculate end time (30 minutes later)
-              let endHourVal = hour;
-              let endMinuteVal = minute + 30;
-
-              if (endMinuteVal >= 60) {
-                endHourVal += 1;
-                endMinuteVal -= 60;
-              }
-
-              // Handle hours > 23 for next day slots (after midnight)
-              const displayEndHour =
-                endHourVal > 23 ? endHourVal - 24 : endHourVal;
-              const endHourFormatted = displayEndHour
-                .toString()
-                .padStart(2, "0");
-              const endMinuteFormatted = endMinuteVal
-                .toString()
-                .padStart(2, "0");
-
-              // Create time slot
-              const startTime = `${startHourFormatted}:${startMinuteFormatted}`;
-              const endTime = `${endHourFormatted}:${endMinuteFormatted}`;
-
-              // Check if slot is in the past for today
-              let available = true;
-              if (isToday(date)) {
-                const now = new Date();
-                const slotDate = new Date(date);
-
-                // Special handling for midnight (00:00) to prevent it from being marked as past time incorrectly
-                if (displayHour === 0 && minute === 0) {
-                  // For midnight, we need to set it to the next day to compare correctly
-                  slotDate.setDate(slotDate.getDate() + 1);
-                  slotDate.setHours(0, 0, 0, 0);
-                } else {
-                  slotDate.setHours(displayHour, minute);
-                }
-
-                if (slotDate <= now) {
-                  available = false;
-                }
-              }
-
-              // Now check against API time slots to determine availability
-              // The API returns hourly time slots, so we need to check if our 30-min slot falls within an hour that's marked unavailable
-              const apiStartHour = parseInt(startHourFormatted);
-
-              // Find the matching API time slot
-              const matchingApiSlot = apiTimeSlots.find((slot) => {
-                const apiSlotHour = parseInt(slot.startTime.split(":")[0]);
-                return apiSlotHour === apiStartHour;
-              });
-
-              // If we have a matching API slot, use its availability
-              if (matchingApiSlot) {
-                available = available && matchingApiSlot.available;
-              }
-
-              allTimeSlots.push({
-                startTime,
-                endTime,
-                available,
-              });
+            if (apiTimeSlots.length === 0) {
+              console.log("No slots returned from API, using fallback");
+              generateTimeSlots(date);
+              return;
             }
+
+            // Store the business hours from API
+            const apiBusinessHours = apiResponse.data.business_hours;
+            setBusinessHours(apiBusinessHours);
+
+            // Process the API time slots
+            const processedHours = processTimeSlots(
+              apiTimeSlots,
+              apiBusinessHours
+            );
+            setHourSlots(processedHours);
+
+            // Convert API slots to our internal format for other calculations
+            const timeSlots = apiTimeSlots.map((slot) => ({
+              startTime: slot.start_time,
+              endTime: slot.end_time,
+              available: slot.available,
+            }));
+
+            setRawTimeSlots(timeSlots);
+          } else {
+            console.error("Invalid API response format:", apiResponse);
+            generateTimeSlots(date);
           }
-
-          console.log(
-            `Generated ${allTimeSlots.length} time slots with API availability`
-          );
-          setRawTimeSlots(allTimeSlots);
-
-          // Process the time slots
-          const processedHours = processTimeSlots(allTimeSlots);
-          setHourSlots(processedHours);
         } catch (apiError) {
           console.error("API error:", apiError);
-          // Fallback to generating time slots locally
           console.log("Falling back to local time slot generation");
           generateTimeSlots(date);
         }
@@ -503,18 +456,6 @@ export default function DateTimeSelection() {
       fetchTimeSlots(selectedDate);
     }
   }, [selectedDate, fetchTimeSlots, selectedUnitName, selectedConsole]);
-
-  // Effect to update availability when duration changes
-  useEffect(() => {
-    if (rawTimeSlots && rawTimeSlots.length > 0) {
-      console.log(
-        "Recalculating availability due to duration change:",
-        duration
-      );
-      const processedHours = processTimeSlots(rawTimeSlots);
-      setHourSlots(processedHours);
-    }
-  }, [duration, rawTimeSlots, processTimeSlots]);
 
   // Function to disable past dates
   const getDisabledDays = () => {
@@ -606,6 +547,17 @@ export default function DateTimeSelection() {
                   Please select a unit first
                 </Badge>
               )}
+
+              {/* Rest time info */}
+              {businessHours?.rest_time && (
+                <Badge
+                  variant="outline"
+                  className="bg-amber-100 border-amber-200 text-amber-600 mt-2 ml-2"
+                >
+                  <Clock className="h-3 w-3 mr-1" />
+                  Rest time: {businessHours.rest_time}
+                </Badge>
+              )}
             </header>
 
             <div className="grid md:grid-cols-5 gap-6">
@@ -685,15 +637,15 @@ export default function DateTimeSelection() {
                         className="rounded-md border-[#B99733]/20 w-full h-full"
                         classNames={{
                           day_selected:
-                            "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white focus:bg-[#B99733] focus:text-white flex justify-center items-center", // Menambahkan flexbox untuk centering
+                            "bg-[#B99733] text-white hover:bg-[#B99733]/90 hover:text-white focus:bg-[#B99733] focus:text-white flex justify-center items-center",
                           day_today: "bg-[#B99733]/10 text-[#B99733]",
                           day_outside: "text-[#B99733]/30",
                           day: "hover:bg-[#B99733]/10 cursor-pointer",
                         }}
                         style={{
-                          fontSize: "1.5rem", // Menyesuaikan ukuran font
-                          height: "100%", // Pastikan kalender mengisi seluruh tinggi kontainer
-                          width: "100%", // Pastikan kalender mengisi seluruh lebar kontainer
+                          fontSize: "1.5rem",
+                          height: "100%",
+                          width: "100%",
                         }}
                       />
                     )}
@@ -846,6 +798,15 @@ export default function DateTimeSelection() {
                       <p className="text-xs text-[#B99733]/70 mt-4 flex items-center gap-1">
                         <span className="inline-block w-2 h-2 bg-[#B99733]/30 rounded-full"></span>
                         Time slots before current time are unavailable
+                      </p>
+                    )}
+
+                    {/* Rest time info */}
+                    {businessHours?.rest_time && (
+                      <p className="text-xs text-amber-500 mt-2 flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 bg-amber-400 rounded-full"></span>
+                        Rest time ({businessHours.rest_time}) slots are
+                        unavailable
                       </p>
                     )}
                   </CardContent>
