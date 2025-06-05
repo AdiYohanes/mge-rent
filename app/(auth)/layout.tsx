@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 // Optionally, you can uncomment and dynamically set metadata for SEO.
 // export const metadata = {
@@ -17,14 +18,20 @@ export default function AuthLayout({
       <div className="flex w-full flex-col bg-white md:w-1/2">
         <header className="p-6">
           <div className="relative mb-2">
-            <Image
-              src="/images/logo.png"
-              alt="Logo"
-              width={40}
-              height={40}
-              className="h-auto w-auto object-contain"
-              priority
-            />
+            <Link
+              href="/"
+              className="inline-block cursor-pointer"
+              aria-label="Go to homepage"
+            >
+              <Image
+                src="/images/logo.png"
+                alt="Logo"
+                width={40}
+                height={40}
+                className="h-auto w-auto object-contain hover:opacity-80 transition-opacity duration-300"
+                priority
+              />
+            </Link>
             {/* Divider with colored dots */}
             <div className="flex items-center justify-center w-full">
               <div className="h-[1px] w-16 bg-gray-200"></div>

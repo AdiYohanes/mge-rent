@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { IoArrowBack } from "react-icons/io5";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
@@ -140,6 +141,18 @@ const Login = () => {
   return (
     <div className="w-full min-h-screen flex items-start justify-center py-2 px-4 overflow-y-auto">
       <div className="w-full max-w-[85%] xs:max-w-[75%] sm:max-w-[400px] mt-4">
+        {/*  Back Button */}
+        <div className="flex items-center justify-between mb-4">
+          <Link
+            href="/"
+            className="flex items-center text-[#b99733] hover:text-[#967515] transition-colors duration-300"
+            aria-label="Back to homepage"
+          >
+            <IoArrowBack className="w-5 h-5" />
+            <span className="ml-1 text-sm">Back to Home</span>
+          </Link>
+        </div>
+
         <div className="bg-white border border-[#1B1010] shadow-lg p-4 sm:p-5">
           <h2 className="text-center text-base sm:text-xl font-minecraft text-[#b99733] mb-3">
             Login
@@ -222,7 +235,7 @@ const Login = () => {
                   href="/forgotPassword"
                   className="text-[10px] sm:text-xs font-medium text-[#b99733] hover:text-[#967515] transition-colors duration-300"
                 >
-                  Forgot password?
+                  Forgot Password?
                 </Link>
               </div>
             </div>

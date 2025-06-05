@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getUserFromCookie, updateUserCookie } from "@/utils/cookieUtils";
-import { updateProfile } from "@/api/user/userApi";
 import { toast } from "sonner";
 
 interface UserData {
@@ -46,21 +45,13 @@ export default function Profile() {
     e.preventDefault();
 
     try {
-      // Kirim data ke API
-      const response = await updateProfile({
+      // Update user data locally
+      const updatedUser = {
+        ...user,
         name,
         email,
         username,
-        phone: phoneNumber,
-      });
-
-      // Update cookie dengan data terbaru dari API
-      const updatedUser = {
-        ...user,
-        name: response.name,
-        email: response.email,
-        username: response.username,
-        phoneNumber: response.phone,
+        phoneNumber,
       } as UserData;
 
       // Update user cookie
@@ -78,19 +69,17 @@ export default function Profile() {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
-      alert("New passwords don't match!");
+      toast.error("New passwords don't match!");
       return;
     }
 
     if (!currentPassword) {
-      alert("Please enter your current password!");
+      toast.error("Please enter your current password!");
       return;
     }
 
-    // In a real app, you would validate the current password against the stored password
-    // and then update it in the database
-
-    alert("Password changed successfully!");
+    // For now, just show a success message
+    toast.success("Password changed successfully!");
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");

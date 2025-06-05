@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import AuthLayout from "../layout";
 import Link from "next/link";
 import { forgotPassword } from "@/api/auth/authApi";
 import { AxiosError } from "axios";

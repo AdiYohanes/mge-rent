@@ -239,13 +239,13 @@ export const updateUserStatus = async (
 };
 
 // Function to update user profile
-export const updateProfile = async (data: UpdateProfileData): Promise<User> => {
-  try {
-    const response = await post<User>(USER_ENDPOINTS.UPDATE_PROFILE, data);
-    console.log("Profile update response:", response);
-    return response;
-  } catch (error) {
-    console.error("Error updating profile:", error);
-    throw error;
-  }
-};
+// export const updateProfile = async (data: UpdateProfileData): Promise<User> => {
+//   try {
+//     const response = await post<User>(USER_ENDPOINTS.UPDATE_PROFILE, data);
+//     console.log("Profile update response:", response);
+//     return response;
+//   } catch (error) {
+//     console.error("Error updating profile:", error);
+//     throw error;
+//   }
+// };
