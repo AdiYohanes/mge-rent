@@ -15,14 +15,13 @@ const SimpleMap = () => {
   return (
     <div className="rounded-lg overflow-hidden shadow-lg border-2 border-[#b99733]/20">
       <iframe
-        title="Google Map"
-        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d126974.38659730626!2d98.6606489546906!3d3.595196785185863!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x303131eae1fdf4e7%3A0x168a35d8f1dd6a44!2sMedan%2C%20Indonesia!5e0!3m2!1sen!2s!4v1586879930014!5m2!1sen!2s"
-        width="100%"
-        height="250"
-        style={{ border: 0 }}
+        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3982.099407452538!2d98.6379297!3d3.5645866999999996!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30312f0010580809%3A0xba8816cf8947a0bc!2sMedan%20Gaming%20Ecosystem!5e0!3m2!1sid!2sid!4v1749090964382!5m2!1sid!2sid"
+        width="600"
+        height="450"
+        style={{ border: 0, width: "100%", height: "100%" }}
+        allowFullScreen
         loading="lazy"
         referrerPolicy="no-referrer-when-downgrade"
-        className="w-full"
       ></iframe>
     </div>
   );

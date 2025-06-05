@@ -92,6 +92,9 @@ export const getProcessedAvailableTimes = async (
       }
     >();
 
+    // Track unique minute values to prevent duplicates
+    const processedMinutes = new Set<string>();
+
     // Process time slots from API
     timeSlots.forEach((slot) => {
       const [hoursStr, minutesStr] = slot.startTime.split(":");
@@ -100,6 +103,11 @@ export const getProcessedAvailableTimes = async (
 
       // Only process slots that are on the hour or half-hour
       if (minute !== 0 && minute !== 30) return;
+
+      // Create unique identifier for this time slot to prevent duplicates
+      const timeKey = `${hour}:${minute}`;
+      if (processedMinutes.has(timeKey)) return;
+      processedMinutes.add(timeKey);
 
       if (!hourMap.has(hour)) {
         hourMap.set(hour, {

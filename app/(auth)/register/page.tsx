@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ const RegisterPage = () => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     username: "",
@@ -143,24 +146,21 @@ const RegisterPage = () => {
   }
 
   return (
-    <div className="w-full min-h-screen flex items-start justify-center py-0 px-4 overflow-y-auto pt-0">
-      <div className="w-full max-w-[90%] xs:max-w-[85%] sm:max-w-sm md:max-w-md lg:max-w-lg mt-0 mb-6 sm:my-4">
-        <div className="bg-white border border-[#1B1010] shadow-lg p-2 sm:p-4 md:p-6 scale-[0.85] sm:scale-100">
-          <h2 className="text-center text-lg sm:text-2xl md:text-3xl font-minecraft text-[#b99733] mb-0.5 sm:mb-4">
+    <div className="w-full min-h-screen flex items-start justify-center py-1 px-4 overflow-y-auto">
+      <div className="w-full max-w-[80%] xs:max-w-[70%] sm:max-w-[350px] mt-2">
+        <div className="bg-white border border-[#1B1010] shadow-lg p-3 sm:p-4">
+          <h2 className="text-center text-sm sm:text-lg font-minecraft text-[#b99733] mb-2">
             Register
           </h2>
 
-          <form
-            className="space-y-0.5 sm:space-y-3 md:space-y-4"
-            onSubmit={handleSubmit}
-          >
+          <form className="space-y-1.5 sm:space-y-2" onSubmit={handleSubmit}>
             {/* Full Name */}
-            <div className="space-y-0.5 sm:space-y-1">
+            <div className="space-y-0.5">
               <Label
                 htmlFor="fullName"
-                className="text-xs sm:text-sm text-gray-700"
+                className="text-[10px] sm:text-xs text-gray-700"
               >
-                Full Name*
+                Name*
               </Label>
               <Input
                 id="fullName"
@@ -169,16 +169,16 @@ const RegisterPage = () => {
                 required
                 value={formData.fullName}
                 onChange={handleChange}
-                className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-xs sm:text-sm"
-                placeholder="Enter your full name"
+                className="w-full px-2 py-0.5 sm:px-2 sm:py-1 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs"
+                placeholder="Enter your name"
               />
             </div>
 
             {/* Username */}
-            <div className="space-y-0.5 sm:space-y-1">
+            <div className="space-y-0.5">
               <Label
                 htmlFor="username"
-                className="text-xs sm:text-sm text-gray-700"
+                className="text-[10px] sm:text-xs text-gray-700"
               >
                 Username*
               </Label>
@@ -189,16 +189,16 @@ const RegisterPage = () => {
                 required
                 value={formData.username}
                 onChange={handleChange}
-                className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-xs sm:text-sm"
+                className="w-full px-2 py-0.5 sm:px-2 sm:py-1 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs"
                 placeholder="Choose a username"
               />
             </div>
 
             {/* Email */}
-            <div className="space-y-0.5 sm:space-y-1">
+            <div className="space-y-0.5">
               <Label
                 htmlFor="email"
-                className="text-xs sm:text-sm text-gray-700"
+                className="text-[10px] sm:text-xs text-gray-700"
               >
                 Email Address*
               </Label>
@@ -209,19 +209,19 @@ const RegisterPage = () => {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-xs sm:text-sm"
+                className="w-full px-2 py-0.5 sm:px-2 sm:py-1 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs"
                 placeholder="Enter your email"
               />
             </div>
 
             {/* Phone */}
-            <div className="space-y-0.5 sm:space-y-1">
+            <div className="space-y-0.5">
               <Label
                 htmlFor="phone"
-                className="text-xs sm:text-sm text-gray-700"
+                className="text-[10px] sm:text-xs text-gray-700"
               >
                 Phone Number*{" "}
-                <span className="text-[9px] sm:text-xs">(WhatsApp)</span>
+                <span className="text-[8px] sm:text-[10px]">(WhatsApp)</span>
               </Label>
               <Input
                 id="phone"
@@ -230,67 +230,93 @@ const RegisterPage = () => {
                 required
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-xs sm:text-sm"
+                className="w-full px-2 py-0.5 sm:px-2 sm:py-1 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs"
                 placeholder="Enter your phone number"
               />
             </div>
 
             {/* Password */}
-            <div className="space-y-0.5 sm:space-y-1">
+            <div className="space-y-0.5">
               <Label
                 htmlFor="password"
-                className="text-xs sm:text-sm text-gray-700"
+                className="text-[10px] sm:text-xs text-gray-700"
               >
                 Password*
               </Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-xs sm:text-sm"
-                placeholder="Create a password"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full px-2 py-0.5 sm:px-2 sm:py-1 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs"
+                  placeholder="Create a password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 focus:outline-none"
+                >
+                  {showPassword ? (
+                    <FaEyeSlash size={10} className="sm:text-xs" />
+                  ) : (
+                    <FaEye size={10} className="sm:text-xs" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Confirm Password */}
-            <div className="space-y-0.5 sm:space-y-1">
+            <div className="space-y-0.5">
               <Label
                 htmlFor="confirmPassword"
-                className="text-xs sm:text-sm text-gray-700"
+                className="text-[10px] sm:text-xs text-gray-700"
               >
                 Confirm Password*
               </Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-xs sm:text-sm"
-                placeholder="Confirm your password"
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full px-2 py-0.5 sm:px-2 sm:py-1 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs"
+                  placeholder="Confirm your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 focus:outline-none"
+                >
+                  {showConfirmPassword ? (
+                    <FaEyeSlash size={10} className="sm:text-xs" />
+                  ) : (
+                    <FaEye size={10} className="sm:text-xs" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Terms and Conditions */}
-            <div className="flex items-start mt-0.5 sm:mt-2">
-              <div className="flex items-center h-4">
+            <div className="flex items-start">
+              <div className="flex items-center h-3">
                 <input
                   id="agreeToTerms"
                   name="agreeToTerms"
                   type="checkbox"
                   checked={formData.agreeToTerms}
                   onChange={handleChange}
-                  className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+                  className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
                 />
               </div>
-              <div className="ml-2 sm:ml-3">
+              <div className="ml-1.5">
                 <label
                   htmlFor="agreeToTerms"
-                  className="text-[9px] sm:text-xs md:text-sm text-gray-700"
+                  className="text-[8px] sm:text-[10px] text-gray-700"
                 >
                   By ticking, you agree to our{" "}
                   <a href="/terms" className="text-[#b99733] hover:underline">
@@ -304,40 +330,38 @@ const RegisterPage = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full py-1 sm:py-2 md:py-3 px-2 sm:px-4 md:px-6 text-xs sm:text-sm md:text-base font-semibold text-white bg-linear-to-r from-[#967515] to-[#c8a84b] hover:from-[#866714] hover:to-[#b7973a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#967515] transition-all duration-300 rounded-none mt-0.5 sm:mt-4"
+              className="w-full py-0.5 sm:py-1 px-2 sm:px-3 text-[10px] sm:text-xs font-semibold text-white bg-linear-to-r from-[#967515] to-[#c8a84b] hover:from-[#866714] hover:to-[#b7973a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#967515] transition-all duration-300 rounded-none"
             >
               {loading ? "Registering..." : "Register"}
             </Button>
 
             {/* Divider */}
-            <div className="relative my-0.5 sm:my-3 md:my-4">
+            <div className="relative my-1.5 sm:my-2">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300"></div>
               </div>
-              <div className="relative flex justify-center text-[10px] sm:text-xs md:text-sm">
-                <span className="px-2 sm:px-3 md:px-4 bg-white text-[#b99733]">
-                  or
-                </span>
+              <div className="relative flex justify-center text-[8px] sm:text-[10px]">
+                <span className="px-2 bg-white text-[#b99733]">or</span>
               </div>
             </div>
 
             {/* Google Sign In */}
             <Button
               type="button"
-              className="w-full flex justify-center items-center px-2 sm:px-4 md:px-6 py-1 sm:py-2 md:py-3 border border-gray-300 shadow-sm bg-white text-xs sm:text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-all duration-300 rounded-none"
+              className="w-full flex justify-center items-center px-2 sm:px-3 py-0.5 sm:py-1 border border-gray-300 shadow-sm bg-white text-[10px] sm:text-xs font-medium text-gray-700 hover:bg-gray-50 transition-all duration-300 rounded-none"
             >
               <Image
-                className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2 md:mr-3"
+                className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1"
                 src="https://www.svgrepo.com/show/475656/google-color.svg"
                 alt="Google logo"
-                width={20}
-                height={20}
+                width={12}
+                height={12}
               />
               Sign in with Google
             </Button>
 
             {/* Login Link */}
-            <div className="text-center text-[10px] sm:text-xs md:text-sm mt-0.5 sm:mt-4">
+            <div className="text-center text-[8px] sm:text-[10px] mt-1.5 sm:mt-2">
               <span className="text-gray-600">Already have an account? </span>
               <Link
                 href="/signin"

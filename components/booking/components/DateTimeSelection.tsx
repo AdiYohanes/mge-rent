@@ -56,6 +56,7 @@ interface HourSlot {
   minutes: MinuteSlot[];
 }
 
+// Business hours interface for mock data
 interface BusinessHours {
   open: string;
   close: string;
@@ -64,43 +65,53 @@ interface BusinessHours {
 
 // Main component
 export default function DateTimeSelection() {
+  const mounted = useMounted();
   const [today, setToday] = useState<Date | null>(null);
-  const { selectedDate, setSelectedDate } = useBookingItemStore();
-  const { selectedTime, setSelectedTime } = useBookingItemStore();
-  const { duration, setDuration } = useBookingItemStore();
-  const { setEndTime } = useBookingItemStore();
-  // Get selected console and unit from BookingItemStore
-  const { selectedConsole } = useBookingItemStore();
-  const { selectedUnitName } = useBookingItemStore();
-
   const [hourSlots, setHourSlots] = useState<HourSlot[]>([]);
-  const [rawTimeSlots, setRawTimeSlots] = useState<TimeSlot[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [rawTimeSlots, setRawTimeSlots] = useState<TimeSlot[]>([]); // Used for potential future conflict checking
   const [businessHours, setBusinessHours] = useState<BusinessHours | null>(
     null
   );
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState<boolean>(false);
   const [timeSlotError, setTimeSlotError] = useState<string | null>(null);
-  const mounted = useMounted();
 
+  // Access store
+  const {
+    selectedDate,
+    setSelectedDate,
+    selectedTime,
+    setSelectedTime,
+    duration,
+    setDuration,
+    setEndTime,
+    selectedConsole,
+    selectedUnitName,
+    endTime,
+  } = useBookingItemStore();
+
+  // Initialize date and duration only after hydration
   useEffect(() => {
     if (mounted) {
       const now = new Date();
-      const currentDate = now;
-      setToday(currentDate);
-      if (selectedDate === undefined) {
-        setSelectedDate(currentDate);
+      setToday(now);
+
+      if (!selectedDate) {
+        setSelectedDate(now);
       }
 
       // Set default duration to 1 hour if not already set
-      if (duration === undefined || duration <= 0) {
+      if (!duration || duration <= 0) {
         setDuration(1);
-        console.log("Setting default duration to 1 hour");
       }
     }
   }, [mounted, setSelectedDate, selectedDate, duration, setDuration]);
 
+  // Calculate end time based on selected date, time and duration
   useEffect(() => {
+    if (!mounted) return;
+
     if (selectedDate && selectedTime && duration > 0) {
       try {
         const [hoursStr, minutesStr] = selectedTime.split(":");
@@ -113,51 +124,38 @@ export default function DateTimeSelection() {
 
           const calculatedEndTime = addHours(startDate, duration);
           setEndTime(calculatedEndTime);
-
-          // Check if this booking has conflicts
-          if (rawTimeSlots && rawTimeSlots.length > 0) {
-            console.log(
-              `Selected time ${selectedTime} with ${duration}h duration, ending at ${format(
-                calculatedEndTime,
-                "HH:mm"
-              )}`
-            );
-          }
         } else {
           setEndTime(null);
         }
-      } catch (error) {
-        console.error("Error calculating end time:", error);
+      } catch {
+        // Suppress error - just reset end time
         setEndTime(null);
       }
     } else {
       setEndTime(null);
     }
-  }, [selectedDate, selectedTime, duration, setEndTime, rawTimeSlots]);
+  }, [mounted, selectedDate, selectedTime, duration, setEndTime]);
 
   // Process raw time slots into hour/minute structure with duration support
   const processTimeSlots = useCallback(
     (apiSlots: ApiTimeSlot[], businessHours: BusinessHours | null) => {
-      console.log("Processing time slots:", apiSlots.length);
-
       if (!apiSlots || apiSlots.length === 0) {
-        console.log("No slots to process");
         return [];
       }
 
       // Parse rest time if available
       let restStartHour = -1;
-      let restEndHour = -1;
 
       if (businessHours?.rest_time) {
-        const [restStart, restEnd] = businessHours.rest_time.split(" - ");
+        const [restStart] = businessHours.rest_time.split(" - ");
         restStartHour = parseInt(restStart.split(":")[0], 10);
-        restEndHour = parseInt(restEnd.split(":")[0], 10);
-        console.log(`Rest time: ${restStartHour}:00 - ${restEndHour}:00`);
+        // Rest end hour is available in the split but not used currently
       }
 
       // Build a map of available hours based on API response
       const availabilityMap = new Map<string, boolean>();
+      // Track processed minutes to avoid duplicates
+      const processedMinutes = new Set<string>();
 
       apiSlots.forEach((slot) => {
         // Store availability status keyed by start_time (e.g. "10:00")
@@ -176,9 +174,6 @@ export default function DateTimeSelection() {
       const hours: HourSlot[] = [];
       const processedHours = new Set<number>();
 
-      // First, display some slots for debugging
-      console.log("First 5 slots:", apiSlots.slice(0, 5));
-
       // Process slots in order to create hour/minute structure
       for (const slot of apiSlots) {
         // Split start_time into hour and minute
@@ -187,9 +182,13 @@ export default function DateTimeSelection() {
         const minute = parseInt(minuteStr, 10);
 
         if (isNaN(hour) || isNaN(minute)) {
-          console.log("Invalid time format:", slot.start_time);
           continue;
         }
+
+        // Check for duplicate minute entries
+        const minuteKey = `${hour}:${minute}`;
+        if (processedMinutes.has(minuteKey)) continue;
+        processedMinutes.add(minuteKey);
 
         // Create hour slot if it doesn't exist
         if (!processedHours.has(hour)) {
@@ -235,8 +234,6 @@ export default function DateTimeSelection() {
         }
       }
 
-      console.log(`Processed ${hours.length} hour slots`);
-
       // Sort hours with special handling for midnight and early morning hours
       hours.sort((a, b) => {
         // For hours after midnight (0, 1), add 24 to make them sort after all other hours
@@ -263,7 +260,6 @@ export default function DateTimeSelection() {
   // Generate time slots based on business hours
   const generateTimeSlots = useCallback(
     (date: Date) => {
-      console.log("Generating time slots for", format(date, "EEEE, MMMM d"));
       const dayOfWeek = date.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
 
       // Define business hours for each day
@@ -337,8 +333,6 @@ export default function DateTimeSelection() {
         });
       }
 
-      console.log("Generated API-format time slots:", mockApiTimeSlots.length);
-
       // Create a mock business hours object
       const mockBusinessHours: BusinessHours = {
         open: `${startHour}:00`,
@@ -354,6 +348,15 @@ export default function DateTimeSelection() {
         mockBusinessHours
       );
       setHourSlots(processedHours);
+
+      // Convert API slots to our internal format for other calculations
+      const timeSlots = mockApiTimeSlots.map((slot) => ({
+        startTime: slot.start_time,
+        endTime: slot.end_time,
+        available: slot.available,
+      }));
+
+      setRawTimeSlots(timeSlots);
     },
     [processTimeSlots]
   );
@@ -375,46 +378,42 @@ export default function DateTimeSelection() {
 
         // If we have a selectedUnitName, extract unit ID
         if (selectedUnitName && selectedUnitName !== "all") {
-          // For now, let's use a mock unit ID of 21 for testing
-          unitId = 21; // This is just a placeholder
+          // TODO: Replace this with actual unit ID lookup
+          unitId = 21; // This is a placeholder and should be replaced
         } else if (selectedConsole) {
           // If no specific unit is selected but console is, use console ID
           unitId = selectedConsole.id;
         } else {
           // No unit or console selected yet
-          console.log("No unit or console selected");
           setHourSlots([]);
           setRawTimeSlots([]);
           setIsLoadingTimeSlots(false);
           return;
         }
 
-        console.log(`Fetching times for unit ${unitId} on ${formattedDate}`);
-
         try {
           // Fetch available times directly from API
           const apiResponse = await getAvailableTimes(unitId, formattedDate);
-          console.log("API response received:", apiResponse.status);
 
           if (apiResponse.status === "success" && apiResponse.data) {
             const apiTimeSlots = apiResponse.data.time_slots || [];
-            console.log(`Got ${apiTimeSlots.length} time slots from API`);
 
             if (apiTimeSlots.length === 0) {
-              console.log("No slots returned from API, using fallback");
               generateTimeSlots(date);
               return;
             }
 
-            // Store the business hours from API
-            const apiBusinessHours = apiResponse.data.business_hours;
-            setBusinessHours(apiBusinessHours);
+            // For now the API doesn't return business hours, use a default one
+            const defaultHours: BusinessHours = {
+              open: "10:00",
+              close: "23:00",
+              rest_time: "18:00 - 19:00",
+            };
+
+            setBusinessHours(defaultHours);
 
             // Process the API time slots
-            const processedHours = processTimeSlots(
-              apiTimeSlots,
-              apiBusinessHours
-            );
+            const processedHours = processTimeSlots(apiTimeSlots, defaultHours);
             setHourSlots(processedHours);
 
             // Convert API slots to our internal format for other calculations
@@ -426,16 +425,17 @@ export default function DateTimeSelection() {
 
             setRawTimeSlots(timeSlots);
           } else {
-            console.error("Invalid API response format:", apiResponse);
+            // Fallback to local generation if API format is invalid
             generateTimeSlots(date);
           }
-        } catch (apiError) {
-          console.error("API error:", apiError);
-          console.log("Falling back to local time slot generation");
+        } catch (error) {
+          // Fallback to local time slot generation on API error
+          console.error("API error:", error);
           generateTimeSlots(date);
         }
-      } catch (err) {
-        console.error("Error fetching time slots:", err);
+      } catch (error) {
+        // Set error and use fallback
+        console.error("Error loading time slots:", error);
         setTimeSlotError("Failed to load available time slots");
         generateTimeSlots(date);
       } finally {
@@ -448,14 +448,22 @@ export default function DateTimeSelection() {
       selectedConsole,
       processTimeSlots,
       generateTimeSlots,
+      setSelectedTime,
     ]
   );
 
+  // Fetch time slots when date or unit selection changes
   useEffect(() => {
-    if (selectedDate) {
+    if (mounted && selectedDate) {
       fetchTimeSlots(selectedDate);
     }
-  }, [selectedDate, fetchTimeSlots, selectedUnitName, selectedConsole]);
+  }, [
+    mounted,
+    selectedDate,
+    fetchTimeSlots,
+    selectedUnitName,
+    selectedConsole,
+  ]);
 
   // Function to disable past dates
   const getDisabledDays = () => {
@@ -468,21 +476,38 @@ export default function DateTimeSelection() {
       setSelectedDate(date);
       setShowCalendar(false);
       setSelectedTime("");
+      console.log(
+        "Date selected:",
+        format(date, "yyyy-MM-dd"),
+        "| Time:",
+        selectedTime,
+        "| Duration:",
+        duration
+      );
     }
   };
 
   const handleTimeSelect = (time: string) => {
-    console.log("Time selected:", time);
-    setSelectedTime(time);
+    try {
+      // Validate that time is in correct format (HH:MM)
+      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
-    // Additional debugging for selected time
-    if (rawTimeSlots && rawTimeSlots.length > 0) {
-      const selectedSlot = rawTimeSlots.find((slot) => slot.startTime === time);
-      if (selectedSlot) {
-        console.log("Selected slot data:", selectedSlot);
+      if (time && timeRegex.test(time)) {
+        setSelectedTime(time);
+        console.log(
+          "Date:",
+          selectedDate ? format(selectedDate, "yyyy-MM-dd") : "none",
+          "| Time selected:",
+          time,
+          "| Duration:",
+          duration
+        );
       } else {
-        console.log("Warning: Selected time not found in available slots");
+        console.error("Invalid time format:", time);
+        // Don't update state with invalid format
       }
+    } catch (error) {
+      console.error("Error selecting time:", error);
     }
   };
 
@@ -505,6 +530,28 @@ export default function DateTimeSelection() {
       </div>
     </div>
   );
+
+  // Add effect to log complete state when all selections are made
+  useEffect(() => {
+    if (selectedDate && selectedTime && duration > 0) {
+      const calculatedEndTime = endTime ? format(endTime, "HH:mm") : "unknown";
+      console.log("BOOKING STATE - Complete selection:", {
+        date: format(selectedDate, "yyyy-MM-dd"),
+        time: selectedTime,
+        duration: duration,
+        endTime: calculatedEndTime,
+        console: selectedConsole?.name || "none",
+        unit: selectedUnitName || "none",
+      });
+    }
+  }, [
+    selectedDate,
+    selectedTime,
+    duration,
+    endTime,
+    selectedConsole,
+    selectedUnitName,
+  ]);
 
   // For consistent server-side and client-side rendering
   return (
@@ -725,14 +772,16 @@ export default function DateTimeSelection() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-h-[220px] overflow-y-auto pr-2">
                           {getAvailableHourSlots().length > 0 ? (
                             getAvailableHourSlots().map((hourSlot) => (
-                              <Popover key={hourSlot.hour}>
+                              <Popover key={`hour-${hourSlot.hour}`}>
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    disabled={!hourSlot.available}
+                                    disabled={
+                                      !hourSlot.available || !selectedDate
+                                    }
                                     className={cn(
                                       "w-full justify-between h-10 sm:h-12 px-3 py-2 border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm",
-                                      !hourSlot.available &&
+                                      (!hourSlot.available || !selectedDate) &&
                                         "opacity-50 cursor-not-allowed"
                                     )}
                                   >
@@ -747,37 +796,38 @@ export default function DateTimeSelection() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-48 p-2">
                                   <div className="grid grid-cols-2 gap-1">
-                                    {hourSlot.minutes.map((minute) => (
-                                      <Button
-                                        key={minute.value}
-                                        variant={
-                                          selectedTime === minute.value
-                                            ? "default"
-                                            : "outline"
-                                        }
-                                        size="sm"
-                                        disabled={!minute.available}
-                                        onClick={() => {
-                                          console.log(
-                                            "Clicking time:",
-                                            minute.value,
-                                            "Available:",
-                                            minute.available
-                                          );
-                                          handleTimeSelect(minute.value);
-                                        }}
-                                        className={cn(
-                                          "justify-center h-8 sm:h-9 text-xs sm:text-sm cursor-pointer",
-                                          selectedTime === minute.value
-                                            ? "bg-[#B99733] text-white hover:bg-[#B99733]/90"
-                                            : "border-[#B99733]/20 hover:bg-[#B99733]/10",
-                                          !minute.available &&
-                                            "opacity-50 cursor-not-allowed"
-                                        )}
-                                      >
-                                        {minute.label.split(" ")[0]}
-                                      </Button>
-                                    ))}
+                                    {hourSlot.minutes.map(
+                                      (minute, minuteIndex) => (
+                                        <Button
+                                          key={`${hourSlot.hour}-${minute.value}-${minuteIndex}`}
+                                          variant={
+                                            selectedTime === minute.value
+                                              ? "default"
+                                              : "outline"
+                                          }
+                                          size="sm"
+                                          disabled={
+                                            !minute.available || !selectedDate
+                                          }
+                                          onClick={() => {
+                                            if (minute && minute.value) {
+                                              handleTimeSelect(minute.value);
+                                            }
+                                          }}
+                                          className={cn(
+                                            "justify-center h-8 sm:h-9 text-xs sm:text-sm cursor-pointer",
+                                            selectedTime === minute.value
+                                              ? "bg-[#B99733] text-white hover:bg-[#B99733]/90"
+                                              : "border-[#B99733]/20 hover:bg-[#B99733]/10",
+                                            (!minute.available ||
+                                              !selectedDate) &&
+                                              "opacity-50 cursor-not-allowed"
+                                          )}
+                                        >
+                                          {minute.label.split(" ")[0]}
+                                        </Button>
+                                      )
+                                    )}
                                   </div>
                                 </PopoverContent>
                               </Popover>
@@ -786,7 +836,9 @@ export default function DateTimeSelection() {
                             <div className="col-span-full flex flex-col items-center justify-center py-8 text-center">
                               <Clock className="h-10 w-10 text-gray-300 mb-2" />
                               <p className="text-gray-500">
-                                No available time slots for this selection
+                                {!selectedDate
+                                  ? "Please select a date first"
+                                  : "No available time slots for this selection"}
                               </p>
                             </div>
                           )}
@@ -819,7 +871,11 @@ export default function DateTimeSelection() {
                       <span>Duration</span>
                     </CardTitle>
                     <CardDescription className="text-[#B99733]/70">
-                      How long do you need?
+                      {!selectedDate
+                        ? "Please select a date first"
+                        : !selectedTime
+                        ? "Please select a time first"
+                        : "How long do you need?"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4">
@@ -832,9 +888,24 @@ export default function DateTimeSelection() {
                             "py-2 cursor-pointer h-10 sm:h-12 text-xs sm:text-sm",
                             duration === hours
                               ? "bg-[#B99733] hover:bg-[#B99733]/90 text-white"
-                              : "border-[#B99733]/20 hover:bg-[#B99733]/10 text-[#B99733]"
+                              : "border-[#B99733]/20 hover:bg-[#B99733]/10 text-[#B99733]",
+                            (!selectedDate || !selectedTime) &&
+                              "opacity-50 cursor-not-allowed"
                           )}
-                          onClick={() => setDuration(hours)}
+                          disabled={!selectedDate || !selectedTime}
+                          onClick={() => {
+                            setDuration(hours);
+                            console.log(
+                              "Date:",
+                              selectedDate
+                                ? format(selectedDate, "yyyy-MM-dd")
+                                : "none",
+                              "| Time:",
+                              selectedTime,
+                              "| Duration selected:",
+                              hours
+                            );
+                          }}
                         >
                           {hours}h
                         </Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import {
   HiOutlineMail,
@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { login, LoginRequestData, ErrorResponse } from "@/api";
 import { AxiosError } from "axios";
 import axios from "axios";
+import { setCookie, getCookie, deleteCookie } from "@/utils/cookies";
 
 const AdminLoginPage = () => {
   const [formData, setFormData] = useState<LoginRequestData>({
@@ -30,6 +31,21 @@ const AdminLoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // Check for saved credentials in cookies
+    const savedUsername = getCookie("admin_username");
+    const savedPassword = getCookie("admin_password");
+    const savedRememberMe = getCookie("admin_remember_me");
+
+    if (savedUsername && savedPassword && savedRememberMe === "true") {
+      setFormData({
+        username: savedUsername,
+        password: savedPassword,
+      });
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -61,6 +77,19 @@ const AdminLoginPage = () => {
         // Check user role
         if (response.user.role === "ADMN" || response.user.role === "SADMN") {
           toast.success("Welcome back, Administrator!");
+
+          // Handle remember me functionality
+          if (rememberMe) {
+            // Set cookies for 30 days
+            setCookie("admin_username", formData.username, 30);
+            setCookie("admin_password", formData.password, 30);
+            setCookie("admin_remember_me", "true", 30);
+          } else {
+            // Remove cookies if remember me is unchecked
+            deleteCookie("admin_username");
+            deleteCookie("admin_password");
+            deleteCookie("admin_remember_me");
+          }
 
           // Save to localStorage or sessionStorage if available
           const adminData = {

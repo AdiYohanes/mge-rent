@@ -3,20 +3,22 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getUserFromCookie, updateUserCookie } from "@/utils/cookieUtils";
-
-// Cookie names
-const USER_COOKIE = "auth_user";
+import { updateProfile } from "@/api/user/userApi";
+import { toast } from "sonner";
 
 interface UserData {
-  fullName?: string;
+  id: string;
+  name?: string;
   email?: string;
   username: string;
   phoneNumber?: string;
+  phone?: string;
+  role: "ADMN" | "SADMN" | "CUST";
   [key: string]: string | undefined;
 }
 
 export default function Profile() {
-  const [fullName, setFullName] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -30,30 +32,46 @@ export default function Profile() {
     const userData = getUserFromCookie();
     if (userData) {
       setUser(userData);
-      if (userData.fullName) setFullName(userData.fullName);
+      if (userData.name) setName(userData.name);
       if (userData.email) setEmail(userData.email);
       if (userData.username) setUsername(userData.username);
-      if (userData.phoneNumber) setPhoneNumber(userData.phoneNumber);
+      if (userData.phoneNumber || userData.phone)
+        setPhoneNumber(userData.phoneNumber || userData.phone || "");
     } else {
       router.push("/signin");
     }
   }, [router]);
 
-  const handleSavePersonalInfo = (e: React.FormEvent) => {
+  const handleSavePersonalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const updatedUser = {
-      ...user,
-      fullName,
-      email,
-      username,
-      phoneNumber,
-    };
+    try {
+      // Kirim data ke API
+      const response = await updateProfile({
+        name,
+        email,
+        username,
+        phone: phoneNumber,
+      });
 
-    // Update user cookie
-    updateUserCookie(updatedUser);
-    setUser(updatedUser);
-    alert("Personal information saved successfully!");
+      // Update cookie dengan data terbaru dari API
+      const updatedUser = {
+        ...user,
+        name: response.name,
+        email: response.email,
+        username: response.username,
+        phoneNumber: response.phone,
+      } as UserData;
+
+      // Update user cookie
+      updateUserCookie(updatedUser);
+      setUser(updatedUser);
+
+      toast.success("Profile berhasil diperbarui!");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Gagal memperbarui profile. Silakan coba lagi.");
+    }
   };
 
   const handleChangePassword = (e: React.FormEvent) => {
@@ -101,11 +119,11 @@ export default function Profile() {
 
         <form onSubmit={handleSavePersonalInfo}>
           <div className="mb-4">
-            <label className="block mb-1">Full Name*</label>
+            <label className="block mb-1">Name*</label>
             <input
               type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="w-full border border-gray-300 p-2"
               required
             />

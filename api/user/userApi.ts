@@ -67,6 +67,13 @@ export interface UpdateUserData {
   password?: string;
 }
 
+export interface UpdateProfileData {
+  name?: string;
+  email?: string;
+  username?: string;
+  phone?: string;
+}
+
 // Function to get all users with pagination, filtering and sorting
 export const getUsers = async (
   params: GetUsersParams = {}
@@ -229,4 +236,16 @@ export const updateUserStatus = async (
     status,
     _method: "POST",
   });
+};
+
+// Function to update user profile
+export const updateProfile = async (data: UpdateProfileData): Promise<User> => {
+  try {
+    const response = await post<User>(USER_ENDPOINTS.UPDATE_PROFILE, data);
+    console.log("Profile update response:", response);
+    return response;
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    throw error;
+  }
 };

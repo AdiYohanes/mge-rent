@@ -8,6 +8,7 @@ import FoodItemComponent from "@/components/restaurant/FoodItem";
 import { useRouter } from "next/navigation";
 import useRestaurantStore, { FoodItem } from "@/store/RestaurantStore";
 import { getPublicFnbs, mapFnbItemToFoodItem } from "@/api";
+import { useMounted } from "@/hooks/use-mounted";
 
 // Types
 // type FoodItem = { ... };
@@ -29,6 +30,7 @@ const containerVariants = {
 };
 
 export default function RestaurantPage() {
+  const mounted = useMounted();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState("All"); // Set initial category to "All"
   const [isBookingSummaryOpen, setIsBookingSummaryOpen] = useState(false);
@@ -126,7 +128,7 @@ export default function RestaurantPage() {
     if (cart.length === 0) return;
 
     // Only access localStorage on the client
-    if (typeof window !== "undefined") {
+    if (mounted) {
       localStorage.setItem("restaurantCart", JSON.stringify(cart));
       localStorage.setItem("restaurantTotal", totalPrice.toString());
     }

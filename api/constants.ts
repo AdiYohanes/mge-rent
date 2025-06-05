@@ -1,6 +1,6 @@
 // API Base URL
-export const API_BASE_URL = "http://mge.168.231.84.221.sslip.io/api";
-export const STORAGE_URL = "http://mge.168.231.84.221.sslip.io/storage";
+export const API_BASE_URL = "http://localhost:8000/api";
+export const STORAGE_URL = "http://localhost:8000/storage";
 
 // Image URLs
 export const IMAGE_URLS = {
@@ -26,6 +26,7 @@ export const USER_ENDPOINTS = {
   CREATE_USER: `${API_BASE_URL}/admin/user`,
   UPDATE_USER: (id: string) => `${API_BASE_URL}/admin/user/${id}`,
   DELETE_USER: (id: string) => `${API_BASE_URL}/admin/user/${id}`,
+  UPDATE_PROFILE: `${API_BASE_URL}/user/profile`,
 };
 
 // Console endpoints

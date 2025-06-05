@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { X, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useMounted } from "@/hooks/use-mounted";
 
 // Types
 type CartItem = {
@@ -17,6 +18,7 @@ type CartItem = {
 };
 
 export default function RestaurantInvoicePage() {
+  const mounted = useMounted();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
   const [promoCode, setPromoCode] = useState("");
@@ -34,6 +36,8 @@ export default function RestaurantInvoicePage() {
   const [agreeToTerms, setAgreeToTerms] = useState(false);
 
   useEffect(() => {
+    if (!mounted) return;
+
     // Get cart from localStorage
     const cartData = localStorage.getItem("restaurantCart");
     const totalData = localStorage.getItem("restaurantTotal");
@@ -45,7 +49,7 @@ export default function RestaurantInvoicePage() {
     if (totalData) {
       setTotalPrice(Number(totalData));
     }
-  }, []);
+  }, [mounted]);
 
   const handleApplyPromo = () => {
     setPromoError("");

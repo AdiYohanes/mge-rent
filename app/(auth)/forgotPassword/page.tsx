@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import AuthLayout from "../layout";
 import Link from "next/link";
+import { forgotPassword } from "@/api/auth/authApi";
+import { AxiosError } from "axios";
 
 const ForgotPassword = () => {
   const router = useRouter();
@@ -28,20 +30,28 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await forgotPassword({ email });
 
-      // Show toast indicating the email was sent
+      // Show success message
       toast.success(
-        "Password reset link has been sent to your email. Please check your inbox."
+        response.message ||
+          "Password reset link has been sent to your email. Please check your inbox."
       );
 
-      // Redirect to login after 3 seconds to give time to check the toast message
+      // Redirect to login after 3 seconds
       setTimeout(() => {
-        router.push("/auth/signin");
+        router.push("/signin");
       }, 3000);
     } catch (error) {
-      toast.error("An error occurred. Please try again.");
+      console.error("Forgot password error:", error);
+
+      let errorMessage = "An error occurred. Please try again.";
+
+      if (error instanceof AxiosError && error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

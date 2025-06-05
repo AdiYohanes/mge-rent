@@ -1,13 +1,18 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useMounted } from "@/hooks/use-mounted";
 
 const Pricelist = () => {
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const mounted = useMounted();
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   useEffect(() => {
+    if (!mounted) return;
+
+    setCurrentTime(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [mounted]);
 
   const packages = [
     { name: "REGULER 1 (PS 4)", price: "10K" },
@@ -48,16 +53,13 @@ const Pricelist = () => {
             </h2>
           </div>
           <div className="inline-block bg-[#edc531] text-[#1B1010] px-6 py-2 font-minecraft border-2 border-[#1B1010] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
-            {currentTime.toLocaleTimeString("id-ID")}
+            {currentTime?.toLocaleTimeString("id-ID")}
           </div>
         </div>
 
         {/* Decorative elements */}
         <div className="absolute top-1 right-1 bg-yellow-400 text-purple-900 px-2 py-1 rounded-none text-sm font-bold shadow-lg">
           MAKE GOOD ENOUGH
-        </div>
-        <div className="absolute bottom-4 left-4 bg-cyan-400 text-purple-900 px-4 py-2 rounded-lg text-sm font-bold shadow-lg">
-          PLAY HARD
         </div>
       </div>
 

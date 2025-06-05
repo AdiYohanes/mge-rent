@@ -4,6 +4,17 @@ import Cookies from "js-cookie";
 export const TOKEN_COOKIE = "auth_token";
 export const USER_COOKIE = "auth_user";
 
+// User data interface
+export interface UserData {
+  id: string;
+  username: string;
+  role: "ADMN" | "SADMN" | "CUST";
+  email?: string;
+  name?: string;
+  phoneNumber?: string;
+  phone?: string;
+}
+
 // Detect if we're running on HTTPS
 const isHttps =
   typeof window !== "undefined" && window.location.protocol === "https:";
@@ -44,7 +55,7 @@ export const AUTH_COOKIE_OPTIONS = {
 /**
  * Set authentication cookies
  */
-export const setAuthCookies = (token: string, userData: any) => {
+export const setAuthCookies = (token: string, userData: UserData) => {
   try {
     // For secure flag to work with sameSite=none in cross-domain scenarios
     const options = {
@@ -56,15 +67,29 @@ export const setAuthCookies = (token: string, userData: any) => {
           : AUTH_COOKIE_OPTIONS.secure,
     };
 
-    Cookies.set(USER_COOKIE, JSON.stringify(userData), options);
+    // Pastikan semua data user tersimpan
+    const userDataToStore = {
+      ...userData,
+      name: userData.name || userData.username,
+      phoneNumber: userData.phoneNumber || userData.phone,
+    };
+
+    Cookies.set(USER_COOKIE, JSON.stringify(userDataToStore), options);
     Cookies.set(TOKEN_COOKIE, token, options);
 
     console.log("Auth cookies set successfully:", {
       token: token ? token.substring(0, 5) + "..." : "NO TOKEN",
-      user: userData ? userData.username : "NO USER DATA",
+      user: userDataToStore
+        ? {
+            username: userDataToStore.username,
+            name: userDataToStore.name,
+            email: userDataToStore.email,
+            phoneNumber: userDataToStore.phoneNumber,
+          }
+        : "NO USER DATA",
       options: JSON.stringify({
         ...options,
-        domain: options.domain || "default (full hostname)", // Tampilkan dengan lebih jelas
+        domain: options.domain || "default (full hostname)",
       }),
       protocol:
         typeof window !== "undefined" ? window.location.protocol : "N/A",
@@ -126,7 +151,7 @@ export const isAuthenticated = () => {
 /**
  * Update user data in cookie
  */
-export const updateUserCookie = (userData: any) => {
+export const updateUserCookie = (userData: UserData) => {
   try {
     Cookies.set(USER_COOKIE, JSON.stringify(userData), AUTH_COOKIE_OPTIONS);
     console.log("User cookie updated successfully");

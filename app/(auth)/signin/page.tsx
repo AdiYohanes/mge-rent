@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import Link from "next/link";
 import { login, LoginRequestData, ErrorResponse } from "@/api";
 import { AxiosError } from "axios";
 import axios from "axios";
+import { setCookie, getCookie, deleteCookie } from "@/utils/cookies";
 
 const Login = () => {
   const [formData, setFormData] = useState<LoginRequestData>({
@@ -21,14 +22,34 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
 
+  // Check for saved credentials on component mount
+  useEffect(() => {
+    const savedUsername = getCookie("remembered_username");
+    const savedPassword = getCookie("remembered_password");
+    const remembered = getCookie("remember_me");
+
+    if (savedUsername && savedPassword && remembered === "true") {
+      setFormData({
+        username: savedUsername,
+        password: savedPassword,
+      });
+      setRememberMe(true);
+    }
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    const { name, value, type, checked } = e.target;
+    if (type === "checkbox") {
+      setRememberMe(checked);
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
   };
 
   const toggleShowPassword = () => {
@@ -49,6 +70,19 @@ const Login = () => {
       const response = await login(formData);
 
       if (response) {
+        // Handle Remember Me
+        if (rememberMe) {
+          // Set cookies for 30 days
+          setCookie("remembered_username", formData.username, 30);
+          setCookie("remembered_password", formData.password, 30);
+          setCookie("remember_me", "true", 30);
+        } else {
+          // Remove cookies if Remember Me is unchecked
+          deleteCookie("remembered_username");
+          deleteCookie("remembered_password");
+          deleteCookie("remember_me");
+        }
+
         // Check if user has admin role, redirect to admin page if true
         if (response.user.role === "ADMN" || response.user.role === "SADMN") {
           toast.info("Please use the admin login page.");
@@ -104,19 +138,19 @@ const Login = () => {
   };
 
   return (
-    <div className="w-full min-h-screen flex items-start sm:items-center justify-center py-2 px-4 overflow-y-auto pt-6 sm:pt-2">
-      <div className="w-full max-w-[90%] xs:max-w-[85%] sm:max-w-sm md:max-w-md mt-4 sm:my-4">
-        <div className="bg-white border border-[#1B1010] shadow-lg p-3 sm:p-6 md:p-8 scale-[0.90] sm:scale-100">
-          <h2 className="text-center text-lg sm:text-2xl md:text-3xl font-minecraft text-[#b99733] mb-2 sm:mb-6">
+    <div className="w-full min-h-screen flex items-start justify-center py-2 px-4 overflow-y-auto">
+      <div className="w-full max-w-[85%] xs:max-w-[75%] sm:max-w-[400px] mt-4">
+        <div className="bg-white border border-[#1B1010] shadow-lg p-4 sm:p-5">
+          <h2 className="text-center text-base sm:text-xl font-minecraft text-[#b99733] mb-3">
             Login
           </h2>
 
-          <form className="space-y-3 sm:space-y-5" onSubmit={handleSubmit}>
+          <form className="space-y-2 sm:space-y-3" onSubmit={handleSubmit}>
             {/* Username Input */}
-            <div className="space-y-1 sm:space-y-2">
+            <div className="space-y-1">
               <Label
                 htmlFor="username"
-                className="text-xs sm:text-sm md:text-base text-gray-700"
+                className="text-xs sm:text-sm text-gray-700"
               >
                 Username
               </Label>
@@ -127,16 +161,16 @@ const Login = () => {
                 required
                 value={formData.username}
                 onChange={handleChange}
-                className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-3 border border-gray-300 placeholder-gray-400 text-gray-900 focus:ring-amber-500 focus:border-amber-500 rounded-none text-sm"
+                className="w-full px-2 py-1 sm:px-3 sm:py-2 border border-gray-300 placeholder-gray-400 text-gray-900 focus:ring-amber-500 focus:border-amber-500 rounded-none text-xs sm:text-sm"
                 placeholder="Enter your username"
               />
             </div>
 
             {/* Password Input */}
-            <div className="space-y-1 sm:space-y-2">
+            <div className="space-y-1">
               <Label
                 htmlFor="password"
-                className="text-xs sm:text-sm md:text-base text-gray-700"
+                className="text-xs sm:text-sm text-gray-700"
               >
                 Password
               </Label>
@@ -148,7 +182,7 @@ const Login = () => {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-3 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none focus:ring-amber-500 focus:border-amber-500 text-sm"
+                  className="w-full px-2 py-1 sm:px-3 sm:py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none focus:ring-amber-500 focus:border-amber-500 text-xs sm:text-sm"
                   placeholder="Enter your password"
                 />
                 <button
@@ -157,9 +191,9 @@ const Login = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 focus:outline-none"
                 >
                   {showPassword ? (
-                    <FaEyeSlash size={14} className="sm:text-base" />
+                    <FaEyeSlash size={12} className="sm:text-sm" />
                   ) : (
-                    <FaEye size={14} className="sm:text-base" />
+                    <FaEye size={12} className="sm:text-sm" />
                   )}
                 </button>
               </div>
@@ -172,19 +206,21 @@ const Login = () => {
                   id="remember-me"
                   name="rememberMe"
                   type="checkbox"
-                  className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-amber-600 focus:ring-amber-500 border-gray-300 rounded cursor-pointer"
+                  checked={rememberMe}
+                  onChange={handleChange}
+                  className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded cursor-pointer"
                 />
                 <label
                   htmlFor="remember-me"
-                  className="ml-1 sm:ml-2 text-[10px] sm:text-xs md:text-sm text-gray-900"
+                  className="ml-1 sm:ml-2 text-[10px] sm:text-xs text-gray-900"
                 >
                   Remember me
                 </label>
               </div>
               <div>
                 <Link
-                  href="/auth/forgotPassword"
-                  className="text-[10px] sm:text-xs md:text-sm font-medium text-[#b99733] hover:text-[#967515] transition-colors duration-300"
+                  href="/forgotPassword"
+                  className="text-[10px] sm:text-xs font-medium text-[#b99733] hover:text-[#967515] transition-colors duration-300"
                 >
                   Forgot password?
                 </Link>
@@ -195,40 +231,38 @@ const Login = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full py-1 sm:py-2 md:py-3 px-2 sm:px-4 md:px-6 text-xs sm:text-sm md:text-base font-semibold text-white bg-linear-to-r from-[#967515] to-[#c8a84b] hover:from-[#866714] hover:to-[#b7973a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#967515] transition-all duration-300 rounded-none"
+              className="w-full py-1 sm:py-2 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-white bg-linear-to-r from-[#967515] to-[#c8a84b] hover:from-[#866714] hover:to-[#b7973a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#967515] transition-all duration-300 rounded-none"
             >
               {loading ? "Logging in..." : "Log in"}
             </Button>
 
             {/* Divider */}
-            <div className="relative my-2 sm:my-4 md:my-6">
+            <div className="relative my-2 sm:my-3">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300"></div>
               </div>
-              <div className="relative flex justify-center text-[10px] sm:text-xs md:text-sm">
-                <span className="px-2 sm:px-3 md:px-4 bg-white text-[#b99733]">
-                  or
-                </span>
+              <div className="relative flex justify-center text-[10px] sm:text-xs">
+                <span className="px-2 sm:px-3 bg-white text-[#b99733]">or</span>
               </div>
             </div>
 
             {/* Google Sign In */}
             <Button
               type="button"
-              className="w-full flex justify-center items-center px-2 sm:px-4 md:px-6 py-1 sm:py-2 md:py-3 border border-gray-300 shadow-sm bg-white text-xs sm:text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-all duration-300 rounded-none"
+              className="w-full flex justify-center items-center px-2 sm:px-4 py-1 sm:py-2 border border-gray-300 shadow-sm bg-white text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all duration-300 rounded-none"
             >
               <Image
-                className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2 md:mr-3"
+                className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2"
                 src="https://www.svgrepo.com/show/475656/google-color.svg"
                 alt="Google logo"
-                width={20}
-                height={20}
+                width={16}
+                height={16}
               />
               Sign in with Google
             </Button>
 
             {/* Register Link */}
-            <div className="text-center text-[10px] sm:text-xs md:text-sm mt-2 sm:mt-4 md:mt-6">
+            <div className="text-center text-[10px] sm:text-xs mt-2 sm:mt-3">
               <span className="text-gray-600">
                 Don&apos;t have an account yet?{" "}
               </span>
@@ -237,17 +271,6 @@ const Login = () => {
                 className="text-[#b99733] underline hover:text-[#967515] transition-colors duration-300"
               >
                 Register
-              </Link>
-            </div>
-
-            {/* Admin Link */}
-            <div className="text-center text-[10px] sm:text-xs md:text-sm">
-              <span className="text-gray-600">Admin user? </span>
-              <Link
-                href="/admin"
-                className="text-[#b99733] underline hover:text-[#967515] transition-colors duration-300"
-              >
-                Admin login
               </Link>
             </div>
           </form>

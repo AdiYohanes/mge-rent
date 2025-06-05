@@ -16,6 +16,7 @@ export interface AuthResponse {
     role: "ADMN" | "SADMN" | "CUST";
     email?: string;
     name?: string;
+    phoneNumber?: string;
   };
 }
 
@@ -49,6 +50,14 @@ export interface ErrorResponse {
   message?: string;
   errors?: Record<string, string[]>;
   [key: string]: unknown;
+}
+
+export interface ForgotPasswordRequestData {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
 }
 
 // Login function
@@ -209,4 +218,14 @@ export const getAuthHeader = ():
   console.log(`Auth header created with token: ${tokenPreview}`);
 
   return { Authorization: `Bearer ${token}` };
+};
+
+// Forgot password function
+export const forgotPassword = async (
+  data: ForgotPasswordRequestData
+): Promise<ForgotPasswordResponse> => {
+  return await post<ForgotPasswordResponse>(
+    AUTH_ENDPOINTS.FORGOT_PASSWORD,
+    data
+  );
 };
