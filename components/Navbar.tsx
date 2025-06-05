@@ -6,7 +6,7 @@ import Image from "next/image";
 import { HiMenuAlt3 } from "react-icons/hi";
 import { RiCloseFill } from "react-icons/ri";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useMounted } from "@/hooks/use-mounted";
 import { getUserFromCookie, clearAuthCookies } from "@/utils/cookieUtils";
 
@@ -15,6 +15,7 @@ export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const mounted = useMounted();
 
@@ -54,6 +55,38 @@ export default function Navbar() {
     router.push("/signin");
   };
 
+  const isActive = (path: string) => {
+    // Remove trailing slash from pathname for consistent comparison
+    const cleanPathname = pathname.replace(/\/$/, "");
+    const cleanPath = path.replace(/\/$/, "");
+
+    // For home page
+    if (cleanPath === "") {
+      return cleanPathname === "";
+    }
+
+    // For other pages
+    return (
+      cleanPathname === cleanPath || cleanPathname.startsWith(`${cleanPath}/`)
+    );
+  };
+
+  const navLinkClass = (path: string) => {
+    return `block transition-colors duration-200 ${
+      isActive(path)
+        ? "text-[#B99733] font-semibold"
+        : "text-black hover:text-[#B99733]"
+    }`;
+  };
+
+  const mobileNavLinkClass = (path: string) => {
+    return `block px-4 py-2 transition-colors duration-200 cursor-pointer ${
+      isActive(path)
+        ? "text-[#B99733] bg-gray-100 font-semibold"
+        : "text-black hover:bg-gray-100 hover:text-[#B99733]"
+    }`;
+  };
+
   // Render a stripped-down version until mounted to prevent hydration mismatch
   if (!mounted) {
     return (
@@ -88,22 +121,16 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden md:flex space-x-6">
-          <Link href="/" className="block text-black hover:text-[#B99733]">
+          <Link href="/" className={navLinkClass("/")}>
             MGE Rental
           </Link>
-          <Link
-            href="/booking"
-            className="block text-black hover:text-[#B99733]"
-          >
+          <Link href="/booking" className={navLinkClass("/booking")}>
             Rent
           </Link>
-          <Link
-            href="/restaurant"
-            className="block text-black hover:text-[#B99733]"
-          >
+          <Link href="/restaurant" className={navLinkClass("/restaurant")}>
             Food & Drinks
           </Link>
-          <Link href="/faq" className="block text-black hover:text-[#B99733]">
+          <Link href="/faq" className={navLinkClass("/faq")}>
             FAQ
           </Link>
         </div>
@@ -123,28 +150,19 @@ export default function Navbar() {
 
         {isMenuOpen && (
           <div className="md:hidden absolute top-16 left-0 right-0 bg-white shadow-md p-4 space-y-4 z-20">
-            <Link
-              href="/"
-              className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
-            >
+            <Link href="/" className={mobileNavLinkClass("/")}>
               MGE Rental
             </Link>
-            <Link
-              href="/booking"
-              className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
-            >
+            <Link href="/booking" className={mobileNavLinkClass("/booking")}>
               Rent
             </Link>
             <Link
               href="/restaurant"
-              className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
+              className={mobileNavLinkClass("/restaurant")}
             >
               Food & Drinks
             </Link>
-            <Link
-              href="/faq"
-              className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer"
-            >
+            <Link href="/faq" className={mobileNavLinkClass("/faq")}>
               FAQ
             </Link>
             {user && (

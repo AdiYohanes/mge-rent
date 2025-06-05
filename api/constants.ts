@@ -113,7 +113,7 @@ export const BOOKING_ENDPOINTS = {
 
 // Public endpoints for customer-facing features
 export const PUBLIC_ENDPOINTS = {
-  GET_FAQS: `${API_BASE_URL}/customer/faq`,
+  GET_FAQS: `${API_BASE_URL}/dashboard/faq`,
 };
 
 // API Endpoints grouped by feature

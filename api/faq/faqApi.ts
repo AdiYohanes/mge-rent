@@ -1,4 +1,4 @@
-import { get, del, post } from "../apiUtils";
+import { get, del } from "../apiUtils";
 import { FAQ_ENDPOINTS, PUBLIC_ENDPOINTS } from "../constants";
 
 // Types
