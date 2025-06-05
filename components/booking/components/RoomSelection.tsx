@@ -19,7 +19,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Gamepad2, Check, Loader2, AlertCircle } from "lucide-react";
 import { useMounted } from "@/hooks/use-mounted";
-import useBookingItemStore from "@/store/BookingItemStore";
+import useBookingItemStore, { Game } from "@/store/BookingItemStore";
 import { RoomItem, getRoomsForDisplay } from "@/api/room/publicRoomApi";
 import { UnitItem, getUnitsForDisplay } from "@/api/booking/unitPublicApi";
 import { PublicGame, publicGameList } from "@/api/game/gameApi";
@@ -60,8 +60,11 @@ const RoomSelection: React.FC = () => {
   const [gamesError, setGamesError] = useState<string | null>(null);
 
   const { selectedRoom, setSelectedRoom } = useBookingItemStore();
-  const { selectedUnitName: selectedUnit, setSelectedUnitName } =
-    useBookingItemStore();
+  const {
+    selectedUnitName: selectedUnit,
+    setSelectedUnitName,
+    setSelectedUnitId,
+  } = useBookingItemStore();
   const { selectedGame, setSelectedGame } = useBookingItemStore();
   const { selectedConsole } = useBookingItemStore();
   const [availableUnits, setAvailableUnits] = useState<UnitItem[]>([]);
@@ -262,8 +265,35 @@ const RoomSelection: React.FC = () => {
 
   // Handle unit selection
   const handleUnitChange = (value: string) => {
+    console.log("=== Unit Selection Debug ===");
+    console.log("Selected Unit Value:", value);
+
+    // Find the selected unit object from availableUnits
+    const selectedUnitObj = availableUnits.find((unit) => unit.name === value);
+    console.log("Selected Unit Object:", selectedUnitObj);
+    console.log("Selected Unit ID:", selectedUnitObj?.id);
+
+    // Log current store state before update
+    console.log("Store State Before Update:", {
+      selectedUnitName: useBookingItemStore.getState().selectedUnitName,
+      selectedUnitId: useBookingItemStore.getState().selectedUnitId,
+      selectedRoom: useBookingItemStore.getState().selectedRoom,
+      selectedConsole: useBookingItemStore.getState().selectedConsole,
+    });
+
+    // Update store with both name and ID
     setSelectedUnitName(value);
-    console.log("Unit selected:", value);
+    setSelectedUnitId(selectedUnitObj?.id || null);
+
+    // Log store state after update
+    console.log("Store State After Update:", {
+      selectedUnitName: useBookingItemStore.getState().selectedUnitName,
+      selectedUnitId: useBookingItemStore.getState().selectedUnitId,
+      selectedRoom: useBookingItemStore.getState().selectedRoom,
+      selectedConsole: useBookingItemStore.getState().selectedConsole,
+    });
+
+    console.log("=== End Unit Selection Debug ===");
   };
 
   // Handle game selection
@@ -272,7 +302,17 @@ const RoomSelection: React.FC = () => {
       setSelectedGame(null);
       console.log("Game deselected:", game.name);
     } else {
-      setSelectedGame(game);
+      // Convert PublicGame to Game type
+      const gameForStore: Game = {
+        id: game.id,
+        name: game.name,
+        unit: game.unit,
+        available: game.available,
+        image: game.image || "/placeholder.svg",
+        description: game.description || "No description available",
+      };
+
+      setSelectedGame(gameForStore);
       console.log(
         "Game selected:",
         game.name,

@@ -33,15 +33,6 @@ interface BookingSummaryProps {
   selectedDate?: Date;
 }
 
-// Define types for console unit selection
-type ConsoleUnitType = "A" | "B" | "C" | "D" | "E" | "F";
-
-interface UnitOption {
-  id: string;
-  label: string;
-  status: "available" | "occupied" | "maintenance";
-}
-
 // Define type for promo codes
 type PromoCodeKey = "DISCOUNT10" | "DISCOUNT20" | "DISCOUNT30";
 
@@ -80,9 +71,6 @@ export default function BookingSummary({
     "idle"
   );
   const [promoMessage, setPromoMessage] = useState("");
-  const [selectedConsoleUnit, setSelectedConsoleUnit] =
-    useState<ConsoleUnitType | null>(null);
-  const [showConsoleUnitSelector, setShowConsoleUnitSelector] = useState(false);
 
   // Check if summary is empty (no selections made)
   const hasConsole = Boolean(selectedConsole);
@@ -114,15 +102,12 @@ export default function BookingSummary({
     isOpen,
   ]);
 
-  // Console unit options
-  const consoleUnits: UnitOption[] = [
-    { id: "A", label: "PS4 - Unit A", status: "available" },
-    { id: "B", label: "PS4 - Unit B", status: "occupied" },
-    { id: "C", label: "PS4 - Unit C", status: "available" },
-    { id: "D", label: "PS4 - Unit D", status: "maintenance" },
-    { id: "E", label: "PS4 - Unit E", status: "available" },
-    { id: "F", label: "Xbox - Unit F", status: "available" },
-  ];
+  // Tambahkan validasi untuk memastikan unit dipilih
+  useEffect(() => {
+    if (selectedRoom && !selectedUnitName) {
+      console.warn("Room dipilih tapi unit belum dipilih");
+    }
+  }, [selectedRoom, selectedUnitName]);
 
   // Helper function to parse console price string (e.g., "18k") into a number
   const parseConsolePrice = (priceStr: string | undefined): number => {
@@ -138,31 +123,24 @@ export default function BookingSummary({
     {
       type: "Console",
       description: selectedConsole
-        ? `${selectedConsole.name}${
-            selectedConsoleUnit ? ` ( ${selectedConsoleUnit})` : ""
-          }`
-        : `No console selected${
-            selectedConsoleUnit ? ` ( ${selectedConsoleUnit})` : ""
-          }`,
+        ? `${selectedConsole.name}`
+        : "No console selected",
       quantity: 1,
       total: selectedConsole ? parseConsolePrice(selectedConsole.price) : 0,
       icon: <Gamepad2 size={16} className="text-indigo-500" />,
-      hasUnitSelection: true,
-      unitType: "console",
+      hasUnitSelection: false,
     },
     {
       type: "Room Type",
       description: selectedRoom
         ? `${selectedRoom.category}${
-            selectedUnitName ? ` ( ${selectedUnitName})` : ""
+            selectedUnitName ? ` - ${selectedUnitName}` : " (Pilih unit)"
           }`
-        : `No room selected${
-            selectedUnitName ? ` ( ${selectedUnitName})` : ""
-          }`,
+        : "No room selected",
       quantity: 1,
       total: selectedRoom ? selectedRoom.price : 0,
       icon: <Home size={16} className="text-emerald-500" />,
-      hasUnitSelection: false, // This refers to the console's specific unit selector, not the room's unit
+      hasUnitSelection: false,
     },
     // Only include duration when a time has been selected
     ...(selectedTime
@@ -236,21 +214,6 @@ export default function BookingSummary({
     if (e.key === "Enter") {
       handleApplyPromoCode();
     }
-  };
-
-  // Handle unit selection
-  const handleUnitSelection = (unitId: string) => {
-    setSelectedConsoleUnit(unitId as ConsoleUnitType);
-    setShowConsoleUnitSelector(false);
-
-    // Highlight total effect after unit selection
-    setHighlightTotal(true);
-    setTimeout(() => setHighlightTotal(false), 1500);
-  };
-
-  // Toggle unit selectors
-  const toggleConsoleUnitSelector = () => {
-    setShowConsoleUnitSelector(!showConsoleUnitSelector);
   };
 
   // If selectedDate is not provided, use a mock date
@@ -369,42 +332,6 @@ export default function BookingSummary({
                               <div className="flex items-center gap-2">
                                 {item.description}
                               </div>
-
-                              {/* Console Unit Selector */}
-                              {item.hasUnitSelection &&
-                                showConsoleUnitSelector && (
-                                  <div className="mt-2 bg-white border border-gray-200 rounded-md shadow-sm p-2 max-h-[200px] overflow-y-auto grid grid-cols-3 gap-1">
-                                    {consoleUnits.map((unit) => (
-                                      <button
-                                        key={unit.id}
-                                        onClick={() =>
-                                          handleUnitSelection(unit.id)
-                                        }
-                                        disabled={unit.status !== "available"}
-                                        className={`text-xs py-1 px-2 rounded flex items-center justify-between ${
-                                          unit.status === "available"
-                                            ? "hover:bg-indigo-50 cursor-pointer"
-                                            : "opacity-50 cursor-not-allowed bg-gray-100"
-                                        } ${
-                                          selectedConsoleUnit === unit.id
-                                            ? "bg-indigo-100 border border-indigo-300"
-                                            : ""
-                                        }`}
-                                      >
-                                        <span>{unit.label}</span>
-                                        <span
-                                          className={`ml-1 h-2 w-2 rounded-full ${
-                                            unit.status === "available"
-                                              ? "bg-green-500"
-                                              : unit.status === "occupied"
-                                              ? "bg-red-500"
-                                              : "bg-amber-500"
-                                          }`}
-                                        ></span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
                             </TableCell>
                             <TableCell className="py-3 text-center">
                               {item.quantity}
@@ -520,55 +447,6 @@ export default function BookingSummary({
                           <div>{item.description}</div>
                           <div>Qty: {item.quantity}</div>
                         </div>
-
-                        {/* Mobile Unit Selection */}
-                        {item.hasUnitSelection && (
-                          <div className="mt-1">
-                            <Button
-                              onClick={() => toggleConsoleUnitSelector()}
-                              variant="outline"
-                              size="sm"
-                              className="w-full h-7 text-xs bg-indigo-50 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300"
-                            >
-                              {selectedConsoleUnit
-                                ? `Console Unit: ${selectedConsoleUnit}`
-                                : "Select Console Unit"}
-                            </Button>
-
-                            {/* Mobile Console Unit Selector */}
-                            {showConsoleUnitSelector && (
-                              <div className="mt-2 bg-white border border-gray-200 rounded-md shadow-sm p-2 max-h-[150px] overflow-y-auto grid grid-cols-2 gap-1">
-                                {consoleUnits.map((unit) => (
-                                  <button
-                                    key={unit.id}
-                                    onClick={() => handleUnitSelection(unit.id)}
-                                    disabled={unit.status !== "available"}
-                                    className={`text-xs py-1 px-2 rounded flex items-center justify-between ${
-                                      unit.status === "available"
-                                        ? "hover:bg-indigo-50 cursor-pointer"
-                                        : "opacity-50 cursor-not-allowed bg-gray-100"
-                                    } ${
-                                      selectedConsoleUnit === unit.id
-                                        ? "bg-indigo-100 border border-indigo-300"
-                                        : ""
-                                    }`}
-                                  >
-                                    <span>{unit.label}</span>
-                                    <span
-                                      className={`ml-1 h-2 w-2 rounded-full ${
-                                        unit.status === "available"
-                                          ? "bg-green-500"
-                                          : unit.status === "occupied"
-                                          ? "bg-red-500"
-                                          : "bg-amber-500"
-                                      }`}
-                                    ></span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     ))}
 

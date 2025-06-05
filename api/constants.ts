@@ -104,6 +104,7 @@ export const BOOKING_ENDPOINTS = {
   GET_ALL: `${API_BASE_URL}/admin/bookings`,
   GET_ONE: (id: string) => `${API_BASE_URL}/admin/bookings/${id}`,
   CREATE_BOOKING: `${API_BASE_URL}/admin/bookings`,
+  CREATE_CUSTOMER_BOOKING: `${API_BASE_URL}/booking/book-room`,
   UPDATE_BOOKING: (id: string) => `${API_BASE_URL}/admin/bookings/${id}`,
   DELETE_BOOKING: (id: string) => `${API_BASE_URL}/admin/bookings/${id}`,
   APPROVE_BOOKING: (id: string) =>

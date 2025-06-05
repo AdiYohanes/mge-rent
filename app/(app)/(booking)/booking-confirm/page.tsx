@@ -13,13 +13,42 @@ import { useMounted } from "@/hooks/use-mounted";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { getUserFromCookie } from "@/utils/cookieUtils";
+import useBookingItemStore from "@/store/BookingItemStore";
+import { post } from "@/api/apiUtils";
+import { BOOKING_ENDPOINTS } from "@/api/constants";
+import { useRouter } from "next/navigation";
+
+// Define types for the API response
+interface PaymentDetails {
+  qr_code?: string;
+  bank_accounts?: Array<{
+    bank_name: string;
+    account_number: string;
+    account_name: string;
+  }>;
+}
+
+interface BookingResponse {
+  status: string;
+  message: string;
+  data: {
+    id: number;
+    booking_number: string;
+    payment_details?: PaymentDetails;
+  };
+}
 
 // Define a type for the user data we expect from the cookie
 interface UserData {
+  id: string;
+  name?: string;
+  email?: string;
   username: string;
-  email?: string; // Optional, adjust based on your actual user object
-  phone?: string; // Optional
-  // Add other relevant fields
+  phoneNumber?: string;
+  phone?: string;
+  role: "ADMN" | "SADMN" | "CUST";
+  [key: string]: string | undefined;
 }
 
 interface BookingConfirmCompProps {
@@ -38,32 +67,23 @@ const BookingConfirmComponent = ({
   const [isPersonalInfoValid, setIsPersonalInfoValid] = useState(false);
   const [useAccountInfo, setUseAccountInfo] = useState(false);
   const mounted = useMounted();
+  const router = useRouter();
 
-  // Helper function to get a cookie by name (can be moved to a utils file)
-  const getCookie = (name: string): string | null => {
-    if (typeof document === "undefined") return null; // Guard for SSR
-    const nameEQ = name + "=";
-    const ca = document.cookie.split(";");
-    for (let i = 0; i < ca.length; i++) {
-      let c = ca[i];
-      while (c.charAt(0) === " ") c = c.substring(1, c.length);
-      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-    }
-    return null;
-  };
-
+  // Get user data from cookies
   useEffect(() => {
     if (mounted) {
-      const userCookie = getCookie("loggedInUser");
-      if (userCookie) {
-        try {
-          const parsedUser: UserData = JSON.parse(userCookie);
-          setLoggedInUser(parsedUser);
-          // If user data is present, consider auto-checking the box and pre-validating if applicable
-          // For now, we'll let the user explicitly check the box.
-        } catch (e) {
-          console.error("Error parsing user cookie:", e);
-          setLoggedInUser(null);
+      const userData = getUserFromCookie();
+      if (userData) {
+        setLoggedInUser(userData);
+
+        // If user has complete information, auto-check the box
+        if (
+          userData.email &&
+          (userData.phoneNumber || userData.phone) &&
+          userData.name
+        ) {
+          setUseAccountInfo(true);
+          setIsPersonalInfoValid(true);
         }
       }
     }
@@ -72,39 +92,154 @@ const BookingConfirmComponent = ({
   const handleUseAccountInfoChange = (checked: boolean) => {
     if (checked) {
       if (loggedInUser) {
-        setUseAccountInfo(true);
-        // Optionally, if PersonalInfo could be immediately validated with loggedInUser data:
-        // checkIfUserDataIsValid(loggedInUser); // You would need a function like this
+        // Check if user has all required information
+        if (
+          loggedInUser.email &&
+          (loggedInUser.phoneNumber || loggedInUser.phone) &&
+          loggedInUser.name
+        ) {
+          setUseAccountInfo(true);
+          setIsPersonalInfoValid(true);
+        } else {
+          toast.error(
+            "Your account information is incomplete. Please update your profile first."
+          );
+          setUseAccountInfo(false);
+        }
       } else {
         toast.error("Please log in to use your saved information.");
-        setUseAccountInfo(false); // Keep it unchecked or uncheck it
+        setUseAccountInfo(false);
       }
     } else {
       setUseAccountInfo(false);
-      // When unchecked, PersonalInfo might need to be cleared or re-validated as empty
-      // setIsPersonalInfoValid(false); // Or let PersonalInfo handle its own validity when data is cleared
+      setIsPersonalInfoValid(false);
     }
   };
 
-  const handlePaymentClick = () => {
-    setShowConfirmModal(true);
+  const handlePaymentClick = async () => {
+    try {
+      setIsSubmitting(true);
+
+      // Validate required data
+      if (!useBookingItemStore.getState().selectedRoom?.id) {
+        toast.error("Please select a room first");
+        return;
+      }
+
+      // Set default game if none selected
+      const selectedGame = useBookingItemStore.getState().selectedGame;
+      if (!selectedGame?.id) {
+        // Create a default game object
+        const defaultGame = {
+          id: 1, // Default game ID
+          name: "Default Game",
+          unit: useBookingItemStore.getState().selectedUnitName || "Unit A",
+          available: true,
+          image: "/placeholder.svg",
+          description: "Default game for booking",
+        };
+        useBookingItemStore.getState().setSelectedGame(defaultGame);
+      }
+
+      if (!useBookingItemStore.getState().selectedDate) {
+        toast.error("Please select a date first");
+        return;
+      }
+
+      if (!useBookingItemStore.getState().selectedTime) {
+        toast.error("Please select a time first");
+        return;
+      }
+
+      if (!useBookingItemStore.getState().duration) {
+        toast.error("Please select a duration first");
+        return;
+      }
+
+      // Validate customer data
+      if (!useAccountInfo || !loggedInUser) {
+        toast.error("Please fill in your personal information");
+        return;
+      }
+
+      // Get booking summary data from store
+      const bookingData = {
+        unit_id: useBookingItemStore.getState().selectedUnitId!,
+        game_id: useBookingItemStore.getState().selectedGame!.id,
+        booking_date: useBookingItemStore
+          .getState()
+          .selectedDate!.toISOString()
+          .split("T")[0],
+        start_time: useBookingItemStore.getState().selectedTime,
+        duration: useBookingItemStore.getState().duration,
+        customer_data: {
+          firstname: loggedInUser.name?.split(" ")[0] || "",
+          lastname: loggedInUser.name?.split(" ").slice(1).join(" ") || "",
+          email: loggedInUser.email || "",
+          phone: loggedInUser.phoneNumber || loggedInUser.phone || "",
+        },
+        payment_method_id: paymentMethod === "qris" ? 1 : 2, // 1 for QRIS, 2 for Bank Transfer
+        total_customer: 4, // This should be dynamic based on user input
+        fnb_items: useBookingItemStore.getState().foodCart.map((item) => ({
+          id: parseInt(item.id),
+          quantity: item.quantity,
+        })),
+        promo_code: "", // This should be dynamic based on user input
+        event_name: "", // This should be dynamic based on user input
+      };
+
+      console.log("Booking Summary:", bookingData);
+
+      // Call the API to create booking using the new endpoint
+      const response = await post<BookingResponse>(
+        BOOKING_ENDPOINTS.CREATE_CUSTOMER_BOOKING,
+        bookingData
+      );
+      console.log("Booking Response:", response);
+
+      // Show success message
+      toast.success("Booking created successfully!");
+
+      // Close the modal
+      setShowConfirmModal(false);
+
+      // Redirect to payment page or show payment details
+      if (response.data.payment_details) {
+        // Handle payment details based on payment method
+        if (paymentMethod === "qris" && response.data.payment_details.qr_code) {
+          // Show QR code for payment
+          // You might want to create a new component for this
+        } else if (
+          paymentMethod === "bank" &&
+          response.data.payment_details.bank_accounts
+        ) {
+          // Show bank account details
+          // You might want to create a new component for this
+        }
+      }
+
+      // Redirect to booking history or payment page
+      router.push("/userBookings");
+    } catch (error) {
+      console.error("Error creating booking:", error);
+      toast.error("Failed to create booking. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleConfirmBooking = async () => {
     try {
       setIsSubmitting(true);
-      // If onConfirm is provided, call it
       if (onConfirm) {
         await onConfirm();
-      }
-      // Simulate API call if no handler is provided
-      else {
+      } else {
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
-      // Close the modal after successful processing
       setShowConfirmModal(false);
     } catch (error) {
       console.error("Error confirming booking:", error);
+      toast.error("Failed to confirm booking. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -141,7 +276,13 @@ const BookingConfirmComponent = ({
             {mounted ? (
               <PersonalInfo
                 initialData={
-                  useAccountInfo && loggedInUser ? loggedInUser : null
+                  useAccountInfo && loggedInUser
+                    ? {
+                        username: loggedInUser.username,
+                        email: loggedInUser.email,
+                        phone: loggedInUser.phoneNumber || loggedInUser.phone,
+                      }
+                    : null
                 }
                 onValidityChange={setIsPersonalInfoValid}
                 key={useAccountInfo ? "autofilled" : "manual"}

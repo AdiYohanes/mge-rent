@@ -57,6 +57,9 @@ interface BookingItemState {
   selectedUnitName: string | null; // To store the name of the selected unit, e.g., "Unit G"
   setSelectedUnitName: (unitName: string | null) => void;
 
+  selectedUnitId: number | null;
+  setSelectedUnitId: (unitId: number | null) => void;
+
   selectedGame: Game | null;
   setSelectedGame: (game: Game | null) => void;
 
@@ -96,6 +99,9 @@ const useBookingItemStore = create<BookingItemState>((set, get) => ({
   // Unit state
   selectedUnitName: null,
   setSelectedUnitName: (unitName) => set({ selectedUnitName: unitName }),
+
+  selectedUnitId: null,
+  setSelectedUnitId: (unitId) => set({ selectedUnitId: unitId }),
 
   // Game state
   selectedGame: null,

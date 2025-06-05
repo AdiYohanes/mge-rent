@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import { cn } from "@/lib/utils";
 import useBookingItemStore, { FoodItem } from "@/store/BookingItemStore";
 import { getPublicFnbs, mapFnbItemToFoodItem } from "@/api";
 
+type Category = "food" | "snacks" | "drinks";
+
 export default function FoodSelection() {
-  const [activeTab, setActiveTab] = useState("food");
+  const [activeTab, setActiveTab] = useState<Category>("food");
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,15 +40,21 @@ export default function FoodSelection() {
           const mappedItems: FoodItem[] = [
             ...response.data.food.map((item) => ({
               ...mapFnbItemToFoodItem(item),
-              category: "food",
+              category: "food" as Category,
+              id: String(item.id), // Convert number to string
+              image: mapFnbItemToFoodItem(item).image || "/placeholder.svg", // Ensure image is always a string
             })),
             ...response.data.beverage.map((item) => ({
               ...mapFnbItemToFoodItem(item),
-              category: "drinks",
+              category: "drinks" as Category,
+              id: String(item.id), // Convert number to string
+              image: mapFnbItemToFoodItem(item).image || "/placeholder.svg", // Ensure image is always a string
             })),
             ...response.data.snack.map((item) => ({
               ...mapFnbItemToFoodItem(item),
-              category: "snacks",
+              category: "snacks" as Category,
+              id: String(item.id), // Convert number to string
+              image: mapFnbItemToFoodItem(item).image || "/placeholder.svg", // Ensure image is always a string
             })),
           ];
 
@@ -65,13 +73,19 @@ export default function FoodSelection() {
     fetchFoodItems();
   }, []);
 
-  const handleAddToCart = (item: FoodItem) => {
-    addFoodToCart(item);
-  };
+  const handleAddToCart = useCallback(
+    (item: FoodItem) => {
+      addFoodToCart(item);
+    },
+    [addFoodToCart]
+  );
 
-  const handleRemoveFromCart = (id: string) => {
-    removeFoodFromCart(id);
-  };
+  const handleRemoveFromCart = useCallback(
+    (id: string) => {
+      removeFoodFromCart(id);
+    },
+    [removeFoodFromCart]
+  );
 
   const formatPrice = (price: number) => {
     return `Rp${price.toLocaleString("id-ID")}`;
@@ -83,7 +97,7 @@ export default function FoodSelection() {
   // Get available categories from the loaded data
   const availableCategories = [
     ...new Set(foodItems.map((item) => item.category)),
-  ];
+  ] as Category[];
 
   // If we don't have the active tab in available categories, set it to the first available
   useEffect(() => {
@@ -140,7 +154,7 @@ export default function FoodSelection() {
         <Tabs
           defaultValue={availableCategories[0] || "food"}
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={(value) => setActiveTab(value as Category)}
         >
           <TabsList className="grid grid-cols-3 mb-6">
             {availableCategories.includes("food") && (
@@ -198,10 +212,11 @@ export default function FoodSelection() {
                     >
                       <div className="relative h-48">
                         <Image
-                          src={item.image || "/placeholder.svg"}
+                          src={item.image}
                           alt={item.name}
                           fill
                           className="object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         />
                         {item.outOfStock && (
                           <div className="absolute top-2 right-2">
@@ -245,6 +260,7 @@ export default function FoodSelection() {
                               )}
                               onClick={() => handleRemoveFromCart(item.id)}
                               disabled={getFoodItemQuantity(item.id) === 0}
+                              aria-label={`Remove ${item.name} from cart`}
                             >
                               <Minus className="h-4 w-4" />
                             </Button>
@@ -256,6 +272,7 @@ export default function FoodSelection() {
                               size="icon"
                               className="h-8 w-8 rounded-full border-[#B99733]/50 text-[#B99733] hover:bg-[#B99733]/10 transition-colors cursor-pointer"
                               onClick={() => handleAddToCart(item)}
+                              aria-label={`Add ${item.name} to cart`}
                             >
                               <Plus className="h-4 w-4" />
                             </Button>
