@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useMounted } from "@/hooks/use-mounted";
+import { motion } from "framer-motion";
+import { FaGamepad, FaUsers, FaClock } from "react-icons/fa";
 
 const Pricelist = () => {
   const mounted = useMounted();
@@ -15,148 +17,319 @@ const Pricelist = () => {
   }, [mounted]);
 
   const packages = [
-    { name: "REGULER 1 (PS 4)", price: "10K" },
-    { name: "REGULER 2 (PS 4)", price: "10K" },
-    { name: "REGULER 3 (PS 4)", price: "10K" },
-    { name: "REGULER 4 (PS 4)", price: "10K" },
-    { name: "REGULER 5 (PS 4)", price: "10K" },
-    { name: "REGULER 6 (PS 5)", price: "15K" },
+    {
+      name: "REGULER 1 (PS 4)",
+      price: "10K",
+      features: ["4K Display", "Comfortable Chair", "Air Conditioned"],
+    },
+    {
+      name: "REGULER 2 (PS 4)",
+      price: "10K",
+      features: ["4K Display", "Comfortable Chair", "Air Conditioned"],
+    },
+    {
+      name: "REGULER 3 (PS 4)",
+      price: "10K",
+      features: ["4K Display", "Comfortable Chair", "Air Conditioned"],
+    },
+    {
+      name: "REGULER 4 (PS 4)",
+      price: "10K",
+      features: ["4K Display", "Comfortable Chair", "Air Conditioned"],
+    },
+    {
+      name: "REGULER 5 (PS 4)",
+      price: "10K",
+      features: ["4K Display", "Comfortable Chair", "Air Conditioned"],
+    },
+    {
+      name: "REGULER 6 (PS 5)",
+      price: "15K",
+      features: [
+        "4K Display",
+        "Comfortable Chair",
+        "Air Conditioned",
+        "PS5 Exclusive",
+      ],
+    },
   ];
 
   const vipPackages = [
-    { name: "VIP 1 (PS 4 + NETFLIX)", price: "20K" },
-    { name: "VIP 2 (PS 4 + NETFLIX + NINTENDO)", price: "25K" },
-    { name: "VIP 3 (PS 5 + NETFLIX)", price: "25K" },
-    { name: "VIP 4 (PS 5 + NETFLIX)", price: "25K" },
+    {
+      name: "VIP 1 (PS 4 + NETFLIX)",
+      price: "20K",
+      features: [
+        "4K Display",
+        "Premium Chair",
+        "Air Conditioned",
+        "Netflix Access",
+        "Snack Bar",
+      ],
+    },
+    {
+      name: "VIP 2 (PS 4 + NETFLIX + NINTENDO)",
+      price: "25K",
+      features: [
+        "4K Display",
+        "Premium Chair",
+        "Air Conditioned",
+        "Netflix Access",
+        "Nintendo Switch",
+        "Snack Bar",
+      ],
+    },
+    {
+      name: "VIP 3 (PS 5 + NETFLIX)",
+      price: "25K",
+      features: [
+        "4K Display",
+        "Premium Chair",
+        "Air Conditioned",
+        "Netflix Access",
+        "PS5 Exclusive",
+        "Snack Bar",
+      ],
+    },
+    {
+      name: "VIP 4 (PS 5 + NETFLIX)",
+      price: "25K",
+      features: [
+        "4K Display",
+        "Premium Chair",
+        "Air Conditioned",
+        "Netflix Access",
+        "PS5 Exclusive",
+        "Snack Bar",
+      ],
+    },
   ];
 
-  const vvipPackages = [{ name: "VVIP 1 (PS 5 + NETFLIX)", price: "35K" }];
+  const vvipPackages = [
+    {
+      name: "VVIP 1 (PS 5 + NETFLIX)",
+      price: "35K",
+      features: [
+        "4K Display",
+        "Gaming Chair",
+        "Air Conditioned",
+        "Netflix Access",
+        "PS5 Exclusive",
+        "Premium Snack Bar",
+        "Private Room",
+      ],
+    },
+  ];
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        duration: 0.5,
+      },
+    },
+  };
 
   return (
-    <div className="max-w-2xl mx-auto bg-gradient-to-b from-purple-600 to-purple-900 text-white min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-[#1B1010] to-[#2D1B1B] text-white">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-700 to-purple-900 p-8 text-center relative overflow-hidden">
-        {/* Animated background pattern */}
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5"></div>
-
-        <div className="relative z-10">
-          <div className="mb-6">
-            <h1 className="text-3xl md:text-4xl font-black text-yellow-400 mb-2">
+      <div className="relative overflow-hidden bg-[#1B1010] py-16">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center"
+          >
+            <h1 className="text-4xl md:text-6xl font-black text-[#B99733] mb-4">
               MEDAN GAMING ECOSYSTEM
             </h1>
-            <div className="w-32 h-1 bg-yellow-400 mx-auto"></div>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-sm p-6 rounded-xl shadow-xl mb-4">
-            <h2 className="text-4xl md:text-5xl font-black text-white">
-              PRICE LIST
-            </h2>
-          </div>
-          <div className="inline-block bg-[#edc531] text-[#1B1010] px-6 py-2 font-minecraft border-2 border-[#1B1010] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
-            {currentTime?.toLocaleTimeString("id-ID")}
-          </div>
+            <div className="w-32 h-1 bg-[#B99733] mx-auto mb-8"></div>
+            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl shadow-2xl mb-8">
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
+                PRICE LIST
+              </h2>
+              <div className="flex items-center justify-center space-x-4">
+                <FaClock className="text-[#B99733] text-xl" />
+                <span className="text-xl font-minecraft bg-[#B99733] text-[#1B1010] px-6 py-2 rounded-none border-2 border-[#1B1010] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                  {currentTime?.toLocaleTimeString("id-ID")}
+                </span>
+              </div>
+            </div>
+          </motion.div>
         </div>
-
-        {/* Decorative elements */}
-        <div className="absolute top-1 right-1 bg-yellow-400 text-purple-900 px-2 py-1 rounded-none text-sm font-bold shadow-lg">
-          MAKE GOOD ENOUGH
-        </div>
-      </div>
-
-      {/* Torn Paper Effect */}
-      <div className="h-4 bg-white relative">
-        <svg
-          className="absolute inset-0 w-full h-full"
-          viewBox="0 0 100 10"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0,0 Q10,8 20,4 T40,6 T60,2 T80,7 T100,3 L100,10 L0,10 Z"
-            fill="white"
-          />
-        </svg>
       </div>
 
       {/* Price Lists */}
-      <div className="p-6 space-y-8">
-        {/* Regular Section */}
-        <div>
-          <h3 className="text-2xl font-bold mb-4 text-yellow-300">REGULER</h3>
-          <div className="space-y-2">
-            {packages.map((pkg, index) => (
-              <div
-                key={index}
-                className="flex justify-between items-center py-2 border-b border-purple-400/30"
-              >
-                <span className="text-lg">{pkg.name}</span>
-                <span className="text-xl font-bold text-cyan-300 flex items-center">
-                  ..... {pkg.price}
-                </span>
-              </div>
-            ))}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-3 gap-8"
+        >
+          {/* Regular Section */}
+          <motion.div
+            variants={itemVariants}
+            className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 shadow-xl"
+          >
+            <div className="flex items-center space-x-2 mb-6">
+              <FaGamepad className="text-[#B99733] text-2xl" />
+              <h3 className="text-2xl font-bold text-[#B99733]">REGULER</h3>
+            </div>
+            <div className="space-y-4">
+              {packages.map((pkg, index) => (
+                <div
+                  key={index}
+                  className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all duration-300"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-lg font-semibold">{pkg.name}</span>
+                    <span className="text-xl font-bold text-[#B99733]">
+                      {pkg.price}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-300 space-y-1">
+                    {pkg.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-center space-x-2">
+                        <span className="w-1.5 h-1.5 bg-[#B99733] rounded-full"></span>
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* VIP Section */}
+          <motion.div
+            variants={itemVariants}
+            className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 shadow-xl"
+          >
+            <div className="flex items-center space-x-2 mb-6">
+              <FaGamepad className="text-[#B99733] text-2xl" />
+              <h3 className="text-2xl font-bold text-[#B99733]">VIP ROOM</h3>
+            </div>
+            <div className="space-y-4">
+              {vipPackages.map((pkg, index) => (
+                <div
+                  key={index}
+                  className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all duration-300"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-lg font-semibold">{pkg.name}</span>
+                    <span className="text-xl font-bold text-[#B99733]">
+                      {pkg.price}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-300 space-y-1">
+                    {pkg.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-center space-x-2">
+                        <span className="w-1.5 h-1.5 bg-[#B99733] rounded-full"></span>
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* VVIP Section */}
+          <motion.div
+            variants={itemVariants}
+            className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 shadow-xl"
+          >
+            <div className="flex items-center space-x-2 mb-6">
+              <FaGamepad className="text-[#B99733] text-2xl" />
+              <h3 className="text-2xl font-bold text-[#B99733]">VVIP ROOM</h3>
+            </div>
+            <div className="space-y-4">
+              {vvipPackages.map((pkg, index) => (
+                <div
+                  key={index}
+                  className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all duration-300"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-lg font-semibold">{pkg.name}</span>
+                    <span className="text-xl font-bold text-[#B99733]">
+                      {pkg.price}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-300 space-y-1">
+                    {pkg.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-center space-x-2">
+                        <span className="w-1.5 h-1.5 bg-[#B99733] rounded-full"></span>
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* Capacity Info */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mt-12 bg-white/5 backdrop-blur-sm rounded-2xl p-6 shadow-xl"
+        >
+          <div className="flex items-center space-x-2 mb-4">
+            <FaUsers className="text-[#B99733] text-2xl" />
+            <h3 className="text-2xl font-bold text-[#B99733]">Room Capacity</h3>
           </div>
-        </div>
-
-        {/* VIP Section */}
-        <div>
-          <h3 className="text-2xl font-bold mb-4 text-yellow-300">VIP ROOM</h3>
-          <div className="space-y-2">
-            {vipPackages.map((pkg, index) => (
-              <div
-                key={index}
-                className="flex justify-between items-center py-2 border-b border-purple-400/30"
-              >
-                <span className="text-lg">{pkg.name}</span>
-                <span className="text-xl font-bold text-cyan-300 flex items-center">
-                  ..... {pkg.price}
-                </span>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white/5 rounded-xl p-4">
+              <h4 className="text-lg font-semibold text-[#B99733] mb-2">
+                REGULER Room
+              </h4>
+              <p className="text-gray-300">4 - 6 people</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4">
+              <h4 className="text-lg font-semibold text-[#B99733] mb-2">
+                VIP Room
+              </h4>
+              <p className="text-gray-300">4 - 6 people</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4">
+              <h4 className="text-lg font-semibold text-[#B99733] mb-2">
+                VVIP Room
+              </h4>
+              <p className="text-gray-300">6 - 10 people</p>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* VVIP Section */}
-        <div>
-          <h3 className="text-2xl font-bold mb-4 text-yellow-300">VVIP ROOM</h3>
-          <div className="space-y-2">
-            {vvipPackages.map((pkg, index) => (
-              <div
-                key={index}
-                className="flex justify-between items-center py-2 border-b border-purple-400/30"
-              >
-                <span className="text-lg">{pkg.name}</span>
-                <span className="text-xl font-bold text-cyan-300 flex items-center">
-                  ..... {pkg.price}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Keterangan */}
-        <div className="text-right text-sm opacity-75 mt-6">
-          <div>* Capacity</div>
-          <div>REGULER Room - 4 - 6 orang</div>
-          <div>VIP Room - 4 - 6 orang</div>
-          <div>VVIP Room - 6 - 10 orang</div>
-        </div>
-      </div>
-
-      {/* Bottom Section */}
-      <div className="mt-8 text-center relative">
-        {/* Gaming Controller Image Placeholder */}
-        <div className="absolute bottom-4 right-4 opacity-30">
-          <div className="w-24 h-16 bg-gray-800 rounded-lg"></div>
-        </div>
-
-        <div className="p-6">
-          <h3 className="text-[#edc531] text-xl font-bold mb-2">
+        {/* Bottom Section */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="mt-12 text-center"
+        >
+          <h3 className="text-[#B99733] text-xl font-bold mb-2">
             #MAKEGOODENOUGH
           </h3>
-          <h2 className="text-4xl font-black text-[#edc531] mb-4">
+          <h2 className="text-4xl font-black text-[#B99733] mb-4">
             NEVER STOP PLAYING
           </h2>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
