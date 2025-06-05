@@ -18,61 +18,23 @@ import {
   Clock3,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
   AlertCircle,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useMounted } from "@/hooks/use-mounted";
 import useBookingItemStore from "@/store/BookingItemStore";
-import {
-  getAvailableTimes,
-  TimeSlot as ApiTimeSlot,
-} from "@/api/booking/datePublicApi";
-
-// Define types for time slots and hour slots
-interface TimeSlot {
-  startTime: string;
-  endTime: string;
-  available: boolean;
-}
-
-interface MinuteSlot {
-  label: string;
-  value: string;
-  available: boolean;
-}
-
-interface HourSlot {
-  hour: number;
-  label: string;
-  available: boolean;
-  minutes: MinuteSlot[];
-}
-
-// Business hours interface for mock data
-interface BusinessHours {
-  open: string;
-  close: string;
-  rest_time: string;
-}
+import { getAvailableTimes } from "@/api/booking/datePublicApi";
 
 // Main component
 export default function DateTimeSelection() {
   const mounted = useMounted();
-  const [today, setToday] = useState<Date | null>(null);
-  const [hourSlots, setHourSlots] = useState<HourSlot[]>([]);
+  const [today, setToday] = useState(null);
+  const [hourSlots, setHourSlots] = useState([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [rawTimeSlots, setRawTimeSlots] = useState<TimeSlot[]>([]); // Used for potential future conflict checking
-  const [businessHours, setBusinessHours] = useState<BusinessHours | null>(
-    null
-  );
+  const [rawTimeSlots, setRawTimeSlots] = useState([]); // Used for potential future conflict checking
+  const [businessHours, setBusinessHours] = useState(null);
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState<boolean>(false);
   const [timeSlotError, setTimeSlotError] = useState<string | null>(null);
@@ -138,7 +100,7 @@ export default function DateTimeSelection() {
 
   // Process raw time slots into hour/minute structure with duration support
   const processTimeSlots = useCallback(
-    (apiSlots: ApiTimeSlot[], businessHours: BusinessHours | null) => {
+    (apiSlots, businessHours) => {
       if (!apiSlots || apiSlots.length === 0) {
         return [];
       }
@@ -149,17 +111,39 @@ export default function DateTimeSelection() {
       if (businessHours?.rest_time) {
         const [restStart] = businessHours.rest_time.split(" - ");
         restStartHour = parseInt(restStart.split(":")[0], 10);
-        // Rest end hour is available in the split but not used currently
       }
 
       // Build a map of available hours based on API response
-      const availabilityMap = new Map<string, boolean>();
-      // Track processed minutes to avoid duplicates
-      const processedMinutes = new Set<string>();
+      const availabilityMap = new Map();
+      const processedMinutes = new Set();
+
+      // Get current time for today's date comparison
+      const now = new Date();
+      const isToday =
+        selectedDate &&
+        format(selectedDate, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
 
       apiSlots.forEach((slot) => {
-        // Store availability status keyed by start_time (e.g. "10:00")
-        availabilityMap.set(slot.start_time, slot.available);
+        // Check if the time slot is in the past for today
+        let isAvailable = slot.available;
+
+        if (isToday) {
+          const [hoursStr, minutesStr] = slot.start_time.split(":");
+          const slotHour = parseInt(hoursStr, 10);
+          const slotMinute = parseInt(minutesStr, 10);
+
+          // Create a date object for the slot time
+          const slotTime = new Date(selectedDate);
+          slotTime.setHours(slotHour, slotMinute, 0, 0);
+
+          // If the slot time is before current time, mark as unavailable
+          if (slotTime <= now) {
+            isAvailable = false;
+          }
+        }
+
+        // Store availability status
+        availabilityMap.set(slot.start_time, isAvailable);
 
         // Extract hour from start_time
         const hour = parseInt(slot.start_time.split(":")[0], 10);
@@ -171,12 +155,11 @@ export default function DateTimeSelection() {
       });
 
       // Create hours and minutes structure
-      const hours: HourSlot[] = [];
-      const processedHours = new Set<number>();
+      const hours = [];
+      const processedHours = new Set();
 
       // Process slots in order to create hour/minute structure
       for (const slot of apiSlots) {
-        // Split start_time into hour and minute
         const [hourStr, minuteStr] = slot.start_time.split(":");
         const hour = parseInt(hourStr, 10);
         const minute = parseInt(minuteStr, 10);
@@ -185,40 +168,39 @@ export default function DateTimeSelection() {
           continue;
         }
 
-        // Check for duplicate minute entries
         const minuteKey = `${hour}:${minute}`;
         if (processedMinutes.has(minuteKey)) continue;
         processedMinutes.add(minuteKey);
 
-        // Create hour slot if it doesn't exist
         if (!processedHours.has(hour)) {
           const timeDate = new Date();
           timeDate.setHours(hour, 0);
-          const hourLabel = format(timeDate, "HH:mm");
+          // Convert 00:00 to 24:00 for display
+          const displayHour = hour === 0 ? 24 : hour;
+          const hourLabel = `${displayHour.toString().padStart(2, "0")}:00`;
 
           hours.push({
             hour,
             label: hourLabel,
-            available: false, // Will update based on available minutes
+            available: false,
             minutes: [],
           });
           processedHours.add(hour);
         }
 
-        // Find the hour slot
         const hourSlot = hours.find((h) => h.hour === hour);
         if (!hourSlot) continue;
 
-        // Only process slots at :00 and :30 minutes
         if (minute === 0 || minute === 30) {
           const timeDate = new Date();
           timeDate.setHours(hour, minute);
-          const label = format(timeDate, "HH:mm");
+          // Convert 00:00 to 24:00 for display
+          const displayHour = hour === 0 ? 24 : hour;
+          const label = `${displayHour.toString().padStart(2, "0")}:${minute
+            .toString()
+            .padStart(2, "0")}`;
 
-          // Get availability from map or default to true
           const isAvailable = availabilityMap.get(slot.start_time) ?? false;
-
-          // Special handling for rest time slots
           const isRestTime = hour === restStartHour;
 
           hourSlot.minutes.push({
@@ -227,7 +209,6 @@ export default function DateTimeSelection() {
             available: isRestTime ? false : isAvailable,
           });
 
-          // Update hour availability if any minute is available
           if (!isRestTime && isAvailable) {
             hourSlot.available = true;
           }
@@ -236,16 +217,15 @@ export default function DateTimeSelection() {
 
       // Sort hours with special handling for midnight and early morning hours
       hours.sort((a, b) => {
-        // For hours after midnight (0, 1), add 24 to make them sort after all other hours
-        const adjustedHourA = a.hour < 2 ? a.hour + 24 : a.hour;
-        const adjustedHourB = b.hour < 2 ? b.hour + 24 : b.hour;
+        // Convert midnight (0) to 24 for sorting
+        const adjustedHourA = a.hour === 0 ? 24 : a.hour;
+        const adjustedHourB = b.hour === 0 ? 24 : b.hour;
         return adjustedHourA - adjustedHourB;
       });
 
       // Sort minutes within each hour
       hours.forEach((hour) => {
         hour.minutes.sort((a, b) => {
-          // Extract minutes from the time values
           const minuteA = parseInt(a.value.split(":")[1], 10);
           const minuteB = parseInt(b.value.split(":")[1], 10);
           return minuteA - minuteB;
@@ -254,18 +234,16 @@ export default function DateTimeSelection() {
 
       return hours;
     },
-    []
+    [selectedDate]
   );
 
   // Generate time slots based on business hours
   const generateTimeSlots = useCallback(
-    (date: Date) => {
+    (date) => {
       const dayOfWeek = date.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
 
       // Define business hours for each day
-      const businessHoursMap: {
-        [key: number]: { start: number; end: number };
-      } = {
+      const businessHoursMap = {
         0: { start: 10, end: 24 }, // Sunday
         1: { start: 10, end: 24 }, // Monday
         2: { start: 10, end: 24 }, // Tuesday
@@ -283,7 +261,7 @@ export default function DateTimeSelection() {
       const restEndHour = 19;
 
       // Convert to API TimeSlot format for consistency
-      const mockApiTimeSlots: ApiTimeSlot[] = [];
+      const mockApiTimeSlots = [];
 
       // Generate time slots every hour as per API
       for (let hour = startHour; hour < endHour; hour++) {
@@ -334,7 +312,7 @@ export default function DateTimeSelection() {
       }
 
       // Create a mock business hours object
-      const mockBusinessHours: BusinessHours = {
+      const mockBusinessHours = {
         open: `${startHour}:00`,
         close: `${endHour}:00`,
         rest_time: `${restStartHour}:00 - ${restEndHour}:00`,
@@ -362,7 +340,7 @@ export default function DateTimeSelection() {
   );
 
   const fetchTimeSlots = useCallback(
-    async (date: Date | undefined) => {
+    async (date) => {
       if (!date || !mounted) return;
 
       setIsLoadingTimeSlots(true);
@@ -374,7 +352,7 @@ export default function DateTimeSelection() {
         const formattedDate = format(date, "yyyy-MM-dd");
 
         // Get unitId from selectedUnitName if available
-        let unitId: number | undefined;
+        let unitId;
 
         // If we have a selectedUnitName, extract unit ID
         if (selectedUnitName && selectedUnitName !== "all") {
@@ -404,7 +382,7 @@ export default function DateTimeSelection() {
             }
 
             // For now the API doesn't return business hours, use a default one
-            const defaultHours: BusinessHours = {
+            const defaultHours = {
               open: "10:00",
               close: "23:00",
               rest_time: "18:00 - 19:00",
@@ -471,7 +449,7 @@ export default function DateTimeSelection() {
     return { before: startOfDay(today) };
   };
 
-  const handleDateChange = (date: Date | undefined) => {
+  const handleDateChange = (date) => {
     if (date) {
       setSelectedDate(date);
       setShowCalendar(false);
@@ -487,10 +465,10 @@ export default function DateTimeSelection() {
     }
   };
 
-  const handleTimeSelect = (time: string) => {
+  const handleTimeSelect = (time) => {
     try {
-      // Validate that time is in correct format (HH:MM)
-      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      // Validate that time is in correct format (HH:MM) including 24:00
+      const timeRegex = /^([01]?[0-9]|2[0-3]|24):[0-5][0-9]$/;
 
       if (time && timeRegex.test(time)) {
         setSelectedTime(time);
@@ -509,6 +487,23 @@ export default function DateTimeSelection() {
     } catch (error) {
       console.error("Error selecting time:", error);
     }
+  };
+
+  // Add function to get max duration based on selected time
+  const getMaxDuration = (selectedTime, closingHour) => {
+    if (!selectedTime) return 5; // Default max duration
+
+    const [hoursStr] = selectedTime.split(":");
+    const selectedHour = parseInt(hoursStr, 10);
+
+    // Convert 24:00 to 0 for calculation
+    const normalizedHour = selectedHour === 24 ? 0 : selectedHour;
+
+    // Calculate hours until closing
+    const hoursUntilClosing = closingHour - normalizedHour;
+
+    // Return the minimum between hours until closing and max duration (5)
+    return Math.min(hoursUntilClosing, 5);
   };
 
   // Simplified function to return all hour slots
@@ -617,13 +612,40 @@ export default function DateTimeSelection() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
+                  {/* Selected date display */}
+                  {selectedDate && (
+                    <div className="flex items-center justify-between p-3 bg-[#B99733]/5 rounded-lg border border-[#B99733]/20 mb-4">
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="h-5 w-5 text-[#B99733]" />
+                        <span className="text-[#B99733] font-medium">
+                          Selected Date:
+                        </span>
+                        <span className="text-[#B99733]">
+                          {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowCalendar(!showCalendar)}
+                        className="text-[#B99733] hover:bg-[#B99733]/10"
+                      >
+                        {showCalendar ? "Hide" : "Change"}
+                      </Button>
+                    </div>
+                  )}
+
                   <Button
-                    variant="outline"
-                    className="w-full flex justify-between items-center border-[#B99733]/20 hover:bg-[#B99733]/10"
+                    variant={selectedDate ? "default" : "outline"}
+                    className={cn(
+                      "w-full flex justify-between items-center border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer",
+                      selectedDate &&
+                        "bg-[#B99733] text-white hover:bg-[#B99733]/90"
+                    )}
                     onClick={() => setShowCalendar(!showCalendar)}
                   >
                     <div className="flex items-center">
-                      <CalendarIcon className="mr-2 h-4 w-4 text-[#B99733]" />
+                      <CalendarIcon className="mr-2 h-4 w-4" />
                       <span>
                         {selectedDate
                           ? format(selectedDate, "EEEE, MMMM d, yyyy")
@@ -631,7 +653,7 @@ export default function DateTimeSelection() {
                       </span>
                     </div>
                     <ChevronDown
-                      className={`h-4 w-4 text-[#B99733] transition-transform ${
+                      className={`h-4 w-4 transition-transform ${
                         showCalendar ? "rotate-180" : ""
                       }`}
                     />
@@ -645,7 +667,7 @@ export default function DateTimeSelection() {
                           selected={selectedDate}
                           onSelect={handleDateChange}
                           disabled={getDisabledDays()}
-                          defaultMonth={today}
+                          defaultMonth={selectedDate || today}
                           className="rounded-md border-[#B99733]/20"
                           classNames={{
                             day_selected:
@@ -653,6 +675,13 @@ export default function DateTimeSelection() {
                             day_today: "bg-[#B99733]/10 text-[#B99733]",
                             day_outside: "text-[#B99733]/30",
                             day: "hover:bg-[#B99733]/10 cursor-pointer",
+                            head_cell: "text-[#B99733] font-medium",
+                            cell: "text-[#B99733]",
+                            nav_button: "text-[#B99733] hover:bg-[#B99733]/10",
+                            nav_button_previous: "text-[#B99733]",
+                            nav_button_next: "text-[#B99733]",
+                            button: "hover:bg-[#B99733]/10",
+                            caption: "text-[#B99733] font-medium",
                           }}
                         />
                       )}
@@ -662,7 +691,7 @@ export default function DateTimeSelection() {
               </Card>
 
               {/* Date Selection - Desktop View */}
-              <Card className="shadow-md border border-red md:col-span-2 hidden md:block">
+              <Card className="shadow-md border border-[#B99733]/20 md:col-span-2 hidden md:block">
                 <CardHeader className="pb-2 border-b border-[#B99733]/10">
                   <CardTitle className="flex items-center gap-2 text-lg text-[#B99733]">
                     <CalendarIcon className="h-5 w-5 text-[#B99733]/80" />
@@ -673,6 +702,21 @@ export default function DateTimeSelection() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-4">
+                  {/* Selected date display */}
+                  {selectedDate && (
+                    <div className="flex items-center justify-between p-3 bg-[#B99733]/5 rounded-lg border border-[#B99733]/20 mb-4">
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="h-5 w-5 text-[#B99733]" />
+                        <span className="text-[#B99733] font-medium">
+                          Selected Date:
+                        </span>
+                        <span className="text-[#B99733]">
+                          {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="calendar-container w-full h-full">
                     {today && (
                       <Calendar
@@ -680,7 +724,7 @@ export default function DateTimeSelection() {
                         selected={selectedDate}
                         onSelect={handleDateChange}
                         disabled={getDisabledDays()}
-                        defaultMonth={today}
+                        defaultMonth={selectedDate || today}
                         className="rounded-md border-[#B99733]/20 w-full h-full"
                         classNames={{
                           day_selected:
@@ -688,6 +732,13 @@ export default function DateTimeSelection() {
                           day_today: "bg-[#B99733]/10 text-[#B99733]",
                           day_outside: "text-[#B99733]/30",
                           day: "hover:bg-[#B99733]/10 cursor-pointer",
+                          head_cell: "text-[#B99733] font-medium",
+                          cell: "text-[#B99733]",
+                          nav_button: "text-[#B99733] hover:bg-[#B99733]/10",
+                          nav_button_previous: "text-[#B99733]",
+                          nav_button_next: "text-[#B99733]",
+                          button: "hover:bg-[#B99733]/10",
+                          caption: "text-[#B99733] font-medium",
                         }}
                         style={{
                           fontSize: "1.5rem",
@@ -769,79 +820,85 @@ export default function DateTimeSelection() {
                     {!isLoadingTimeSlots &&
                       !timeSlotError &&
                       (selectedConsole || selectedUnitName) && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-h-[220px] overflow-y-auto pr-2">
-                          {getAvailableHourSlots().length > 0 ? (
-                            getAvailableHourSlots().map((hourSlot) => (
-                              <Popover key={`hour-${hourSlot.hour}`}>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    disabled={
-                                      !hourSlot.available || !selectedDate
-                                    }
-                                    className={cn(
-                                      "w-full justify-between h-10 sm:h-12 px-3 py-2 border-[#B99733]/20 hover:bg-[#B99733]/10 cursor-pointer text-xs sm:text-sm",
-                                      (!hourSlot.available || !selectedDate) &&
-                                        "opacity-50 cursor-not-allowed"
-                                    )}
-                                  >
-                                    <div className="flex items-center gap-1 sm:gap-2">
-                                      <Clock3 className="h-3 w-3 sm:h-4 sm:w-4 text-[#B99733]" />
-                                      <span className="text-[#B99733]">
-                                        {hourSlot.label}
-                                      </span>
-                                    </div>
-                                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-[#B99733]/70" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-48 p-2">
-                                  <div className="grid grid-cols-2 gap-1">
-                                    {hourSlot.minutes.map(
-                                      (minute, minuteIndex) => (
-                                        <Button
-                                          key={`${hourSlot.hour}-${minute.value}-${minuteIndex}`}
-                                          variant={
-                                            selectedTime === minute.value
-                                              ? "default"
-                                              : "outline"
-                                          }
-                                          size="sm"
-                                          disabled={
-                                            !minute.available || !selectedDate
-                                          }
-                                          onClick={() => {
-                                            if (minute && minute.value) {
-                                              handleTimeSelect(minute.value);
-                                            }
-                                          }}
-                                          className={cn(
-                                            "justify-center h-8 sm:h-9 text-xs sm:text-sm cursor-pointer",
-                                            selectedTime === minute.value
-                                              ? "bg-[#B99733] text-white hover:bg-[#B99733]/90"
-                                              : "border-[#B99733]/20 hover:bg-[#B99733]/10",
-                                            (!minute.available ||
-                                              !selectedDate) &&
-                                              "opacity-50 cursor-not-allowed"
-                                          )}
-                                        >
-                                          {minute.label.split(" ")[0]}
-                                        </Button>
-                                      )
-                                    )}
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            ))
-                          ) : (
-                            <div className="col-span-full flex flex-col items-center justify-center py-8 text-center">
-                              <Clock className="h-10 w-10 text-gray-300 mb-2" />
-                              <p className="text-gray-500">
-                                {!selectedDate
-                                  ? "Please select a date first"
-                                  : "No available time slots for this selection"}
-                              </p>
+                        <div className="space-y-4">
+                          {/* Selected time display */}
+                          {selectedTime && (
+                            <div className="flex items-center justify-between p-3 bg-[#B99733]/5 rounded-lg border border-[#B99733]/20">
+                              <div className="flex items-center gap-2">
+                                <Clock3 className="h-5 w-5 text-[#B99733]" />
+                                <span className="text-[#B99733] font-medium">
+                                  Selected Time:
+                                </span>
+                                <span className="text-[#B99733]">
+                                  {selectedTime}
+                                </span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedTime("")}
+                                className="text-[#B99733] hover:bg-[#B99733]/10"
+                              >
+                                Change
+                              </Button>
                             </div>
                           )}
+
+                          {/* Time slots grid */}
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3 max-h-[220px] overflow-y-auto pr-2">
+                            {getAvailableHourSlots().length > 0 ? (
+                              getAvailableHourSlots().map((hourSlot) => (
+                                <div
+                                  key={`hour-${hourSlot.hour}`}
+                                  className="space-y-2"
+                                >
+                                  {hourSlot.minutes.map(
+                                    (minute, minuteIndex) => (
+                                      <Button
+                                        key={`${hourSlot.hour}-${minute.value}-${minuteIndex}`}
+                                        variant={
+                                          selectedTime === minute.value
+                                            ? "default"
+                                            : "outline"
+                                        }
+                                        disabled={
+                                          !minute.available || !selectedDate
+                                        }
+                                        onClick={() => {
+                                          if (minute && minute.value) {
+                                            handleTimeSelect(minute.value);
+                                          }
+                                        }}
+                                        className={cn(
+                                          "w-full justify-center h-10 sm:h-12 text-xs sm:text-sm transition-all duration-200",
+                                          selectedTime === minute.value
+                                            ? "bg-[#B99733] text-white hover:bg-[#B99733]/90"
+                                            : "border-[#B99733]/20 hover:bg-[#B99733]/10 hover:border-[#B99733]/30 active:bg-[#B99733]/20",
+                                          (!minute.available ||
+                                            !selectedDate) &&
+                                            "opacity-50 cursor-not-allowed hover:bg-transparent hover:border-[#B99733]/20"
+                                        )}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <Clock3 className="h-4 w-4" />
+                                          <span>{minute.label}</span>
+                                        </div>
+                                      </Button>
+                                    )
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="col-span-full flex flex-col items-center justify-center py-8 text-center">
+                                <Clock className="h-10 w-10 text-gray-300 mb-2" />
+                                <p className="text-gray-500">
+                                  {!selectedDate
+                                    ? "Please select a date first"
+                                    : "No available time slots for this selection"}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -880,36 +937,48 @@ export default function DateTimeSelection() {
                   </CardHeader>
                   <CardContent className="pt-4">
                     <div className="grid grid-cols-5 gap-2">
-                      {[1, 2, 3, 4, 5].map((hours) => (
-                        <Button
-                          key={hours}
-                          variant={duration === hours ? "default" : "outline"}
-                          className={cn(
-                            "py-2 cursor-pointer h-10 sm:h-12 text-xs sm:text-sm",
-                            duration === hours
-                              ? "bg-[#B99733] hover:bg-[#B99733]/90 text-white"
-                              : "border-[#B99733]/20 hover:bg-[#B99733]/10 text-[#B99733]",
-                            (!selectedDate || !selectedTime) &&
-                              "opacity-50 cursor-not-allowed"
-                          )}
-                          disabled={!selectedDate || !selectedTime}
-                          onClick={() => {
-                            setDuration(hours);
-                            console.log(
-                              "Date:",
-                              selectedDate
-                                ? format(selectedDate, "yyyy-MM-dd")
-                                : "none",
-                              "| Time:",
-                              selectedTime,
-                              "| Duration selected:",
-                              hours
-                            );
-                          }}
-                        >
-                          {hours}h
-                        </Button>
-                      ))}
+                      {[1, 2, 3, 4, 5].map((hours) => {
+                        const maxDuration = getMaxDuration(selectedTime, 24); // Using 24 as closing hour
+                        const isDisabled = hours > maxDuration;
+
+                        return (
+                          <Button
+                            key={hours}
+                            variant={duration === hours ? "default" : "outline"}
+                            className={cn(
+                              "py-2 cursor-pointer h-10 sm:h-12 text-xs sm:text-sm",
+                              duration === hours
+                                ? "bg-[#B99733] hover:bg-[#B99733]/90 text-white"
+                                : "border-[#B99733]/20 hover:bg-[#B99733]/10 text-[#B99733]",
+                              (!selectedDate || !selectedTime || isDisabled) &&
+                                "opacity-50 cursor-not-allowed"
+                            )}
+                            disabled={
+                              !selectedDate || !selectedTime || isDisabled
+                            }
+                            onClick={() => {
+                              setDuration(hours);
+                              console.log(
+                                "Date:",
+                                selectedDate
+                                  ? format(selectedDate, "yyyy-MM-dd")
+                                  : "none",
+                                "| Time:",
+                                selectedTime,
+                                "| Duration selected:",
+                                hours
+                              );
+                            }}
+                          >
+                            {hours}h
+                            {isDisabled && (
+                              <span className="ml-1 text-[10px] text-red-500">
+                                (closed)
+                              </span>
+                            )}
+                          </Button>
+                        );
+                      })}
                     </div>
                   </CardContent>
                   <CardFooter className="pt-4 flex justify-between items-center border-t border-[#B99733]/10 mt-4">
