@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Receipt,
 } from "lucide-react";
 import {
   Card,
@@ -32,7 +33,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { getBookings, Booking, CustomerData } from "@/api";
+import {
+  getBookings,
+  Booking,
+  CustomerData,
+  getReceiptItemsByReceiptId,
+} from "@/api";
+import ReceiptPrintView from "../receipt/ReceiptPrintView";
+import { getUserFromCookie } from "@/utils/cookieUtils";
 
 // Type for our processed transaction data
 interface Transaction {
@@ -63,6 +71,8 @@ export function TransactionTable() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showReceiptView, setShowReceiptView] = useState(false);
+  const [receiptData, setReceiptData] = useState({});
 
   // Fetch booking data from API
   useEffect(() => {
@@ -75,10 +85,16 @@ export function TransactionTable() {
           "success"
         );
 
+        console.log("API Response:", response);
+        console.log("Total bookings before filter:", response.data.length);
+
         // Filter for bookings with "success" status
         const successBookings = response.data.filter(
           (booking: Booking) => booking.status === "success"
         );
+
+        console.log("Success bookings after filter:", successBookings.length);
+        console.log("Success bookings:", successBookings);
 
         // Transform API data to match our transaction structure
         const transformedData: Transaction[] = successBookings.map(
@@ -165,6 +181,8 @@ export function TransactionTable() {
             };
           }
         );
+
+        console.log("Transformed transactions:", transformedData);
 
         setTransactions(transformedData);
         setError(null);
@@ -329,237 +347,330 @@ export function TransactionTable() {
     }
   };
 
+  const handleReceiptClick = async (bookingId: string) => {
+    try {
+      const receiptItems = await getReceiptItemsByReceiptId(bookingId);
+      const user = getUserFromCookie();
+      const cashierName = user?.name || user?.username || "-";
+      const mapped = {
+        no_receipt: `TRX${bookingId.padStart(6, "0")}`,
+        table: "VIP 4/2",
+        date: receiptItems[0]?.created_at
+          ? new Date(receiptItems[0].created_at).toLocaleDateString("id-ID")
+          : "-",
+        cashier: cashierName,
+        items: receiptItems.map((item) => ({
+          ...item,
+          name:
+            item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1),
+        })),
+        subtotal: receiptItems.reduce(
+          (sum, item) => sum + parseFloat(item.price) * item.quantity,
+          0
+        ),
+        tax: Math.round(
+          receiptItems.reduce(
+            (sum, item) => sum + parseFloat(item.price) * item.quantity,
+            0
+          ) * 0.1
+        ),
+        total: Math.round(
+          receiptItems.reduce(
+            (sum, item) => sum + parseFloat(item.price) * item.quantity,
+            0
+          ) * 1.1
+        ),
+        bayar: Math.round(
+          receiptItems.reduce(
+            (sum, item) => sum + parseFloat(item.price) * item.quantity,
+            0
+          ) * 1.1
+        ),
+        wifi: "7314_Gaming",
+        whatsapp: "081516764805",
+        instagram: "MGE_medangamingecosystem",
+        logoUrl: "/images/logo.png",
+        qrUrl: "/images/qr_mge.png",
+        alamat:
+          "Setiabudi Square (Komplek Tasbi 1), JL Setia Budi C-3, Tj. Sari, Kec. Medan Selayang, Kota Medan, Sumatera Utara, 20132",
+        toko: "Medan Gaming Ecosystem",
+      };
+      setReceiptData(mapped);
+      setShowReceiptView(true);
+    } catch (error) {
+      console.error("Error fetching receipt items:", error);
+    }
+  };
+
+  const handleBackToTable = () => {
+    setShowReceiptView(false);
+    setReceiptData({});
+  };
+
   return (
-    <Card className="shadow-sm border-gray-200">
-      <CardHeader className="bg-white py-4 px-6 border-b">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <h2 className="text-2xl font-bold text-gray-800">List Transaction</h2>
+    <>
+      {showReceiptView && receiptData ? (
+        <ReceiptPrintView data={receiptData} onBack={handleBackToTable} />
+      ) : (
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="bg-white py-4 px-6 border-b">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+              <h2 className="text-2xl font-bold text-gray-800">
+                List Transaction
+              </h2>
 
-          <div className="flex gap-2 items-center">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Show</span>
-              <Select
-                value={String(itemsPerPage)}
-                onValueChange={(value) => {
-                  setItemsPerPage(Number(value));
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="h-8 w-[70px]">
-                  <SelectValue placeholder={itemsPerPage.toString()} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5</SelectItem>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="text-sm font-medium">entries</span>
-            </div>
+              <div className="flex gap-2 items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Show</span>
+                  <Select
+                    value={String(itemsPerPage)}
+                    onValueChange={(value) => {
+                      setItemsPerPage(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue placeholder={itemsPerPage.toString()} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm font-medium">entries</span>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <Select value={month} onValueChange={setMonth}>
-                <SelectTrigger className="h-8 w-[110px]">
-                  <SelectValue placeholder={getMonthName(month)} />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                    <SelectItem key={m} value={String(m)}>
-                      {getMonthName(String(m))}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <div className="flex items-center gap-2">
+                  <Select value={month} onValueChange={setMonth}>
+                    <SelectTrigger className="h-8 w-[110px]">
+                      <SelectValue placeholder={getMonthName(month)} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <SelectItem key={m} value={String(m)}>
+                          {getMonthName(String(m))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-              <Select value={year} onValueChange={setYear}>
-                <SelectTrigger className="h-8 w-[80px]">
-                  <SelectValue placeholder={year} />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from(
-                    { length: 5 },
-                    (_, i) => new Date().getFullYear() - 2 + i
-                  ).map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  <Select value={year} onValueChange={setYear}>
+                    <SelectTrigger className="h-8 w-[80px]">
+                      <SelectValue placeholder={year} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from(
+                        { length: 5 },
+                        (_, i) => new Date().getFullYear() - 2 + i
+                      ).map((y) => (
+                        <SelectItem key={y} value={String(y)}>
+                          {y}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="relative w-full md:w-[200px]">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search..."
-                className="pl-8 pr-4 h-9"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
+                <div className="relative w-full md:w-[200px]">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search..."
+                    className="pl-8 pr-4 h-9"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </CardHeader>
+          </CardHeader>
 
-      <CardContent className="p-0">
-        <div className="overflow-x-auto" style={{ minWidth: "100%" }}>
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-10">
-              <Loader2 className="h-10 w-10 animate-spin text-amber-500" />
-              <p className="mt-4 text-gray-600">Loading transaction data...</p>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-10 text-red-500">
-              <p>{error}</p>
-              <Button
-                onClick={() => window.location.reload()}
-                className="mt-4 bg-amber-500 hover:bg-amber-600 text-white"
-              >
-                Retry
-              </Button>
-            </div>
-          ) : (
-            <Table className="w-auto min-w-full">
-              <TableHeader className="bg-gray-50 whitespace-nowrap">
-                <TableRow>
-                  <TableHead className="w-[60px] min-w-[60px]">NO</TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
-                    onClick={() => handleSort("transactionNumber")}
+          <CardContent className="p-0">
+            <div className="overflow-x-auto" style={{ minWidth: "100%" }}>
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-10">
+                  <Loader2 className="h-10 w-10 animate-spin text-amber-500" />
+                  <p className="mt-4 text-gray-600">
+                    Loading transaction data...
+                  </p>
+                </div>
+              ) : error ? (
+                <div className="flex flex-col items-center justify-center py-10 text-red-500">
+                  <p>{error}</p>
+                  <Button
+                    onClick={() => window.location.reload()}
+                    className="mt-4 bg-amber-500 hover:bg-amber-600 text-white"
                   >
-                    <div className="flex items-center">
-                      NO. TRANSAKSI
-                      {sortField === "transactionNumber" && (
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-100 min-w-[100px]"
-                    onClick={() => handleSort("type")}
-                  >
-                    <div className="flex items-center">
-                      TYPE
-                      {sortField === "type" && (
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-100 min-w-[120px]"
-                    onClick={() => handleSort("name")}
-                  >
-                    <div className="flex items-center">
-                      NAME
-                      {sortField === "name" && (
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead className="min-w-[140px]">PHONE NUMBER</TableHead>
-                  <TableHead className="min-w-[150px]">DETAILS</TableHead>
-                  <TableHead className="min-w-[100px]">QUANTITY</TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
-                    onClick={() => handleSort("bookingDate")}
-                  >
-                    <div className="flex items-center">
-                      TANGGAL BOOKING
-                      {sortField === "bookingDate" && (
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-100 min-w-[160px]"
-                    onClick={() => handleSort("totalPayment")}
-                  >
-                    <div className="flex items-center">
-                      TOTAL PEMBAYARAN
-                      {sortField === "totalPayment" && (
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead className="min-w-[160px]">
-                    METODE PEMBAYARAN
-                  </TableHead>
-                  <TableHead className="min-w-[180px]">
-                    TANGGAL PEMBAYARAN
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
-                    onClick={() => handleSort("status")}
-                  >
-                    <div className="flex items-center">
-                      STATUS
-                      {sortField === "status" && (
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead className="min-w-[120px]">TOTAL REFUND</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="whitespace-nowrap">
-                {paginatedData.length > 0 ? (
-                  paginatedData.map((transaction, index) => (
-                    <TableRow key={transaction.id} className="hover:bg-gray-50">
-                      <TableCell>{firstIndex + index + 1}</TableCell>
-                      <TableCell className="font-medium">
-                        {transaction.transactionNumber}
-                      </TableCell>
-                      <TableCell>{transaction.type}</TableCell>
-                      <TableCell>{transaction.name}</TableCell>
-                      <TableCell>{transaction.phoneNumber}</TableCell>
-                      <TableCell>{transaction.details}</TableCell>
-                      <TableCell>{transaction.quantity}</TableCell>
-                      <TableCell>{transaction.bookingDate}</TableCell>
-                      <TableCell>{transaction.totalPayment}</TableCell>
-                      <TableCell>{transaction.paymentMethod}</TableCell>
-                      <TableCell>{transaction.paymentDate}</TableCell>
-                      <TableCell>
-                        {getStatusBadge(transaction.status)}
-                      </TableCell>
-                      <TableCell>{transaction.totalRefund}</TableCell>
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <Table className="w-auto min-w-full">
+                  <TableHeader className="bg-gray-50 whitespace-nowrap">
+                    <TableRow>
+                      <TableHead className="w-[60px] min-w-[60px]">
+                        NO
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
+                        onClick={() => handleSort("transactionNumber")}
+                      >
+                        <div className="flex items-center">
+                          NO. TRANSAKSI
+                          {sortField === "transactionNumber" && (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-100 min-w-[100px]"
+                        onClick={() => handleSort("type")}
+                      >
+                        <div className="flex items-center">
+                          TYPE
+                          {sortField === "type" && (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-100 min-w-[120px]"
+                        onClick={() => handleSort("name")}
+                      >
+                        <div className="flex items-center">
+                          NAME
+                          {sortField === "name" && (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[140px]">
+                        PHONE NUMBER
+                      </TableHead>
+                      <TableHead className="min-w-[150px]">DETAILS</TableHead>
+                      <TableHead className="min-w-[100px]">QUANTITY</TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
+                        onClick={() => handleSort("bookingDate")}
+                      >
+                        <div className="flex items-center">
+                          TANGGAL BOOKING
+                          {sortField === "bookingDate" && (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-100 min-w-[160px]"
+                        onClick={() => handleSort("totalPayment")}
+                      >
+                        <div className="flex items-center">
+                          TOTAL PEMBAYARAN
+                          {sortField === "totalPayment" && (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[160px]">
+                        METODE PEMBAYARAN
+                      </TableHead>
+                      <TableHead className="min-w-[180px]">
+                        TANGGAL PEMBAYARAN
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
+                        onClick={() => handleSort("status")}
+                      >
+                        <div className="flex items-center">
+                          STATUS
+                          {sortField === "status" && (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[120px]">
+                        TOTAL REFUND
+                      </TableHead>
+                      <TableHead className="min-w-[80px] text-center">
+                        RECEIPT
+                      </TableHead>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={13} className="text-center py-6">
-                      No transactions found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      </CardContent>
+                  </TableHeader>
+                  <TableBody className="whitespace-nowrap">
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((transaction, index) => (
+                        <TableRow
+                          key={transaction.id}
+                          className="hover:bg-gray-50"
+                        >
+                          <TableCell>{firstIndex + index + 1}</TableCell>
+                          <TableCell className="font-medium">
+                            {transaction.transactionNumber}
+                          </TableCell>
+                          <TableCell>{transaction.type}</TableCell>
+                          <TableCell>{transaction.name}</TableCell>
+                          <TableCell>{transaction.phoneNumber}</TableCell>
+                          <TableCell>{transaction.details}</TableCell>
+                          <TableCell>{transaction.quantity}</TableCell>
+                          <TableCell>{transaction.bookingDate}</TableCell>
+                          <TableCell>{transaction.totalPayment}</TableCell>
+                          <TableCell>{transaction.paymentMethod}</TableCell>
+                          <TableCell>{transaction.paymentDate}</TableCell>
+                          <TableCell>
+                            {getStatusBadge(transaction.status)}
+                          </TableCell>
+                          <TableCell>{transaction.totalRefund}</TableCell>
+                          <TableCell className="text-center">
+                            <button
+                              className="p-2 text-[#B99733] hover:bg-[#B99733]/10 rounded-full transition-colors duration-200"
+                              title="View Receipt"
+                              onClick={() => handleReceiptClick(transaction.id)}
+                            >
+                              <Receipt className="h-5 w-5" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={14} className="text-center py-6">
+                          No transactions found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </CardContent>
 
-      <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">
-            Showing{" "}
-            {filteredData.length > 0
-              ? Math.min(
-                  filteredData.length,
-                  (currentPage - 1) * itemsPerPage + 1
-                )
-              : 0}
-            -{Math.min(filteredData.length, currentPage * itemsPerPage)} of{" "}
-            {filteredData.length} entries
-          </span>
-        </div>
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">
+                Showing{" "}
+                {filteredData.length > 0
+                  ? Math.min(
+                      filteredData.length,
+                      (currentPage - 1) * itemsPerPage + 1
+                    )
+                  : 0}
+                -{Math.min(filteredData.length, currentPage * itemsPerPage)} of{" "}
+                {filteredData.length} entries
+              </span>
+            </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1">{paginationButtons()}</div>
-        )}
-      </CardFooter>
-    </Card>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                {paginationButtons()}
+              </div>
+            )}
+          </CardFooter>
+        </Card>
+      )}
+    </>
   );
 }

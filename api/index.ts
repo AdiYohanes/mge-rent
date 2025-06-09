@@ -173,6 +173,12 @@ export {
   type NotificationMeta,
 } from "./notification/notificationApi";
 
+// Receipt API
+export {
+  getReceiptItemsByReceiptId,
+  type ReceiptItem,
+} from "./receipt/receiptApi";
+
 // Import User for the extended interface
 import { User } from "./user/userApi";
 

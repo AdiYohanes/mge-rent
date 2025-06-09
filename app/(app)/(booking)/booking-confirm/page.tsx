@@ -18,6 +18,7 @@ import useBookingItemStore from "@/store/BookingItemStore";
 import { post } from "@/api/apiUtils";
 import { BOOKING_ENDPOINTS } from "@/api/constants";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 
 // Define types for the API response
 interface PaymentDetails {
@@ -166,15 +167,19 @@ const BookingConfirmComponent = ({
       const bookingData = {
         unit_id: useBookingItemStore.getState().selectedUnitId!,
         game_id: useBookingItemStore.getState().selectedGame!.id,
-        booking_date: useBookingItemStore
-          .getState()
-          .selectedDate!.toISOString()
-          .split("T")[0],
+        booking_date: format(
+          useBookingItemStore.getState().selectedDate!,
+          "yyyy-MM-dd"
+        ),
         start_time: useBookingItemStore.getState().selectedTime,
         duration: useBookingItemStore.getState().duration,
         customer_data: {
           firstname: loggedInUser.name?.split(" ")[0] || "",
-          lastname: loggedInUser.name?.split(" ").slice(1).join(" ") || "",
+          lastname:
+            loggedInUser.name?.split(" ").slice(1).join(" ") ||
+            loggedInUser.name?.split(" ")[0] ||
+            "",
+          name: loggedInUser.name || "",
           email: loggedInUser.email || "",
           phone: loggedInUser.phoneNumber || loggedInUser.phone || "",
         },
@@ -203,26 +208,23 @@ const BookingConfirmComponent = ({
       // Close the modal
       setShowConfirmModal(false);
 
-      // Redirect to payment page or show payment details
-      if (response.data.payment_details) {
-        // Handle payment details based on payment method
-        if (paymentMethod === "qris" && response.data.payment_details.qr_code) {
-          // Show QR code for payment
-          // You might want to create a new component for this
-        } else if (
-          paymentMethod === "bank" &&
-          response.data.payment_details.bank_accounts
-        ) {
-          // Show bank account details
-          // You might want to create a new component for this
-        }
-      }
-
-      // Redirect to booking history or payment page
-      router.push("/userBookings");
-    } catch (error) {
+      // Redirect to booking success page with booking number
+      router.push(
+        `/booking-success?booking_number=${response.data.booking_number}`
+      );
+    } catch (error: unknown) {
       console.error("Error creating booking:", error);
-      toast.error("Failed to create booking. Please try again.");
+      if (
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        error.response?.status === 401
+      ) {
+        toast.error("Sesi Anda telah berakhir. Silakan login kembali.");
+        router.push("/login");
+      } else {
+        toast.error("Gagal membuat booking. Silakan coba lagi.");
+      }
     } finally {
       setIsSubmitting(false);
     }
