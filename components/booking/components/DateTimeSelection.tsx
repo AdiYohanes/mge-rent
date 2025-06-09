@@ -27,14 +27,48 @@ import { useMounted } from "@/hooks/use-mounted";
 import useBookingItemStore from "@/store/BookingItemStore";
 import { getAvailableTimes } from "@/api/booking/datePublicApi";
 
+// Define interfaces for type safety
+interface TimeSlot {
+  start_time: string;
+  end_time: string;
+  available: boolean;
+}
+
+interface BusinessHours {
+  open: string;
+  close: string;
+  rest_time: string;
+}
+
+interface MinuteSlot {
+  label: string;
+  value: string;
+  available: boolean;
+}
+
+interface HourSlot {
+  hour: number;
+  label: string;
+  available: boolean;
+  minutes: MinuteSlot[];
+}
+
+interface InternalTimeSlot {
+  startTime: string;
+  endTime: string;
+  available: boolean;
+}
+
 // Main component
 export default function DateTimeSelection() {
   const mounted = useMounted();
-  const [today, setToday] = useState(null);
-  const [hourSlots, setHourSlots] = useState([]);
+  const [today, setToday] = useState<Date | null>(null);
+  const [hourSlots, setHourSlots] = useState<HourSlot[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [rawTimeSlots, setRawTimeSlots] = useState([]); // Used for potential future conflict checking
-  const [businessHours, setBusinessHours] = useState(null);
+  const [rawTimeSlots, setRawTimeSlots] = useState<InternalTimeSlot[]>([]); // Used for potential future conflict checking
+  const [businessHours, setBusinessHours] = useState<BusinessHours | null>(
+    null
+  );
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState<boolean>(false);
   const [timeSlotError, setTimeSlotError] = useState<string | null>(null);
@@ -100,7 +134,7 @@ export default function DateTimeSelection() {
 
   // Process raw time slots into hour/minute structure with duration support
   const processTimeSlots = useCallback(
-    (apiSlots, businessHours) => {
+    (apiSlots: TimeSlot[], businessHours: BusinessHours | null) => {
       if (!apiSlots || apiSlots.length === 0) {
         return [];
       }
@@ -114,8 +148,8 @@ export default function DateTimeSelection() {
       }
 
       // Build a map of available hours based on API response
-      const availabilityMap = new Map();
-      const processedMinutes = new Set();
+      const availabilityMap = new Map<string, boolean>();
+      const processedMinutes = new Set<string>();
 
       // Get current time for today's date comparison
       const now = new Date();
@@ -123,7 +157,7 @@ export default function DateTimeSelection() {
         selectedDate &&
         format(selectedDate, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
 
-      apiSlots.forEach((slot) => {
+      apiSlots.forEach((slot: TimeSlot) => {
         // Check if the time slot is in the past for today
         let isAvailable = slot.available;
 
@@ -155,8 +189,8 @@ export default function DateTimeSelection() {
       });
 
       // Create hours and minutes structure
-      const hours = [];
-      const processedHours = new Set();
+      const hours: HourSlot[] = [];
+      const processedHours = new Set<number>();
 
       // Process slots in order to create hour/minute structure
       for (const slot of apiSlots) {
@@ -239,7 +273,7 @@ export default function DateTimeSelection() {
 
   // Generate time slots based on business hours
   const generateTimeSlots = useCallback(
-    (date) => {
+    (date: Date) => {
       const dayOfWeek = date.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
 
       // Define business hours for each day
@@ -254,14 +288,15 @@ export default function DateTimeSelection() {
       };
 
       // Get business hours for the selected day
-      const { start: startHour, end: endHour } = businessHoursMap[dayOfWeek];
+      const { start: startHour, end: endHour } =
+        businessHoursMap[dayOfWeek as keyof typeof businessHoursMap];
 
       // Create a rest time for fallback scenario (18:00 - 19:00)
       const restStartHour = 18;
       const restEndHour = 19;
 
       // Convert to API TimeSlot format for consistency
-      const mockApiTimeSlots = [];
+      const mockApiTimeSlots: TimeSlot[] = [];
 
       // Generate time slots every hour as per API
       for (let hour = startHour; hour < endHour; hour++) {
@@ -312,7 +347,7 @@ export default function DateTimeSelection() {
       }
 
       // Create a mock business hours object
-      const mockBusinessHours = {
+      const mockBusinessHours: BusinessHours = {
         open: `${startHour}:00`,
         close: `${endHour}:00`,
         rest_time: `${restStartHour}:00 - ${restEndHour}:00`,
@@ -340,7 +375,7 @@ export default function DateTimeSelection() {
   );
 
   const fetchTimeSlots = useCallback(
-    async (date) => {
+    async (date: Date) => {
       if (!date || !mounted) return;
 
       setIsLoadingTimeSlots(true);
@@ -382,7 +417,7 @@ export default function DateTimeSelection() {
             }
 
             // For now the API doesn't return business hours, use a default one
-            const defaultHours = {
+            const defaultHours: BusinessHours = {
               open: "10:00",
               close: "23:00",
               rest_time: "18:00 - 19:00",
@@ -395,7 +430,7 @@ export default function DateTimeSelection() {
             setHourSlots(processedHours);
 
             // Convert API slots to our internal format for other calculations
-            const timeSlots = apiTimeSlots.map((slot) => ({
+            const timeSlots = apiTimeSlots.map((slot: TimeSlot) => ({
               startTime: slot.start_time,
               endTime: slot.end_time,
               available: slot.available,
@@ -449,7 +484,7 @@ export default function DateTimeSelection() {
     return { before: startOfDay(today) };
   };
 
-  const handleDateChange = (date) => {
+  const handleDateChange = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
       setShowCalendar(false);
@@ -465,7 +500,7 @@ export default function DateTimeSelection() {
     }
   };
 
-  const handleTimeSelect = (time) => {
+  const handleTimeSelect = (time: string) => {
     try {
       // Validate that time is in correct format (HH:MM) including 24:00
       const timeRegex = /^([01]?[0-9]|2[0-3]|24):[0-5][0-9]$/;
@@ -490,7 +525,10 @@ export default function DateTimeSelection() {
   };
 
   // Add function to get max duration based on selected time
-  const getMaxDuration = (selectedTime, closingHour) => {
+  const getMaxDuration = (
+    selectedTime: string | undefined,
+    closingHour: number
+  ) => {
     if (!selectedTime) return 5; // Default max duration
 
     const [hoursStr] = selectedTime.split(":");
@@ -664,10 +702,10 @@ export default function DateTimeSelection() {
                       {today && (
                         <Calendar
                           mode="single"
-                          selected={selectedDate}
+                          selected={selectedDate || undefined}
                           onSelect={handleDateChange}
                           disabled={getDisabledDays()}
-                          defaultMonth={selectedDate || today}
+                          defaultMonth={today}
                           className="rounded-md border-[#B99733]/20"
                           classNames={{
                             day_selected:
@@ -721,10 +759,10 @@ export default function DateTimeSelection() {
                     {today && (
                       <Calendar
                         mode="single"
-                        selected={selectedDate}
+                        selected={selectedDate || undefined}
                         onSelect={handleDateChange}
                         disabled={getDisabledDays()}
-                        defaultMonth={selectedDate || today}
+                        defaultMonth={today}
                         className="rounded-md border-[#B99733]/20 w-full h-full"
                         classNames={{
                           day_selected:
@@ -794,7 +832,11 @@ export default function DateTimeSelection() {
                         <p className="text-red-500 mb-4">{timeSlotError}</p>
                         <Button
                           variant="outline"
-                          onClick={() => fetchTimeSlots(selectedDate)}
+                          onClick={() => {
+                            if (selectedDate) {
+                              fetchTimeSlots(selectedDate);
+                            }
+                          }}
                           className="border-[#B99733]/20 hover:bg-[#B99733]/10"
                         >
                           Try Again

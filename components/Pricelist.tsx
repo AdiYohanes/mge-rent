@@ -142,9 +142,9 @@ const Pricelist = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1B1010] to-[#2D1B1B] text-white">
+    <div className="bg-gradient-to-b from-[#1B1010] to-[#2D1B1B] text-white">
       {/* Header */}
-      <div className="relative overflow-hidden bg-[#1B1010] py-16">
+      <div className="relative overflow-hidden bg-[#1B1010] py-16 pt-24">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <motion.div
@@ -187,7 +187,9 @@ const Pricelist = () => {
           >
             <div className="flex items-center space-x-2 mb-6">
               <FaGamepad className="text-[#B99733] text-2xl" />
-              <h3 className="text-2xl font-bold text-[#B99733]">REGULER</h3>
+              <h3 className="text-2xl font-minecraft text-[#B99733]">
+                REGULER
+              </h3>
             </div>
             <div className="space-y-4">
               {packages.map((pkg, index) => (
@@ -221,7 +223,9 @@ const Pricelist = () => {
           >
             <div className="flex items-center space-x-2 mb-6">
               <FaGamepad className="text-[#B99733] text-2xl" />
-              <h3 className="text-2xl font-bold text-[#B99733]">VIP ROOM</h3>
+              <h3 className="text-2xl font-minecraft text-[#B99733]">
+                VIP ROOM
+              </h3>
             </div>
             <div className="space-y-4">
               {vipPackages.map((pkg, index) => (
@@ -255,7 +259,9 @@ const Pricelist = () => {
           >
             <div className="flex items-center space-x-2 mb-6">
               <FaGamepad className="text-[#B99733] text-2xl" />
-              <h3 className="text-2xl font-bold text-[#B99733]">VVIP ROOM</h3>
+              <h3 className="text-2xl font-minecraft text-[#B99733]">
+                VVIP ROOM
+              </h3>
             </div>
             <div className="space-y-4">
               {vvipPackages.map((pkg, index) => (
@@ -292,23 +298,25 @@ const Pricelist = () => {
         >
           <div className="flex items-center space-x-2 mb-4">
             <FaUsers className="text-[#B99733] text-2xl" />
-            <h3 className="text-2xl font-bold text-[#B99733]">Room Capacity</h3>
+            <h3 className="text-2xl font-minecraft text-[#B99733]">
+              Room Capacity
+            </h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white/5 rounded-xl p-4">
-              <h4 className="text-lg font-semibold text-[#B99733] mb-2">
+              <h4 className="text-lg font-minecraft text-[#B99733] mb-2">
                 REGULER Room
               </h4>
               <p className="text-gray-300">4 - 6 people</p>
             </div>
             <div className="bg-white/5 rounded-xl p-4">
-              <h4 className="text-lg font-semibold text-[#B99733] mb-2">
+              <h4 className="text-lg font-minecraft text-[#B99733] mb-2">
                 VIP Room
               </h4>
               <p className="text-gray-300">4 - 6 people</p>
             </div>
             <div className="bg-white/5 rounded-xl p-4">
-              <h4 className="text-lg font-semibold text-[#B99733] mb-2">
+              <h4 className="text-lg font-minecraft text-[#B99733] mb-2">
                 VVIP Room
               </h4>
               <p className="text-gray-300">6 - 10 people</p>

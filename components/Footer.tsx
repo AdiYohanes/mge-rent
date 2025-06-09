@@ -73,7 +73,7 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col">
       <main className="grow">{/* Main content here */}</main>
 
       <footer className="bg-[#1B1010] text-white py-10">
