@@ -165,7 +165,7 @@ export default function Navbar() {
             <Link href="/faq" className={mobileNavLinkClass("/faq")}>
               FAQ
             </Link>
-            {user && (
+            {user ? (
               <div className="relative">
                 <div
                   className="block px-4 py-2 text-black hover:bg-gray-100 hover:text-[#B99733] transition-colors duration-200 cursor-pointer flex items-center"
@@ -206,6 +206,21 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
+            ) : (
+              <Link href="/signin" className="block px-4 py-2">
+                <Button
+                  variant="ghost"
+                  className="w-full bg-[#1B1010] text-white gap-2 px-4 py-2 rounded-none hover:bg-gray-900 hover:text-[#B99733] transition duration-300 cursor-pointer"
+                >
+                  <Image
+                    src="/images/button-icon.png"
+                    alt="Login Icon"
+                    width={16}
+                    height={16}
+                  />
+                  Login
+                </Button>
+              </Link>
             )}
           </div>
         )}

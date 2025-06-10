@@ -33,12 +33,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import {
-  getBookings,
-  Booking,
-  CustomerData,
-  getReceiptItemsByReceiptId,
-} from "@/api";
+import { getBookings, Booking, CustomerData } from "@/api";
+import { getReceipts, Receipt as ReceiptType } from "@/api/receipt/receiptApi";
 import ReceiptPrintView from "../receipt/ReceiptPrintView";
 import { getUserFromCookie } from "@/utils/cookieUtils";
 
@@ -73,6 +69,7 @@ export function TransactionTable() {
   const [error, setError] = useState<string | null>(null);
   const [showReceiptView, setShowReceiptView] = useState(false);
   const [receiptData, setReceiptData] = useState({});
+  const [receipts, setReceipts] = useState<ReceiptType[]>([]);
 
   // Fetch booking data from API
   useEffect(() => {
@@ -198,6 +195,20 @@ export function TransactionTable() {
 
     fetchBookings();
   }, [currentPage, itemsPerPage]);
+
+  // Fetch receipts data
+  useEffect(() => {
+    const fetchReceipts = async () => {
+      try {
+        const response = await getReceipts(1, 100); // Get first 100 receipts
+        setReceipts(response.data);
+      } catch (error) {
+        console.error("Error fetching receipts:", error);
+      }
+    };
+
+    fetchReceipts();
+  }, []);
 
   // Sort and filter data
   const filteredData = transactions
@@ -349,43 +360,39 @@ export function TransactionTable() {
 
   const handleReceiptClick = async (bookingId: string) => {
     try {
-      const receiptItems = await getReceiptItemsByReceiptId(bookingId);
+      // Find receipt that matches the booking_id
+      const matchedReceipt = receipts.find(
+        (receipt) => receipt.booking_id.toString() === bookingId
+      );
+
+      if (!matchedReceipt) {
+        console.error("No receipt found for this booking");
+        return;
+      }
+
       const user = getUserFromCookie();
       const cashierName = user?.name || user?.username || "-";
+
+      // Parse customer data from booking
+      const customerData = JSON.parse(matchedReceipt.booking.customer_data);
+
       const mapped = {
-        no_receipt: `TRX${bookingId.padStart(6, "0")}`,
-        table: "VIP 4/2",
-        date: receiptItems[0]?.created_at
-          ? new Date(receiptItems[0].created_at).toLocaleDateString("id-ID")
-          : "-",
+        no_receipt: matchedReceipt.receipt_id,
+        table: "VIP 4/2", // You might want to get this from the booking data
+        date: new Date(matchedReceipt.created_at).toLocaleDateString("id-ID"),
         cashier: cashierName,
-        items: receiptItems.map((item) => ({
+        items: matchedReceipt.items.map((item) => ({
           ...item,
           name:
             item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1),
         })),
-        subtotal: receiptItems.reduce(
-          (sum, item) => sum + parseFloat(item.price) * item.quantity,
+        subtotal: matchedReceipt.items.reduce(
+          (sum: number, item) => sum + parseFloat(item.price) * item.quantity,
           0
         ),
-        tax: Math.round(
-          receiptItems.reduce(
-            (sum, item) => sum + parseFloat(item.price) * item.quantity,
-            0
-          ) * 0.1
-        ),
-        total: Math.round(
-          receiptItems.reduce(
-            (sum, item) => sum + parseFloat(item.price) * item.quantity,
-            0
-          ) * 1.1
-        ),
-        bayar: Math.round(
-          receiptItems.reduce(
-            (sum, item) => sum + parseFloat(item.price) * item.quantity,
-            0
-          ) * 1.1
-        ),
+        tax: parseFloat(matchedReceipt.tax),
+        total: parseFloat(matchedReceipt.total_price),
+        bayar: parseFloat(matchedReceipt.total_price),
         wifi: "7314_Gaming",
         whatsapp: "081516764805",
         instagram: "MGE_medangamingecosystem",
@@ -394,11 +401,17 @@ export function TransactionTable() {
         alamat:
           "Setiabudi Square (Komplek Tasbi 1), JL Setia Budi C-3, Tj. Sari, Kec. Medan Selayang, Kota Medan, Sumatera Utara, 20132",
         toko: "Medan Gaming Ecosystem",
+        customer: {
+          name: `${customerData.firstname} ${customerData.lastname}`,
+          email: customerData.email,
+          phone: customerData.phone,
+        },
       };
+
       setReceiptData(mapped);
       setShowReceiptView(true);
     } catch (error) {
-      console.error("Error fetching receipt items:", error);
+      console.error("Error fetching receipt:", error);
     }
   };
 
@@ -408,223 +421,182 @@ export function TransactionTable() {
   };
 
   return (
-    <>
-      {showReceiptView && receiptData ? (
-        <ReceiptPrintView data={receiptData} onBack={handleBackToTable} />
-      ) : (
-        <Card className="shadow-sm border-gray-200">
-          <CardHeader className="bg-white py-4 px-6 border-b">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <h2 className="text-2xl font-bold text-gray-800">
-                List Transaction
-              </h2>
+    <div className="space-y-6">
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-white py-4 px-4 sm:px-6 border-b">
+          <div className="flex flex-col gap-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+              List Transaction
+            </h2>
 
-              <div className="flex gap-2 items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Show</span>
-                  <Select
-                    value={String(itemsPerPage)}
-                    onValueChange={(value) => {
-                      setItemsPerPage(Number(value));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-[70px]">
-                      <SelectValue placeholder={itemsPerPage.toString()} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <span className="text-sm font-medium">entries</span>
-                </div>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 items-start sm:items-center">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-sm font-medium whitespace-nowrap">
+                  Show
+                </span>
+                <Select
+                  value={String(itemsPerPage)}
+                  onValueChange={(value) => {
+                    setItemsPerPage(Number(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[70px]">
+                    <SelectValue placeholder={itemsPerPage.toString()} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm font-medium whitespace-nowrap">
+                  entries
+                </span>
+              </div>
 
-                <div className="flex items-center gap-2">
-                  <Select value={month} onValueChange={setMonth}>
-                    <SelectTrigger className="h-8 w-[110px]">
-                      <SelectValue placeholder={getMonthName(month)} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                        <SelectItem key={m} value={String(m)}>
-                          {getMonthName(String(m))}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Select value={month} onValueChange={setMonth}>
+                  <SelectTrigger className="h-8 w-full sm:w-[110px]">
+                    <SelectValue placeholder={getMonthName(month)} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {getMonthName(String(m))}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                  <Select value={year} onValueChange={setYear}>
-                    <SelectTrigger className="h-8 w-[80px]">
-                      <SelectValue placeholder={year} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from(
-                        { length: 5 },
-                        (_, i) => new Date().getFullYear() - 2 + i
-                      ).map((y) => (
-                        <SelectItem key={y} value={String(y)}>
-                          {y}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select value={year} onValueChange={setYear}>
+                  <SelectTrigger className="h-8 w-full sm:w-[80px]">
+                    <SelectValue placeholder={year} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(
+                      { length: 5 },
+                      (_, i) => new Date().getFullYear() - 2 + i
+                    ).map((y) => (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="relative w-full md:w-[200px]">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search..."
-                    className="pl-8 pr-4 h-9"
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  />
-                </div>
+              <div className="relative w-full sm:w-[200px]">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search..."
+                  className="pl-8 pr-4 h-9"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
               </div>
             </div>
-          </CardHeader>
+          </div>
+        </CardHeader>
 
-          <CardContent className="p-0">
-            <div className="overflow-x-auto" style={{ minWidth: "100%" }}>
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-10">
-                  <Loader2 className="h-10 w-10 animate-spin text-amber-500" />
-                  <p className="mt-4 text-gray-600">
-                    Loading transaction data...
-                  </p>
-                </div>
-              ) : error ? (
-                <div className="flex flex-col items-center justify-center py-10 text-red-500">
-                  <p>{error}</p>
-                  <Button
-                    onClick={() => window.location.reload()}
-                    className="mt-4 bg-amber-500 hover:bg-amber-600 text-white"
-                  >
-                    Retry
-                  </Button>
-                </div>
-              ) : (
-                <Table className="w-auto min-w-full">
-                  <TableHeader className="bg-gray-50 whitespace-nowrap">
-                    <TableRow>
-                      <TableHead className="w-[60px] min-w-[60px]">
-                        NO
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
-                        onClick={() => handleSort("transactionNumber")}
-                      >
-                        <div className="flex items-center">
-                          NO. TRANSAKSI
-                          {sortField === "transactionNumber" && (
-                            <ArrowUpDown className="ml-1 h-4 w-4" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-100 min-w-[100px]"
-                        onClick={() => handleSort("type")}
-                      >
-                        <div className="flex items-center">
-                          TYPE
-                          {sortField === "type" && (
-                            <ArrowUpDown className="ml-1 h-4 w-4" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-100 min-w-[120px]"
-                        onClick={() => handleSort("name")}
-                      >
-                        <div className="flex items-center">
-                          NAME
-                          {sortField === "name" && (
-                            <ArrowUpDown className="ml-1 h-4 w-4" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead className="min-w-[140px]">
-                        PHONE NUMBER
-                      </TableHead>
-                      <TableHead className="min-w-[150px]">DETAILS</TableHead>
-                      <TableHead className="min-w-[100px]">QUANTITY</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
-                        onClick={() => handleSort("bookingDate")}
-                      >
-                        <div className="flex items-center">
-                          TANGGAL BOOKING
-                          {sortField === "bookingDate" && (
-                            <ArrowUpDown className="ml-1 h-4 w-4" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-100 min-w-[160px]"
-                        onClick={() => handleSort("totalPayment")}
-                      >
-                        <div className="flex items-center">
-                          TOTAL PEMBAYARAN
-                          {sortField === "totalPayment" && (
-                            <ArrowUpDown className="ml-1 h-4 w-4" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead className="min-w-[160px]">
-                        METODE PEMBAYARAN
-                      </TableHead>
-                      <TableHead className="min-w-[180px]">
-                        TANGGAL PEMBAYARAN
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
-                        onClick={() => handleSort("status")}
-                      >
-                        <div className="flex items-center">
-                          STATUS
-                          {sortField === "status" && (
-                            <ArrowUpDown className="ml-1 h-4 w-4" />
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead className="min-w-[120px]">
-                        TOTAL REFUND
-                      </TableHead>
-                      <TableHead className="min-w-[80px] text-center">
-                        RECEIPT
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="whitespace-nowrap">
-                    {paginatedData.length > 0 ? (
-                      paginatedData.map((transaction, index) => (
-                        <TableRow
+        <CardContent className="p-0">
+          <div className="overflow-x-auto" style={{ minWidth: "100%" }}>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Loader2 className="h-10 w-10 animate-spin text-amber-500" />
+                <p className="mt-4 text-gray-600">
+                  Loading transaction data...
+                </p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-10 text-red-500">
+                <p>{error}</p>
+                <Button
+                  onClick={() => window.location.reload()}
+                  className="mt-4 bg-amber-500 hover:bg-amber-600 text-white"
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="block sm:hidden">
+                  {/* Mobile View */}
+                  {paginatedData.length > 0 ? (
+                    <div className="space-y-4 p-4">
+                      {paginatedData.map((transaction) => (
+                        <div
                           key={transaction.id}
-                          className="hover:bg-gray-50"
+                          className="bg-white rounded-lg border p-4 space-y-3"
                         >
-                          <TableCell>{firstIndex + index + 1}</TableCell>
-                          <TableCell className="font-medium">
-                            {transaction.transactionNumber}
-                          </TableCell>
-                          <TableCell>{transaction.type}</TableCell>
-                          <TableCell>{transaction.name}</TableCell>
-                          <TableCell>{transaction.phoneNumber}</TableCell>
-                          <TableCell>{transaction.details}</TableCell>
-                          <TableCell>{transaction.quantity}</TableCell>
-                          <TableCell>{transaction.bookingDate}</TableCell>
-                          <TableCell>{transaction.totalPayment}</TableCell>
-                          <TableCell>{transaction.paymentMethod}</TableCell>
-                          <TableCell>{transaction.paymentDate}</TableCell>
-                          <TableCell>
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <p className="font-medium text-sm">
+                                {transaction.transactionNumber}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {transaction.bookingDate}
+                              </p>
+                            </div>
                             {getStatusBadge(transaction.status)}
-                          </TableCell>
-                          <TableCell>{transaction.totalRefund}</TableCell>
-                          <TableCell className="text-center">
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Name:</span>
+                              <span>{transaction.name}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Type:</span>
+                              <span>{transaction.type}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Phone:</span>
+                              <span>{transaction.phoneNumber}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Details:</span>
+                              <span className="text-right">
+                                {transaction.details}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Quantity:</span>
+                              <span>{transaction.quantity}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">
+                                Total Payment:
+                              </span>
+                              <span className="font-medium">
+                                {transaction.totalPayment}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">
+                                Payment Method:
+                              </span>
+                              <span>{transaction.paymentMethod}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">
+                                Payment Date:
+                              </span>
+                              <span>{transaction.paymentDate}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">
+                                Total Refund:
+                              </span>
+                              <span>{transaction.totalRefund}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end pt-2">
                             <button
                               className="p-2 text-[#B99733] hover:bg-[#B99733]/10 rounded-full transition-colors duration-200"
                               title="View Receipt"
@@ -632,45 +604,190 @@ export function TransactionTable() {
                             >
                               <Receipt className="h-5 w-5" />
                             </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      No transactions found
+                    </div>
+                  )}
+                </div>
+
+                <div className="hidden sm:block">
+                  {/* Desktop View */}
+                  <Table className="w-auto min-w-full">
+                    <TableHeader className="bg-gray-50 whitespace-nowrap">
+                      <TableRow>
+                        <TableHead className="w-[60px] min-w-[60px]">
+                          NO
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
+                          onClick={() => handleSort("transactionNumber")}
+                        >
+                          <div className="flex items-center">
+                            NO. TRANSAKSI
+                            {sortField === "transactionNumber" && (
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            )}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-100 min-w-[100px]"
+                          onClick={() => handleSort("type")}
+                        >
+                          <div className="flex items-center">
+                            TYPE
+                            {sortField === "type" && (
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            )}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-100 min-w-[120px]"
+                          onClick={() => handleSort("name")}
+                        >
+                          <div className="flex items-center">
+                            NAME
+                            {sortField === "name" && (
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            )}
+                          </div>
+                        </TableHead>
+                        <TableHead className="min-w-[140px]">
+                          PHONE NUMBER
+                        </TableHead>
+                        <TableHead className="min-w-[150px]">DETAILS</TableHead>
+                        <TableHead className="min-w-[100px]">
+                          QUANTITY
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
+                          onClick={() => handleSort("bookingDate")}
+                        >
+                          <div className="flex items-center">
+                            TANGGAL BOOKING
+                            {sortField === "bookingDate" && (
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            )}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-100 min-w-[160px]"
+                          onClick={() => handleSort("totalPayment")}
+                        >
+                          <div className="flex items-center">
+                            TOTAL PEMBAYARAN
+                            {sortField === "totalPayment" && (
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            )}
+                          </div>
+                        </TableHead>
+                        <TableHead className="min-w-[160px]">
+                          METODE PEMBAYARAN
+                        </TableHead>
+                        <TableHead className="min-w-[180px]">
+                          TANGGAL PEMBAYARAN
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-100 min-w-[140px]"
+                          onClick={() => handleSort("status")}
+                        >
+                          <div className="flex items-center">
+                            STATUS
+                            {sortField === "status" && (
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            )}
+                          </div>
+                        </TableHead>
+                        <TableHead className="min-w-[120px]">
+                          TOTAL REFUND
+                        </TableHead>
+                        <TableHead className="min-w-[80px] text-center">
+                          RECEIPT
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="whitespace-nowrap">
+                      {paginatedData.length > 0 ? (
+                        paginatedData.map((transaction, index) => (
+                          <TableRow
+                            key={transaction.id}
+                            className="hover:bg-gray-50"
+                          >
+                            <TableCell>{firstIndex + index + 1}</TableCell>
+                            <TableCell className="font-medium">
+                              {transaction.transactionNumber}
+                            </TableCell>
+                            <TableCell>{transaction.type}</TableCell>
+                            <TableCell>{transaction.name}</TableCell>
+                            <TableCell>{transaction.phoneNumber}</TableCell>
+                            <TableCell>{transaction.details}</TableCell>
+                            <TableCell>{transaction.quantity}</TableCell>
+                            <TableCell>{transaction.bookingDate}</TableCell>
+                            <TableCell>{transaction.totalPayment}</TableCell>
+                            <TableCell>{transaction.paymentMethod}</TableCell>
+                            <TableCell>{transaction.paymentDate}</TableCell>
+                            <TableCell>
+                              {getStatusBadge(transaction.status)}
+                            </TableCell>
+                            <TableCell>{transaction.totalRefund}</TableCell>
+                            <TableCell className="text-center">
+                              <button
+                                className="p-2 text-[#B99733] hover:bg-[#B99733]/10 rounded-full transition-colors duration-200"
+                                title="View Receipt"
+                                onClick={() =>
+                                  handleReceiptClick(transaction.id)
+                                }
+                              >
+                                <Receipt className="h-5 w-5" />
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={14} className="text-center py-6">
+                            No transactions found
                           </TableCell>
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={14} className="text-center py-6">
-                          No transactions found
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-          </CardContent>
-
-          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">
-                Showing{" "}
-                {filteredData.length > 0
-                  ? Math.min(
-                      filteredData.length,
-                      (currentPage - 1) * itemsPerPage + 1
-                    )
-                  : 0}
-                -{Math.min(filteredData.length, currentPage * itemsPerPage)} of{" "}
-                {filteredData.length} entries
-              </span>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1">
-                {paginationButtons()}
-              </div>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
-          </CardFooter>
-        </Card>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 sm:px-6 py-4 border-t">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">
+              Showing{" "}
+              {filteredData.length > 0
+                ? Math.min(
+                    filteredData.length,
+                    (currentPage - 1) * itemsPerPage + 1
+                  )
+                : 0}
+              -{Math.min(filteredData.length, currentPage * itemsPerPage)} of{" "}
+              {filteredData.length} entries
+            </span>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">{paginationButtons()}</div>
+          )}
+        </CardFooter>
+      </Card>
+
+      {showReceiptView && receiptData && (
+        <div className="mt-6">
+          <ReceiptPrintView data={receiptData} onBack={handleBackToTable} />
+        </div>
       )}
-    </>
+    </div>
   );
 }

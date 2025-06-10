@@ -146,9 +146,9 @@ const RegisterPage = () => {
   }
 
   return (
-    <div className="w-full min-h-screen flex items-start justify-center py-1 px-4 overflow-y-auto">
-      <div className="w-full max-w-[80%] xs:max-w-[70%] sm:max-w-[350px] mt-2">
-        <div className="bg-white border border-[#1B1010] shadow-lg p-3 sm:p-4">
+    <div className="w-full flex items-start justify-center py-1 px-4">
+      <div className="w-full max-w-[80%] xs:max-w-[70%] sm:max-w-[350px] -mt-4 sm:-mt-6">
+        <div className="bg-white/95 backdrop-blur-sm border border-[#1B1010] shadow-lg p-3 sm:p-4">
           <h2 className="text-center text-sm sm:text-lg font-minecraft text-[#b99733] mb-2">
             Register
           </h2>
