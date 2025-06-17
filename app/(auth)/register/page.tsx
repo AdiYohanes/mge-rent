@@ -14,6 +14,27 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { register, RegisterRequestData, ErrorResponse } from "@/api";
 import { AxiosError } from "axios";
+import { z } from "zod";
+
+// Password validation schema
+const passwordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters long")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number")
+      .regex(
+        /[^A-Za-z0-9]/,
+        "Password must contain at least one special character"
+      ),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 const RegisterPage = () => {
   const router = useRouter();
@@ -31,6 +52,11 @@ const RegisterPage = () => {
     agreeToTerms: false,
   });
 
+  const [passwordErrors, setPasswordErrors] = useState<{
+    password?: string;
+    confirmPassword?: string;
+  }>({});
+
   // Set mounted state to true when component mounts on client
   useEffect(() => {
     setMounted(true);
@@ -42,6 +68,28 @@ const RegisterPage = () => {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+
+    // Validate passwords when either password field changes
+    if (name === "password" || name === "confirmPassword") {
+      try {
+        passwordSchema.parse({
+          password: name === "password" ? value : formData.password,
+          confirmPassword:
+            name === "confirmPassword" ? value : formData.confirmPassword,
+        });
+        setPasswordErrors({});
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          const errors: { [key: string]: string } = {};
+          error.errors.forEach((err) => {
+            if (err.path[0]) {
+              errors[err.path[0] as string] = err.message;
+            }
+          });
+          setPasswordErrors(errors);
+        }
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,9 +108,18 @@ const RegisterPage = () => {
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match.");
-      return;
+    // Validate passwords using Zod
+    try {
+      passwordSchema.parse({
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast.error(firstError.message);
+        return;
+      }
     }
 
     if (!formData.agreeToTerms) {
@@ -200,7 +257,7 @@ const RegisterPage = () => {
                 htmlFor="email"
                 className="text-[10px] sm:text-xs text-gray-700"
               >
-                Email Address*
+                Email Address
               </Label>
               <Input
                 id="email"
@@ -251,7 +308,11 @@ const RegisterPage = () => {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full px-2 py-0.5 sm:px-2 sm:py-1 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs"
+                  className={`w-full px-2 py-0.5 sm:px-2 sm:py-1 border ${
+                    passwordErrors.password
+                      ? "border-red-500"
+                      : "border-gray-300"
+                  } placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs`}
                   placeholder="Create a password"
                 />
                 <button
@@ -266,6 +327,11 @@ const RegisterPage = () => {
                   )}
                 </button>
               </div>
+              {passwordErrors.password && (
+                <p className="text-[8px] sm:text-[10px] text-red-500 mt-0.5">
+                  {passwordErrors.password}
+                </p>
+              )}
             </div>
 
             {/* Confirm Password */}
@@ -284,7 +350,11 @@ const RegisterPage = () => {
                   required
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="w-full px-2 py-0.5 sm:px-2 sm:py-1 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs"
+                  className={`w-full px-2 py-0.5 sm:px-2 sm:py-1 border ${
+                    passwordErrors.confirmPassword
+                      ? "border-red-500"
+                      : "border-gray-300"
+                  } placeholder-gray-400 text-gray-900 rounded-none text-[10px] sm:text-xs`}
                   placeholder="Confirm your password"
                 />
                 <button
@@ -299,31 +369,32 @@ const RegisterPage = () => {
                   )}
                 </button>
               </div>
+              {passwordErrors.confirmPassword && (
+                <p className="text-[8px] sm:text-[10px] text-red-500 mt-0.5">
+                  {passwordErrors.confirmPassword}
+                </p>
+              )}
             </div>
 
             {/* Terms and Conditions */}
-            <div className="flex items-start">
-              <div className="flex items-center h-3">
-                <input
-                  id="agreeToTerms"
-                  name="agreeToTerms"
-                  type="checkbox"
-                  checked={formData.agreeToTerms}
-                  onChange={handleChange}
-                  className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
-                />
-              </div>
-              <div className="ml-1.5">
-                <label
-                  htmlFor="agreeToTerms"
-                  className="text-[8px] sm:text-[10px] text-gray-700"
-                >
-                  By ticking, you agree to our{" "}
-                  <a href="/terms" className="text-[#b99733] hover:underline">
-                    Terms and Conditions
-                  </a>
-                </label>
-              </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                id="agreeToTerms"
+                name="agreeToTerms"
+                type="checkbox"
+                checked={formData.agreeToTerms}
+                onChange={handleChange}
+                className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+              />
+              <label
+                htmlFor="agreeToTerms"
+                className="text-[8px] sm:text-[10px] text-gray-700"
+              >
+                By ticking, you agree to our{" "}
+                <a href="/terms" className="text-[#b99733] hover:underline">
+                  Terms and Conditions
+                </a>
+              </label>
             </div>
 
             {/* Register Button */}
