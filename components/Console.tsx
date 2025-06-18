@@ -59,7 +59,7 @@ const Console = () => {
                 src="/images/console/ps5.png"
                 width={500}
                 height={500}
-                alt={consoles[0].model}
+                alt="empty"
                 className="object-cover w-full h-full"
               />
             </div>
@@ -70,7 +70,11 @@ const Console = () => {
                 <div key={console.id} className="flex flex-col space-y-4">
                   <div className="flex items-center space-x-4">
                     <h2 className="text-6xl font-minecraft text-[#b99733]">
-                      {console.model === "PS4" ? "Playstation 4" : console.model === "PS5" ? "Playstation 5" : console.model}
+                      {console.model === "PS4"
+                        ? "Playstation 4"
+                        : console.model === "PS5"
+                        ? "Playstation 5"
+                        : console.model}
                     </h2>
                     <Image
                       src="/images/arrow-gold.png"
